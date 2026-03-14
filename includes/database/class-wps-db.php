@@ -122,12 +122,15 @@ class WPS_Db {
     /**
      * Insertar una fila en una tabla del plugin.
      *
-     * @return int|false  El ID insertado o false en error.
+     * @return int|false  El ID insertado (o 1 si no hay auto-increment) o false en error.
      */
     public function insert( string $table_name, array $data, array $format = array() ) {
         $table  = $this->table( $table_name );
         $result = $this->wpdb->insert( $table, $data, $format ?: null );
-        return $result ? $this->wpdb->insert_id : false;
+        if ( ! $result ) {
+            return false;
+        }
+        return $this->wpdb->insert_id ?: 1;
     }
 
     /**
