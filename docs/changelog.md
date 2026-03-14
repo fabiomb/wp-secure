@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [1.0.0] — 2025-01-XX
+## [0.1.0] — 2026-03-13
 
 ### Fase 1 — Base de Datos y Estructura
 - Esquema de 9 tablas con prefijo `wps_`.
