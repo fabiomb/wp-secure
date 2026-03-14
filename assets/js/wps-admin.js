@@ -20,6 +20,7 @@
             this.initConfirmActions();
             this.initToggleForms();
             this.initAjaxActions();
+            this.initUaToggle();
 
             // Módulos por página.
             if (typeof wpsAdmin !== 'undefined') {
@@ -193,6 +194,13 @@
                 for (var i = rows.length - 1; i >= 0; i--) {
                     var r = rows[i];
                     var ipUrl = wpsAdmin.ajaxUrl.replace('admin-ajax.php', 'admin.php?page=wp-secure-traffic&ip=' + encodeURIComponent(r.ip_address));
+                    var uaShort = r.user_agent ? r.user_agent.substring(0, 80) : '';
+                    var uaNeedExpand = r.user_agent && r.user_agent.length > 80;
+                    var uaHtml = '<span class="wps-ua-short">' + self.esc(uaShort) + (uaNeedExpand ? '…' : '') + '</span>';
+                    if (uaNeedExpand) {
+                        uaHtml += '<span class="wps-ua-full">' + self.esc(r.user_agent) + '</span>';
+                        uaHtml += '<button type="button" class="wps-ua-toggle" data-collapsed="▼" data-expanded="▲">▼</button>';
+                    }
                     var tr = '<tr class="wps-traffic-new">' +
                         '<td>' + self.esc(r.created_at) + '</td>' +
                         '<td><a href="' + ipUrl + '"><code>' + self.esc(r.ip_address) + '</code></a></td>' +
@@ -201,8 +209,11 @@
                         '<td><code>' + self.esc(r.request_method) + '</code></td>' +
                         '<td title="' + self.esc(r.request_uri) + '">' + self.esc(r.request_uri.substring(0, 80)) + '</td>' +
                         '<td>' + self.esc(r.http_status) + '</td>' +
-                        '<td title="' + self.esc(r.user_agent) + '">' + self.esc(r.user_agent.substring(0, 40)) + '</td>' +
-                        '<td><a href="' + ipUrl + '" class="button button-small">' + '<span class="dashicons dashicons-visibility" style="font-size:14px;line-height:1.8;"></span></a></td>' +
+                        '<td class="wps-ua-cell">' + uaHtml + '</td>' +
+                        '<td>' +
+                            '<a href="' + ipUrl + '" class="button button-small" title="Ver detalle"><span class="dashicons dashicons-visibility" style="font-size:14px;line-height:1.8;"></span></a> ' +
+                            '<button type="button" class="button button-small wps-ajax-action" data-action="wps_block_ip" data-ip="' + self.esc(r.ip_address) + '" data-reason="Bloqueo manual desde tráfico en vivo" data-wps-confirm="¿Bloquear ' + self.esc(r.ip_address) + '?" title="Bloquear IP"><span class="dashicons dashicons-dismiss" style="font-size:14px;line-height:1.8;color:#d63638;"></span></button>' +
+                        '</td>' +
                         '</tr>';
                     $tbody.prepend(tr);
 
@@ -263,6 +274,20 @@
                     WPS.showNotice(wpsAdmin.strings.error, 'error');
                     $btn.prop('disabled', false).css('opacity', '1');
                 });
+            });
+        },
+
+        /*──────────────────────────────────────────
+         * User-Agent expand/collapse
+         *──────────────────────────────────────────*/
+
+        initUaToggle: function () {
+            $(document).on('click', '.wps-ua-toggle', function (e) {
+                e.preventDefault();
+                var $cell = $(this).closest('.wps-ua-cell');
+                $cell.toggleClass('wps-ua-expanded');
+                var isExpanded = $cell.hasClass('wps-ua-expanded');
+                $(this).text(isExpanded ? $(this).data('expanded') : $(this).data('collapsed'));
             });
         },
 

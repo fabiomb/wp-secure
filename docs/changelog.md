@@ -1,5 +1,16 @@
 # Registro de Cambios
 
+## [0.1.2] — 2026-03-14
+
+### Mejoras
+- Widget de seguridad en el dashboard principal de WordPress con estadísticas de peticiones, bloqueos, IPs únicas, eventos críticos y bloqueos activos.
+- Botón "Permanente" en la pantalla de bloqueos para convertir bloqueos temporales en permanentes.
+- Botón "Detalle IP" en la página de eventos para ver información completa de una IP (geolocalización, historial, tráfico).
+- User-Agent: se muestra más contenido (80 caracteres) con botón expandir/colapsar para valores largos en tráfico en vivo y detalle de IP.
+
+### Correcciones
+- Filtros de tráfico en vivo: corregidos métodos faltantes `esc_like()` y `prepare()` en `WPS_Db` que impedían el funcionamiento de los filtros por tipo, método e IP.
+
 ## [0.1.0] — 2026-03-13
 
 ### Fase 1 — Base de Datos y Estructura

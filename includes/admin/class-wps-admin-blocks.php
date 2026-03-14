@@ -174,6 +174,11 @@ class WPS_Admin_Blocks {
                                 ) ); ?>" class="button button-small" data-wps-confirm="<?php esc_attr_e( '¿Desbloquear esta IP?', 'wp-secure' ); ?>">
                                     <?php esc_html_e( 'Desbloquear', 'wp-secure' ); ?>
                                 </a>
+                                <?php if ( $block['expires_at'] ) : ?>
+                                    <button type="button" class="button button-small wps-ajax-action" data-action="wps_make_permanent" data-id="<?php echo esc_attr( $block['id'] ); ?>" title="<?php esc_attr_e( 'Convertir a bloqueo permanente', 'wp-secure' ); ?>">
+                                        <?php esc_html_e( 'Permanente', 'wp-secure' ); ?>
+                                    </button>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>

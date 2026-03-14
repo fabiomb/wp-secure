@@ -283,7 +283,20 @@ class WPS_Admin_Live_Traffic {
 								<td title="<?php echo esc_attr( $req['request_uri'] ); ?>"><?php echo esc_html( mb_strimwidth( $req['request_uri'], 0, 80, '…' ) ); ?></td>
 								<td><?php echo esc_html( $req['http_status'] ?? '—' ); ?></td>
 								<td><span class="wps-badge wps-badge-info"><?php echo esc_html( $req['visitor_type'] ); ?></span></td>
-								<td title="<?php echo esc_attr( $req['user_agent'] ?? '' ); ?>"><?php echo esc_html( mb_strimwidth( $req['user_agent'] ?? '—', 0, 40, '…' ) ); ?></td>
+								<td>
+									<?php
+									$ua_full = $req['user_agent'] ?? '';
+									$ua_short = mb_strimwidth( $ua_full, 0, 80, '…' );
+									$ua_needs_expand = mb_strlen( $ua_full ) > 80;
+									?>
+									<span class="wps-ua-cell<?php echo $ua_needs_expand ? '' : ''; ?>">
+										<span class="wps-ua-short"><?php echo esc_html( $ua_short ); ?></span>
+										<?php if ( $ua_needs_expand ) : ?>
+											<span class="wps-ua-full"><?php echo esc_html( $ua_full ); ?></span>
+											<button type="button" class="wps-ua-toggle" data-collapsed="▼" data-expanded="▲">▼</button>
+										<?php endif; ?>
+									</span>
+								</td>
 							</tr>
 						<?php endforeach; ?>
 						</tbody>

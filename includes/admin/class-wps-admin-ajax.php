@@ -19,6 +19,7 @@ class WPS_Admin_Ajax {
     public function init(): void {
         add_action( 'wp_ajax_wps_block_ip', array( $this, 'ajax_block_ip' ) );
         add_action( 'wp_ajax_wps_unblock_ip', array( $this, 'ajax_unblock_ip' ) );
+        add_action( 'wp_ajax_wps_make_permanent', array( $this, 'ajax_make_permanent' ) );
         add_action( 'wp_ajax_wps_whitelist_add', array( $this, 'ajax_whitelist_add' ) );
         add_action( 'wp_ajax_wps_whitelist_remove', array( $this, 'ajax_whitelist_remove' ) );
         add_action( 'wp_ajax_wps_get_dashboard_stats', array( $this, 'ajax_dashboard_stats' ) );
@@ -75,6 +76,25 @@ class WPS_Admin_Ajax {
         }
 
         wp_send_json_error( array( 'message' => __( 'No se pudo desbloquear.', 'wp-secure' ) ) );
+    }
+
+    /**
+     * Convertir bloqueo temporal en permanente via AJAX.
+     */
+    public function ajax_make_permanent(): void {
+        $this->verify_ajax();
+
+        $block_id = absint( $_POST['id'] ?? 0 );
+        if ( ! $block_id ) {
+            wp_send_json_error( array( 'message' => __( 'ID inválido.', 'wp-secure' ) ) );
+        }
+
+        $blocker = WPS_Blocker::get_instance();
+        if ( $blocker->make_permanent( $block_id ) ) {
+            wp_send_json_success( array( 'message' => __( 'Bloqueo convertido a permanente.', 'wp-secure' ) ) );
+        }
+
+        wp_send_json_error( array( 'message' => __( 'No se pudo convertir el bloqueo.', 'wp-secure' ) ) );
     }
 
     /**
@@ -348,7 +368,7 @@ class WPS_Admin_Ajax {
                 'request_method' => $row['request_method'],
                 'request_uri'    => $row['request_uri'],
                 'http_status'    => $row['http_status'] ?? '',
-                'user_agent'     => mb_strimwidth( $row['user_agent'] ?? '', 0, 60, '…' ),
+                'user_agent'     => $row['user_agent'] ?? '',
             );
         }
 

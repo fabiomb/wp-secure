@@ -36,12 +36,37 @@ class WPS_Admin {
         add_action( 'admin_init', array( $this, 'handle_settings_save' ) );
         add_action( 'admin_init', array( $this, 'handle_export' ) );
 
+        // Widget en el dashboard de WordPress.
+        add_action( 'wp_dashboard_setup', array( $this, 'register_dashboard_widget' ) );
+
         // Redirigir al wizard o dashboard después de activar.
         add_action( 'admin_init', array( $this, 'maybe_redirect_after_activation' ) );
 
         // Inicializar notificador.
         $notifier = WPS_Admin_Notifier::get_instance( $this->loader );
         $notifier->init();
+    }
+
+    /**
+     * Registrar widget en el dashboard de WordPress.
+     */
+    public function register_dashboard_widget(): void {
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        wp_add_dashboard_widget(
+            'wps_dashboard_widget',
+            __( 'WP Seguro — Resumen de Seguridad', 'wp-secure' ),
+            array( $this, 'render_dashboard_widget' )
+        );
+    }
+
+    /**
+     * Renderizar el widget del dashboard de WordPress.
+     */
+    public function render_dashboard_widget(): void {
+        $dashboard = new WPS_Admin_Dashboard( $this->loader );
+        $dashboard->render_widget();
     }
 
     /**
@@ -190,6 +215,16 @@ class WPS_Admin {
                 array(),
                 '4.4.0',
                 true
+            );
+        }
+
+        // Cargar estilos en el dashboard principal de WordPress para el widget.
+        if ( 'index.php' === $hook_suffix && current_user_can( $this->capability ) ) {
+            wp_enqueue_style(
+                'wps-admin',
+                WPS_PLUGIN_URL . 'assets/css/wps-admin.css',
+                array(),
+                WPS_VERSION
             );
         }
     }

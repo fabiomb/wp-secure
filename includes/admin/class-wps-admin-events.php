@@ -60,6 +60,13 @@ class WPS_Admin_Events {
                             <?php esc_html_e( 'Limpiar filtros', 'wp-secure' ); ?>
                         </a>
                     <?php endif; ?>
+
+                    <?php if ( $ip && WPS_Ip_Utils::is_valid_ip( $ip ) ) : ?>
+                        <a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-traffic&ip=' . urlencode( $ip ) ) ); ?>" class="button" title="<?php esc_attr_e( 'Ver detalle completo de esta IP', 'wp-secure' ); ?>">
+                            <span class="dashicons dashicons-visibility" style="font-size:16px;width:16px;height:16px;vertical-align:text-top;"></span>
+                            <?php esc_html_e( 'Detalle IP', 'wp-secure' ); ?>
+                        </a>
+                    <?php endif; ?>
                 </form>
             </div>
 
@@ -115,6 +122,9 @@ class WPS_Admin_Events {
                                                 <?php echo esc_html( $event['ip_address'] ); ?>
                                             </a>
                                         </code>
+                                        <a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-traffic&ip=' . urlencode( $event['ip_address'] ) ) ); ?>" class="button button-small" style="margin-left:4px;padding:0 4px;min-height:24px;line-height:22px;" title="<?php esc_attr_e( 'Ver detalle IP', 'wp-secure' ); ?>">
+                                            <span class="dashicons dashicons-visibility" style="font-size:14px;width:14px;height:14px;line-height:1.6;"></span>
+                                        </a>
                                     <?php else : ?>
                                         —
                                     <?php endif; ?>

@@ -195,6 +195,20 @@ class WPS_Db {
     }
 
     /**
+     * Preparar una query con placeholders.
+     */
+    public function prepare( string $query, ...$args ): string {
+        return $this->wpdb->prepare( $query, ...$args );
+    }
+
+    /**
+     * Escapar un valor para uso con LIKE.
+     */
+    public function esc_like( string $text ): string {
+        return $this->wpdb->esc_like( $text );
+    }
+
+    /**
      * Último error de la BD.
      */
     public function last_error(): string {

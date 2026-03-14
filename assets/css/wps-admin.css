@@ -503,12 +503,23 @@
 #wps-traffic-table th:nth-child(5) { width: 60px; }
 #wps-traffic-table th:nth-child(6) { width: auto; }
 #wps-traffic-table th:nth-child(7) { width: 55px; }
-#wps-traffic-table th:nth-child(8) { width: 160px; }
-#wps-traffic-table th:nth-child(9) { width: 60px; }
+#wps-traffic-table th:nth-child(8) { width: 220px; }
+#wps-traffic-table th:nth-child(9) { width: 80px; }
 
 #wps-traffic-table td {
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#wps-traffic-table td.wps-ua-cell {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+}
+
+#wps-traffic-table td:nth-child(9) {
+    overflow: visible;
     white-space: nowrap;
 }
 
@@ -635,4 +646,85 @@
     height: 14px;
     vertical-align: text-top;
     margin-right: 2px;
+}
+
+/* ─── Dashboard Widget ───────────────────────── */
+.wps-widget-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.wps-widget-stat {
+    text-align: center;
+    padding: 8px 4px;
+    background: var(--wps-gray-50);
+    border-radius: var(--wps-radius);
+}
+
+.wps-widget-stat-number {
+    display: block;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--wps-gray-900);
+    line-height: 1.3;
+}
+
+.wps-widget-stat-danger {
+    color: var(--wps-danger);
+}
+
+.wps-widget-stat-label {
+    display: block;
+    font-size: 11px;
+    color: var(--wps-gray-600);
+    margin-top: 2px;
+}
+
+.wps-widget-links {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--wps-gray-100);
+}
+
+.wps-widget-links a {
+    font-size: 12px;
+    text-decoration: none;
+}
+
+/* ─── User Agent expandable ──────────────────── */
+.wps-ua-cell {
+    position: relative;
+}
+
+.wps-ua-short {
+    display: inline;
+}
+
+.wps-ua-full {
+    display: none;
+    white-space: normal;
+    word-break: break-all;
+}
+
+.wps-ua-cell.wps-ua-expanded .wps-ua-short {
+    display: none;
+}
+
+.wps-ua-cell.wps-ua-expanded .wps-ua-full {
+    display: inline;
+}
+
+.wps-ua-toggle {
+    cursor: pointer;
+    color: var(--wps-primary);
+    font-size: 11px;
+    margin-left: 4px;
+    border: none;
+    background: none;
+    padding: 0;
+    text-decoration: underline;
 }

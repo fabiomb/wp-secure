@@ -207,6 +207,19 @@ class WPS_Blocker {
     }
 
     /**
+     * Convertir un bloqueo temporal en permanente.
+     */
+    public function make_permanent( int $id ): bool {
+        $result = $this->db->update(
+            'blocked_ips',
+            array( 'expires_at' => null ),
+            array( 'id' => $id, 'is_active' => 1 )
+        );
+
+        return $result > 0;
+    }
+
+    /**
      * Obtener bloqueos activos paginados.
      */
     public function get_active_blocks( int $page = 1, int $per_page = 20 ): array {

@@ -146,6 +146,50 @@ class WPS_Admin_Dashboard {
 	}
 
 	/**
+	 * Renderizar el widget del dashboard de WordPress.
+	 */
+	public function render_widget(): void {
+		$stats = $this->get_stats();
+		$db    = WPS_Db::get_instance();
+		$blocked_table = WPS_Db_Schema::table( 'blocked_ips' );
+		$active_blocks = (int) $db->get_var(
+			"SELECT COUNT(*) FROM {$blocked_table} WHERE is_active = 1"
+		);
+		?>
+		<div class="wps-widget">
+			<div class="wps-widget-stats">
+				<div class="wps-widget-stat">
+					<span class="wps-widget-stat-number"><?php echo esc_html( number_format_i18n( $stats['total_requests'] ) ); ?></span>
+					<span class="wps-widget-stat-label"><?php esc_html_e( 'Peticiones (24h)', 'wp-secure' ); ?></span>
+				</div>
+				<div class="wps-widget-stat">
+					<span class="wps-widget-stat-number wps-widget-stat-danger"><?php echo esc_html( number_format_i18n( $stats['blocked_requests'] ) ); ?></span>
+					<span class="wps-widget-stat-label"><?php esc_html_e( 'Bloqueadas (24h)', 'wp-secure' ); ?></span>
+				</div>
+				<div class="wps-widget-stat">
+					<span class="wps-widget-stat-number"><?php echo esc_html( number_format_i18n( $stats['unique_ips'] ) ); ?></span>
+					<span class="wps-widget-stat-label"><?php esc_html_e( 'IPs Únicas (24h)', 'wp-secure' ); ?></span>
+				</div>
+				<div class="wps-widget-stat">
+					<span class="wps-widget-stat-number <?php echo $stats['critical_events'] > 0 ? 'wps-widget-stat-danger' : ''; ?>"><?php echo esc_html( number_format_i18n( $stats['critical_events'] ) ); ?></span>
+					<span class="wps-widget-stat-label"><?php esc_html_e( 'Eventos Críticos', 'wp-secure' ); ?></span>
+				</div>
+				<div class="wps-widget-stat">
+					<span class="wps-widget-stat-number"><?php echo esc_html( number_format_i18n( $active_blocks ) ); ?></span>
+					<span class="wps-widget-stat-label"><?php esc_html_e( 'Bloqueos Activos', 'wp-secure' ); ?></span>
+				</div>
+			</div>
+			<div class="wps-widget-links">
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure' ) ); ?>"><?php esc_html_e( 'Dashboard', 'wp-secure' ); ?></a>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-traffic' ) ); ?>"><?php esc_html_e( 'Tráfico en Vivo', 'wp-secure' ); ?></a>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-events' ) ); ?>"><?php esc_html_e( 'Eventos', 'wp-secure' ); ?></a>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-blocks' ) ); ?>"><?php esc_html_e( 'Bloqueos', 'wp-secure' ); ?></a>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
 	 * Obtener estadísticas de las últimas 24 horas.
 	 */
 	private function get_stats(): array {
