@@ -1,0 +1,257 @@
+<?php
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Detector de intentos de login.
+ *
+ * Monitorea wp_login, wp_login_failed y bloquea por fuerza bruta.
+ */
+class WPS_Login_Detector {
+
+    /** @var WPS_Loader */
+    private $loader;
+
+    /** @var WPS_Db */
+    private $db;
+
+    /** @var WPS_Logger */
+    private $logger;
+
+    /** @var WPS_Blocker */
+    private $blocker;
+
+    public function __construct( WPS_Loader $loader ) {
+        $this->loader  = $loader;
+        $this->db      = WPS_Db::get_instance();
+        $this->logger  = WPS_Logger::get_instance();
+        $this->blocker = WPS_Blocker::get_instance();
+    }
+
+    /**
+     * Registrar hooks de WordPress para interceptar login.
+     */
+    public function init(): void {
+        // Interceptar antes de que WordPress procese el login.
+        add_action( 'wp_login', array( $this, 'on_login_success' ), 10, 2 );
+        add_action( 'wp_login_failed', array( $this, 'on_login_failed' ), 10, 2 );
+        add_filter( 'authenticate', array( $this, 'check_before_auth' ), 30, 3 );
+    }
+
+    /**
+     * Verificar antes de autenticar: bloquear IP si es necesario.
+     *
+     * @param WP_User|WP_Error|null $user
+     * @param string                $username
+     * @param string                $password
+     * @return WP_User|WP_Error|null
+     */
+    public function check_before_auth( $user, string $username, string $password ) {
+        if ( empty( $username ) ) {
+            return $user;
+        }
+
+        $request = WPS_Request::get_instance();
+        $ip      = $request->ip();
+
+        // Si la IP está en whitelist de login, permitir.
+        if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip, 'login' ) ) {
+            return $user;
+        }
+
+        // Si login solo whitelist está activo, bloquear IPs no listadas.
+        if ( $this->loader->get_setting( 'login_whitelist_only', false ) ) {
+            $this->logger->event_immediate( WPS_Event_Types::LOGIN_BLOCKED, array(
+                'ip_address'  => $ip,
+                'request_uri' => $request->uri(),
+                'user_agent'  => $request->user_agent(),
+                'details'     => array( 'reason' => 'login_whitelist_only', 'username' => $username ),
+            ) );
+
+            return new \WP_Error(
+                'wps_blocked',
+                __( 'Acceso denegado. Tu IP no está autorizada para iniciar sesión.', 'wp-secure' )
+            );
+        }
+
+        // Verificar si la IP ya está bloqueada.
+        $block = $this->blocker->is_blocked( $ip );
+        if ( $block ) {
+            $this->blocker->increment_hits( (int) $block['id'] );
+            return new \WP_Error(
+                'wps_blocked',
+                __( 'Tu IP ha sido bloqueada temporalmente por múltiples intentos fallidos. Intenta más tarde.', 'wp-secure' )
+            );
+        }
+
+        // Bloquear IP inmediatamente si el usuario no existe en WordPress.
+        if ( $this->loader->get_setting( 'login_block_unknown_user', true ) ) {
+            $user_exists = ( get_user_by( 'login', $username ) || get_user_by( 'email', $username ) );
+
+            if ( ! $user_exists ) {
+                $this->record_attempt( $ip, $username, false, false );
+                $this->block_for_unknown_user( $ip, $username );
+
+                return new \WP_Error(
+                    'wps_blocked',
+                    __( 'Tu IP ha sido bloqueada por intentar acceder con un usuario inexistente.', 'wp-secure' )
+                );
+            }
+        }
+
+        return $user;
+    }
+
+    /**
+     * Login exitoso.
+     *
+     * @param string  $username
+     * @param WP_User $user
+     */
+    public function on_login_success( string $username, $user ): void {
+        $request = WPS_Request::get_instance();
+        $ip      = $request->ip();
+
+        $this->record_attempt( $ip, $username, true, true );
+
+        $this->logger->event( WPS_Event_Types::LOGIN_SUCCESS, array(
+            'ip_address'  => $ip,
+            'request_uri' => $request->uri(),
+            'user_agent'  => $request->user_agent(),
+            'wp_user_id'  => $user->ID,
+            'details'     => array( 'username' => $username ),
+        ), WPS_Event_Types::SEVERITY_INFO );
+    }
+
+    /**
+     * Login fallido.
+     *
+     * @param string   $username
+     * @param WP_Error $error
+     */
+    public function on_login_failed( string $username, $error = null ): void {
+        $request = WPS_Request::get_instance();
+        $ip      = $request->ip();
+
+        // Verificar whitelist.
+        if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip, 'login' ) ) {
+            return;
+        }
+
+        $user_exists = ( get_user_by( 'login', $username ) || get_user_by( 'email', $username ) );
+        $this->record_attempt( $ip, $username, $user_exists, false );
+
+        $this->logger->event( WPS_Event_Types::LOGIN_FAILED, array(
+            'ip_address'  => $ip,
+            'request_uri' => $request->uri(),
+            'user_agent'  => $request->user_agent(),
+            'details'     => array(
+                'username'    => $username,
+                'user_exists' => $user_exists,
+            ),
+        ) );
+
+        // Evaluar si se debe bloquear.
+        $this->evaluate_block( $ip );
+    }
+
+    /**
+     * Registrar un intento de login en la tabla de intentos.
+     */
+    private function record_attempt( string $ip, string $username, bool $user_exists, bool $success ): void {
+        $this->db->insert( 'login_attempts', array(
+            'ip_address'   => $ip,
+            'username'     => substr( $username, 0, 255 ),
+            'user_exists'  => $user_exists ? 1 : 0,
+            'success'      => $success ? 1 : 0,
+            'attempted_at' => current_time( 'mysql', true ),
+        ) );
+    }
+
+    /**
+     * Bloquear IP por intento con usuario inexistente.
+     */
+    private function block_for_unknown_user( string $ip, string $username ): void {
+        $minutes = (int) $this->loader->get_setting( 'login_block_minutes', 15 );
+        $minutes = $this->calculate_escalated_duration( $ip, 'auto_login', $minutes );
+
+        $this->blocker->block_ip(
+            $ip,
+            'auto_login',
+            sprintf( 'Login con usuario inexistente: %s', substr( $username, 0, 50 ) ),
+            $minutes
+        );
+
+        $this->logger->event( WPS_Event_Types::LOGIN_BLOCKED, array(
+            'ip_address' => $ip,
+            'details'    => array(
+                'reason'   => 'unknown_user',
+                'username' => $username,
+                'duration' => $minutes . ' min',
+            ),
+        ) );
+    }
+
+    /**
+     * Evaluar si la IP debe ser bloqueada por exceder intentos fallidos.
+     */
+    private function evaluate_block( string $ip ): void {
+        $max_attempts = (int) $this->loader->get_setting( 'login_max_attempts', 5 );
+        $table        = WPS_Db_Schema::table( 'login_attempts' );
+
+        // Contar intentos fallidos en la última hora.
+        $failed_count = (int) $this->db->get_var(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "SELECT COUNT(*) FROM {$table}
+             WHERE ip_address = %s
+             AND success = 0
+             AND attempted_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
+            $ip
+        );
+
+        if ( $failed_count >= $max_attempts ) {
+            $minutes = (int) $this->loader->get_setting( 'login_block_minutes', 15 );
+            $minutes = $this->calculate_escalated_duration( $ip, 'auto_login', $minutes );
+
+            $this->blocker->block_ip(
+                $ip,
+                'auto_login',
+                sprintf( 'Excedió %d intentos de login fallidos en 1 hora', $max_attempts ),
+                $minutes
+            );
+
+            $this->logger->event( WPS_Event_Types::LOGIN_BLOCKED, array(
+                'ip_address' => $ip,
+                'details'    => array(
+                    'reason'         => 'max_attempts',
+                    'failed_count'   => $failed_count,
+                    'max_attempts'   => $max_attempts,
+                    'duration'       => $minutes . ' min',
+                ),
+            ) );
+        }
+    }
+
+    /**
+     * Calcular duración escalada basada en bloqueos previos.
+     */
+    private function calculate_escalated_duration( string $ip, string $block_type, int $base_minutes ): int {
+        $escalate_after = (int) $this->loader->get_setting( 'login_escalate_after', 3 );
+        $escalate_hours = (int) $this->loader->get_setting( 'login_escalate_hours', 24 );
+        $permanent_after = (int) $this->loader->get_setting( 'login_permanent_after', 3 );
+
+        $previous = $this->blocker->count_previous_blocks( $ip, $block_type, 48 );
+
+        // ¿Bloqueo permanente?
+        $escalated_count = max( 0, $previous - $escalate_after );
+        if ( $escalated_count >= $permanent_after ) {
+            return 0; // 0 = permanente (block_ip con null minutes).
+        }
+
+        // ¿Escalar?
+        if ( $previous >= $escalate_after ) {
+            return $escalate_hours * 60;
+        }
+
+        return $base_minutes;
+    }
+}

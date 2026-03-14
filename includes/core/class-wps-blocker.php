@@ -1,0 +1,452 @@
+<?php
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Ejecuta bloqueos: verifica si una IP está bloqueada y emite respuesta 403.
+ */
+class WPS_Blocker {
+
+    /** @var WPS_Blocker|null */
+    private static $instance = null;
+
+    /** @var WPS_Db */
+    private $db;
+
+    /** @var WPS_Loader */
+    private $loader;
+
+    private function __construct() {
+        $this->db     = WPS_Db::get_instance();
+        $this->loader = WPS_Loader::get_instance();
+    }
+
+    public static function get_instance(): self {
+        if ( null === self::$instance ) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+
+    /**
+     * Verificar si una IP está actualmente bloqueada.
+     *
+     * @return array|null Datos del bloqueo si está bloqueada, null si no.
+     */
+    public function is_blocked( string $ip ): ?array {
+        $table = WPS_Db_Schema::table( 'blocked_ips' );
+
+        // 1. Buscar por IP exacta.
+        $row = $this->db->get_row(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "SELECT * FROM {$table}
+             WHERE ip_address = %s
+             AND is_active = 1
+             AND (expires_at IS NULL OR expires_at > NOW())
+             LIMIT 1",
+            $ip
+        );
+
+        if ( $row ) {
+            return $row;
+        }
+
+        // 2. Buscar por rango binario.
+        $ip_bin = WPS_Ip_Utils::ip_to_binary( $ip );
+        if ( $ip_bin ) {
+            $row = $this->db->get_row(
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                "SELECT * FROM {$table}
+                 WHERE ip_range_start IS NOT NULL
+                 AND ip_range_end IS NOT NULL
+                 AND ip_range_start <= %s
+                 AND ip_range_end >= %s
+                 AND is_active = 1
+                 AND (expires_at IS NULL OR expires_at > NOW())
+                 LIMIT 1",
+                $ip_bin,
+                $ip_bin
+            );
+
+            if ( $row ) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Bloquear una IP individual.
+     *
+     * @param string      $ip         Dirección IP.
+     * @param string      $block_type Tipo de bloqueo (manual, auto_login, etc.).
+     * @param string      $reason     Razón del bloqueo.
+     * @param int|null    $minutes    Minutos de bloqueo temporal. Null = permanente.
+     * @return int|false  ID del bloqueo o false en error.
+     */
+    public function block_ip( string $ip, string $block_type, string $reason, ?int $minutes = null ) {
+        if ( ! WPS_Ip_Utils::is_valid_ip( $ip ) ) {
+            return false;
+        }
+
+        // Verificar que no esté en whitelist.
+        if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+            return false;
+        }
+
+        // Verificar si ya está bloqueada (activa).
+        $existing = $this->is_blocked( $ip );
+        if ( $existing ) {
+            // Incrementar hit_count.
+            $this->increment_hits( (int) $existing['id'] );
+            return (int) $existing['id'];
+        }
+
+        $data = array(
+            'ip_address' => $ip,
+            'block_type' => $block_type,
+            'reason'     => substr( $reason, 0, 500 ),
+            'blocked_at' => current_time( 'mysql', true ),
+            'is_active'  => 1,
+        );
+
+        if ( $minutes ) {
+            $data['expires_at'] = gmdate( 'Y-m-d H:i:s', time() + ( $minutes * 60 ) );
+        }
+
+        $id = $this->db->insert( 'blocked_ips', $data );
+
+        if ( $id ) {
+            $logger = WPS_Logger::get_instance();
+            $logger->event( WPS_Event_Types::IP_BLOCKED, array(
+                'ip_address' => $ip,
+                'details'    => array(
+                    'block_type' => $block_type,
+                    'reason'     => $reason,
+                    'duration'   => $minutes ? $minutes . ' min' : 'permanent',
+                ),
+            ) );
+        }
+
+        return $id;
+    }
+
+    /**
+     * Bloquear un rango CIDR.
+     */
+    public function block_cidr( string $cidr, string $block_type, string $reason, ?int $minutes = null ) {
+        if ( ! WPS_Ip_Utils::is_valid_cidr( $cidr ) ) {
+            return false;
+        }
+
+        $range = WPS_Ip_Utils::cidr_to_range( $cidr );
+        if ( ! $range ) {
+            return false;
+        }
+
+        $data = array(
+            'cidr'           => $cidr,
+            'ip_range_start' => $range['start'],
+            'ip_range_end'   => $range['end'],
+            'block_type'     => $block_type,
+            'reason'         => substr( $reason, 0, 500 ),
+            'blocked_at'     => current_time( 'mysql', true ),
+            'is_active'      => 1,
+        );
+
+        if ( $minutes ) {
+            $data['expires_at'] = gmdate( 'Y-m-d H:i:s', time() + ( $minutes * 60 ) );
+        }
+
+        return $this->db->insert( 'blocked_ips', $data );
+    }
+
+    /**
+     * Desbloquear por ID.
+     */
+    public function unblock( int $id ): bool {
+        $result = $this->db->update(
+            'blocked_ips',
+            array( 'is_active' => 0 ),
+            array( 'id' => $id )
+        );
+
+        if ( $result ) {
+            $logger = WPS_Logger::get_instance();
+            $logger->event( WPS_Event_Types::MANUAL_UNBLOCK, array(
+                'details'    => array( 'block_id' => $id ),
+                'wp_user_id' => get_current_user_id(),
+            ) );
+        }
+
+        return $result > 0;
+    }
+
+    /**
+     * Desbloquear una IP específica (todos los bloqueos activos).
+     */
+    public function unblock_ip( string $ip ): int {
+        $table = WPS_Db_Schema::table( 'blocked_ips' );
+        return $this->db->query(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "UPDATE {$table} SET is_active = 0 WHERE ip_address = %s AND is_active = 1",
+            $ip
+        );
+    }
+
+    /**
+     * Incrementar el contador de hits de un bloqueo activo.
+     */
+    public function increment_hits( int $id ): void {
+        $table = WPS_Db_Schema::table( 'blocked_ips' );
+        $this->db->query(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "UPDATE {$table} SET hit_count = hit_count + 1 WHERE id = %d",
+            $id
+        );
+    }
+
+    /**
+     * Obtener bloqueos activos paginados.
+     */
+    public function get_active_blocks( int $page = 1, int $per_page = 20 ): array {
+        $table  = WPS_Db_Schema::table( 'blocked_ips' );
+        $offset = ( $page - 1 ) * $per_page;
+
+        $total = (int) $this->db->get_var(
+            "SELECT COUNT(*) FROM {$table} WHERE is_active = 1"
+        );
+
+        $items = $this->db->get_results(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "SELECT * FROM {$table}
+             WHERE is_active = 1
+             ORDER BY blocked_at DESC
+             LIMIT %d OFFSET %d",
+            $per_page,
+            $offset
+        );
+
+        return array(
+            'items'    => $items,
+            'total'    => $total,
+            'pages'    => ceil( $total / $per_page ),
+            'page'     => $page,
+            'per_page' => $per_page,
+        );
+    }
+
+    /**
+     * Emitir respuesta de bloqueo y detener ejecución.
+     */
+    public function send_block_response( string $reason = '' ): void {
+        $code    = (int) $this->loader->get_setting( 'block_response_code', 403 );
+        $message = $this->loader->get_setting( 'block_custom_message', '' );
+
+        if ( empty( $message ) ) {
+            $message = __( 'Acceso denegado. Tu dirección IP ha sido bloqueada por motivos de seguridad.', 'wp-secure' );
+        }
+
+        http_response_code( $code );
+        header( 'Content-Type: text/html; charset=utf-8' );
+        header( 'X-WPS-Blocked: 1' );
+
+        echo '<!DOCTYPE html><html><head><title>' . $code . '</title></head><body>';
+        echo '<h1>' . esc_html( $code ) . ' — ' . esc_html( $code === 503 ? 'Service Unavailable' : 'Forbidden' ) . '</h1>';
+        echo '<p>' . esc_html( $message ) . '</p>';
+        echo '</body></html>';
+        exit;
+    }
+
+    /**
+     * Contar bloqueos temporales previos para una IP (para escalation).
+     */
+    public function count_previous_blocks( string $ip, string $block_type, int $hours = 24 ): int {
+        $table = WPS_Db_Schema::table( 'blocked_ips' );
+        return (int) $this->db->get_var(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "SELECT COUNT(*) FROM {$table}
+             WHERE ip_address = %s
+             AND block_type = %s
+             AND blocked_at > DATE_SUB(NOW(), INTERVAL %d HOUR)",
+            $ip,
+            $block_type,
+            $hours
+        );
+    }
+
+    /*──────────────────────────────────────────────
+     * Bloqueo por País
+     *──────────────────────────────────────────────*/
+
+    /**
+     * Verificar si un país está bloqueado.
+     */
+    public function is_country_blocked( string $country_code ): bool {
+        if ( empty( $country_code ) || strlen( $country_code ) !== 2 ) {
+            return false;
+        }
+
+        $table = WPS_Db_Schema::table( 'blocked_countries' );
+        $row   = $this->db->get_var(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "SELECT country_code FROM {$table} WHERE country_code = %s",
+            strtoupper( $country_code )
+        );
+
+        return null !== $row;
+    }
+
+    /**
+     * Bloquear un país.
+     */
+    public function block_country( string $country_code, string $country_name ): bool {
+        $country_code = strtoupper( $country_code );
+        if ( strlen( $country_code ) !== 2 ) {
+            return false;
+        }
+
+        // Verificar si ya está bloqueado.
+        if ( $this->is_country_blocked( $country_code ) ) {
+            return true;
+        }
+
+        $result = $this->db->insert( 'blocked_countries', array(
+            'country_code' => $country_code,
+            'country_name' => substr( $country_name, 0, 100 ),
+            'blocked_at'   => current_time( 'mysql', true ),
+            'blocked_by'   => wp_get_current_user()->user_login ?: 'system',
+        ) );
+
+        if ( $result ) {
+            $logger = WPS_Logger::get_instance();
+            $logger->event_immediate( WPS_Event_Types::COUNTRY_BLOCKED, array(
+                'details'    => array(
+                    'country_code' => $country_code,
+                    'country_name' => $country_name,
+                    'action'       => 'blocked',
+                ),
+                'wp_user_id' => get_current_user_id(),
+            ), WPS_Event_Types::SEVERITY_INFO );
+        }
+
+        return (bool) $result;
+    }
+
+    /**
+     * Desbloquear un país.
+     */
+    public function unblock_country( string $country_code ): bool {
+        $country_code = strtoupper( $country_code );
+        $result       = $this->db->delete( 'blocked_countries', array( 'country_code' => $country_code ) );
+
+        if ( $result ) {
+            $logger = WPS_Logger::get_instance();
+            $logger->event_immediate( WPS_Event_Types::MANUAL_UNBLOCK, array(
+                'details'    => array(
+                    'type'         => 'country',
+                    'country_code' => $country_code,
+                ),
+                'wp_user_id' => get_current_user_id(),
+            ), WPS_Event_Types::SEVERITY_INFO );
+        }
+
+        return $result > 0;
+    }
+
+    /**
+     * Obtener todos los países bloqueados.
+     */
+    public function get_blocked_countries(): array {
+        $table = WPS_Db_Schema::table( 'blocked_countries' );
+        return $this->db->get_results(
+            "SELECT * FROM {$table} ORDER BY country_name ASC"
+        );
+    }
+
+    /*──────────────────────────────────────────────
+     * Bloqueo por ASN
+     *──────────────────────────────────────────────*/
+
+    /**
+     * Verificar si un ASN está bloqueado.
+     */
+    public function is_asn_blocked( int $asn ): bool {
+        if ( $asn <= 0 ) {
+            return false;
+        }
+
+        $table = WPS_Db_Schema::table( 'blocked_asns' );
+        $row   = $this->db->get_var(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "SELECT asn FROM {$table} WHERE asn = %d",
+            $asn
+        );
+
+        return null !== $row;
+    }
+
+    /**
+     * Bloquear un ASN.
+     */
+    public function block_asn( int $asn, string $asn_name ): bool {
+        if ( $asn <= 0 ) {
+            return false;
+        }
+
+        if ( $this->is_asn_blocked( $asn ) ) {
+            return true;
+        }
+
+        $result = $this->db->insert( 'blocked_asns', array(
+            'asn'        => $asn,
+            'asn_name'   => substr( $asn_name, 0, 255 ),
+            'blocked_at' => current_time( 'mysql', true ),
+            'blocked_by' => wp_get_current_user()->user_login ?: 'system',
+        ) );
+
+        if ( $result ) {
+            $logger = WPS_Logger::get_instance();
+            $logger->event_immediate( WPS_Event_Types::ASN_BLOCKED, array(
+                'details'    => array(
+                    'asn'      => $asn,
+                    'asn_name' => $asn_name,
+                    'action'   => 'blocked',
+                ),
+                'wp_user_id' => get_current_user_id(),
+            ), WPS_Event_Types::SEVERITY_INFO );
+        }
+
+        return (bool) $result;
+    }
+
+    /**
+     * Desbloquear un ASN.
+     */
+    public function unblock_asn( int $asn ): bool {
+        $result = $this->db->delete( 'blocked_asns', array( 'asn' => $asn ) );
+
+        if ( $result ) {
+            $logger = WPS_Logger::get_instance();
+            $logger->event_immediate( WPS_Event_Types::MANUAL_UNBLOCK, array(
+                'details'    => array(
+                    'type' => 'asn',
+                    'asn'  => $asn,
+                ),
+                'wp_user_id' => get_current_user_id(),
+            ), WPS_Event_Types::SEVERITY_INFO );
+        }
+
+        return $result > 0;
+    }
+
+    /**
+     * Obtener todos los ASNs bloqueados.
+     */
+    public function get_blocked_asns(): array {
+        $table = WPS_Db_Schema::table( 'blocked_asns' );
+        return $this->db->get_results(
+            "SELECT * FROM {$table} ORDER BY asn_name ASC"
+        );
+    }
+}
