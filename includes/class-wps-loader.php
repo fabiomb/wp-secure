@@ -306,6 +306,7 @@ class WPS_Loader {
         $stored_version = get_option( 'wps_version', '0.0.0' );
         if ( version_compare( $stored_version, WPS_VERSION, '<' ) ) {
             WPS_Db_Migrations::run();
+            WPS_Activator::install_muplugin();
             update_option( 'wps_version', WPS_VERSION );
         }
     }
