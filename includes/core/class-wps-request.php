@@ -127,6 +127,59 @@ class WPS_Request {
     }
 
     /**
+     * Determinar si la URI corresponde a una URL de taxonomía de WordPress
+     * (tag, category, taxonomías personalizadas).
+     *
+     * Estas URLs contienen slugs que provienen de contenido publicado
+     * y pueden incluir palabras que coinciden con patrones de seguridad
+     * sin ser un ataque real.
+     */
+    public function is_wp_content_path(): bool {
+        $path = wp_parse_url( $this->uri, PHP_URL_PATH );
+        if ( ! $path ) {
+            return false;
+        }
+
+        $path = rtrim( $path, '/' );
+
+        // Bases de taxonomías por defecto.
+        $bases = array( 'tag', 'category' );
+
+        // Obtener bases personalizadas de WordPress.
+        if ( function_exists( 'get_option' ) ) {
+            $tag_base = get_option( 'tag_base' );
+            if ( $tag_base ) {
+                $bases[] = trim( $tag_base, '/' );
+            }
+            $cat_base = get_option( 'category_base' );
+            if ( $cat_base ) {
+                $bases[] = trim( $cat_base, '/' );
+            }
+        }
+
+        // Obtener taxonomías personalizadas registradas.
+        if ( function_exists( 'get_taxonomies' ) ) {
+            $custom = get_taxonomies( array( 'public' => true, '_builtin' => false ), 'objects' );
+            foreach ( $custom as $tax ) {
+                if ( ! empty( $tax->rewrite['slug'] ) ) {
+                    $bases[] = $tax->rewrite['slug'];
+                }
+            }
+        }
+
+        $bases = array_unique( $bases );
+
+        foreach ( $bases as $base ) {
+            // Coincidir: /base/slug o /base/slug/page/2, etc.
+            if ( preg_match( '#^/' . preg_quote( $base, '#' ) . '/[a-z0-9_-]+#i', $path ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Devuelve los datos de la request como array (para logging).
      */
     public function to_array(): array {

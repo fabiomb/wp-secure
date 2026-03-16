@@ -54,7 +54,8 @@ class WPS_Crawler_Verifier {
 		),
 		'facebookbot' => array(
 			'ua'      => '/facebookexternalhit|Facebot/i',
-			'domains' => array( '.facebook.com', '.fbcdn.net' ),
+			'domains' => array( '.facebook.com', '.fbcdn.net', '.fb.com', '.tfbnw.net', '.meta.com' ),
+			'asns'    => array( 32934 ),
 		),
 		'linkedinbot' => array(
 			'ua'      => '/LinkedInBot/i',
@@ -96,6 +97,11 @@ class WPS_Crawler_Verifier {
 
 		// Verificar rDNS.
 		$result = $this->verify_rdns( $ip, self::$crawlers[ $crawler_id ]['domains'] );
+
+		// Fallback: verificar por ASN si rDNS falla y el crawler tiene ASNs definidos.
+		if ( self::RESULT_SPOOFED === $result && ! empty( self::$crawlers[ $crawler_id ]['asns'] ) ) {
+			$result = $this->verify_asn( $ip, self::$crawlers[ $crawler_id ]['asns'] );
+		}
 
 		// Cachear resultado por 24 horas.
 		$this->set_cache( $ip, $result );
@@ -179,6 +185,31 @@ class WPS_Crawler_Verifier {
 	private function set_cache( string $ip, string $result ): void {
 		$key = self::$cache_prefix . md5( $ip );
 		set_transient( $key, $result, DAY_IN_SECONDS );
+	}
+
+	/**
+	 * Verificar IP mediante ASN como fallback cuando rDNS no es confiable.
+	 *
+	 * Algunos crawlers legítimos (Facebook, etc.) no siempre tienen rDNS
+	 * coherente, pero sus IPs pertenecen a ASNs conocidos y verificables.
+	 *
+	 * @param string $ip   IP a verificar.
+	 * @param array  $asns ASNs esperados del crawler.
+	 * @return string RESULT_LEGITIMATE | RESULT_SPOOFED
+	 */
+	private function verify_asn( string $ip, array $asns ): string {
+		if ( ! class_exists( 'WPS_Geo' ) ) {
+			return self::RESULT_SPOOFED;
+		}
+
+		$geo = WPS_Geo::get_instance();
+		$info = $geo->lookup( $ip );
+
+		if ( ! empty( $info['asn'] ) && in_array( (int) $info['asn'], $asns, true ) ) {
+			return self::RESULT_LEGITIMATE;
+		}
+
+		return self::RESULT_SPOOFED;
 	}
 
 	/**

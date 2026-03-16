@@ -253,7 +253,19 @@ class WPS_Blocker {
      * Emitir respuesta de bloqueo y detener ejecución.
      */
     public function send_block_response( string $reason = '' ): void {
-        $code    = (int) $this->loader->get_setting( 'block_response_code', 403 );
+        $code         = (int) $this->loader->get_setting( 'block_response_code', 403 );
+        $redirect_url = $this->loader->get_setting( 'block_redirect_url', '' );
+
+        // Si hay una URL de redirección configurada, redirigir allí.
+        if ( ! empty( $redirect_url ) ) {
+            $safe_url = esc_url( $redirect_url );
+            if ( $safe_url ) {
+                header( 'X-WPS-Blocked: 1' );
+                header( 'Location: ' . $safe_url, true, 302 );
+                exit;
+            }
+        }
+
         $message = $this->loader->get_setting( 'block_custom_message', '' );
 
         if ( empty( $message ) ) {

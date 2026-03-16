@@ -37,10 +37,12 @@ class WPS_Db_Maintenance {
         $traffic_days  = (int) $db->get_setting( 'retention_traffic_days', 30 );
         $events_days   = (int) $db->get_setting( 'retention_events_days', 90 );
         $login_days    = (int) $db->get_setting( 'retention_login_days', 7 );
+        $blocks_days   = (int) $db->get_setting( 'retention_blocks_days', 30 );
 
         $traffic_table = WPS_Db_Schema::table( 'traffic_log' );
         $events_table  = WPS_Db_Schema::table( 'security_events' );
         $login_table   = WPS_Db_Schema::table( 'login_attempts' );
+        $blocked_table = WPS_Db_Schema::table( 'blocked_ips' );
 
         // Purgar logs de tráfico.
         $db->query(
@@ -58,6 +60,15 @@ class WPS_Db_Maintenance {
         $db->query(
             "DELETE FROM {$login_table} WHERE attempted_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
             $login_days
+        );
+
+        // Purgar bloqueos temporales ya cumplidos (expirados e inactivos).
+        $db->query(
+            "DELETE FROM {$blocked_table}
+             WHERE is_active = 0
+             AND expires_at IS NOT NULL
+             AND expires_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
+            $blocks_days
         );
     }
 

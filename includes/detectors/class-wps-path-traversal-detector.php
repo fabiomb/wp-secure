@@ -113,23 +113,39 @@ class WPS_Path_Traversal_Detector {
 		$decoded_uri  = rawurldecode( rawurldecode( $uri ) );
 		$decoded_qs   = rawurldecode( rawurldecode( $query_string ) );
 
-		// Traversal en URI.
-		foreach ( self::$traversal_patterns as $pattern ) {
-			if ( preg_match( $pattern, $uri ) || preg_match( $pattern, $decoded_uri ) ) {
-				return 'traversal:' . $pattern;
+		// Omitir análisis de URI si es una ruta de contenido WP
+		// (tags, categorías, etc.) para evitar falsos positivos.
+		$is_content_path = $request->is_wp_content_path();
+
+		if ( ! $is_content_path ) {
+			// Traversal en URI.
+			foreach ( self::$traversal_patterns as $pattern ) {
+				if ( preg_match( $pattern, $uri ) || preg_match( $pattern, $decoded_uri ) ) {
+					return 'traversal:' . $pattern;
+				}
 			}
-			if ( $query_string && ( preg_match( $pattern, $query_string ) || preg_match( $pattern, $decoded_qs ) ) ) {
-				return 'traversal:' . $pattern;
+
+			// Archivos sensibles en URI.
+			foreach ( self::$sensitive_files as $pattern ) {
+				if ( preg_match( $pattern, $decoded_uri ) ) {
+					return 'sensitive_file:' . $pattern;
+				}
 			}
 		}
 
-		// Archivos sensibles en URI.
-		foreach ( self::$sensitive_files as $pattern ) {
-			if ( preg_match( $pattern, $decoded_uri ) ) {
-				return 'sensitive_file:' . $pattern;
+		// Traversal y archivos sensibles en query string (siempre analizar).
+		if ( $query_string ) {
+			foreach ( self::$traversal_patterns as $pattern ) {
+				if ( preg_match( $pattern, $query_string ) || preg_match( $pattern, $decoded_qs ) ) {
+					return 'traversal:' . $pattern;
+				}
 			}
-			if ( $decoded_qs && preg_match( $pattern, $decoded_qs ) ) {
-				return 'sensitive_file:' . $pattern;
+			if ( $decoded_qs ) {
+				foreach ( self::$sensitive_files as $pattern ) {
+					if ( preg_match( $pattern, $decoded_qs ) ) {
+						return 'sensitive_file:' . $pattern;
+					}
+				}
 			}
 		}
 
@@ -189,7 +205,10 @@ class WPS_Path_Traversal_Detector {
 	 * Manejar detección.
 	 */
 	private function handle_detection( string $ip, WPS_Request $request, string $match_info ): void {
-		$minutes = (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
+		$block_mode = $this->loader->get_setting( 'critical_block_mode', 'temporary' );
+		$minutes    = 'permanent' === $block_mode
+			? null
+			: (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
 
 		$this->logger->event_immediate( WPS_Event_Types::TRAVERSAL_DETECTED, array(
 			'ip_address'  => $ip,

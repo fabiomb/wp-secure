@@ -137,8 +137,11 @@ class WPS_Sqli_Detector {
 	private function collect_inputs( WPS_Request $request ): array {
 		$inputs = array();
 
-		// URI.
-		$inputs[] = $request->uri();
+		// URI y query string: omitir URI si es una ruta de contenido WP
+		// (tags, categorías, etc.) para evitar falsos positivos con slugs.
+		if ( ! $request->is_wp_content_path() ) {
+			$inputs[] = $request->uri();
+		}
 
 		// Query string.
 		$inputs[] = $request->query_string();
@@ -220,7 +223,10 @@ class WPS_Sqli_Detector {
 	 * Manejar una detección de SQLi.
 	 */
 	private function handle_detection( string $ip, WPS_Request $request, string $pattern ): void {
-		$minutes = (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
+		$block_mode = $this->loader->get_setting( 'critical_block_mode', 'temporary' );
+		$minutes    = 'permanent' === $block_mode
+			? null
+			: (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
 
 		$this->logger->event_immediate( WPS_Event_Types::SQLI_DETECTED, array(
 			'ip_address'  => $ip,

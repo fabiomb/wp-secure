@@ -170,14 +170,20 @@ class WPS_Scanner_Detector {
 			}
 		}
 
-		// 2. Verificar rutas de escaneo.
-		foreach ( self::$scanner_paths as $pattern ) {
-			if ( preg_match( $pattern, $uri ) ) {
-				return array(
-					'type'    => 'scanner_path',
-					'pattern' => $pattern,
-					'value'   => $uri,
-				);
+		// No analizar URIs de taxonomías de WordPress (tags, categorías, etc.)
+		// para evitar falsos positivos con slugs que coinciden con patrones.
+		$is_content_path = $request->is_wp_content_path();
+
+		// 2. Verificar rutas de escaneo (solo si no es una URL de contenido WP).
+		if ( ! $is_content_path ) {
+			foreach ( self::$scanner_paths as $pattern ) {
+				if ( preg_match( $pattern, $uri ) ) {
+					return array(
+						'type'    => 'scanner_path',
+						'pattern' => $pattern,
+						'value'   => $uri,
+					);
+				}
 			}
 		}
 
@@ -214,7 +220,10 @@ class WPS_Scanner_Detector {
 	 * Manejar detección de scanner.
 	 */
 	private function handle_detection( string $ip, WPS_Request $request, array $detection ): void {
-		$minutes = (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
+		$block_mode = $this->loader->get_setting( 'critical_block_mode', 'temporary' );
+		$minutes    = 'permanent' === $block_mode
+			? null
+			: (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
 
 		$this->logger->event_immediate( WPS_Event_Types::SCANNER_DETECTED, array(
 			'ip_address'  => $ip,
