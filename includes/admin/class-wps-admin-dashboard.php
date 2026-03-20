@@ -149,8 +149,9 @@ class WPS_Admin_Dashboard {
 	 * Renderizar el widget del dashboard de WordPress.
 	 */
 	public function render_widget(): void {
-		$stats = $this->get_stats();
-		$db    = WPS_Db::get_instance();
+		$stats  = $this->get_stats();
+		$hourly = $this->get_hourly_activity();
+		$db     = WPS_Db::get_instance();
 		$blocked_table = WPS_Db_Schema::table( 'blocked_ips' );
 		$active_blocks = (int) $db->get_var(
 			"SELECT COUNT(*) FROM {$blocked_table} WHERE is_active = 1"
@@ -179,6 +180,12 @@ class WPS_Admin_Dashboard {
 					<span class="wps-widget-stat-label"><?php esc_html_e( 'Bloqueos Activos', 'wp-secure' ); ?></span>
 				</div>
 			</div>
+
+			<!-- Gráfico de actividad 24h -->
+			<div class="wps-widget-chart">
+				<canvas id="wps-widget-chart-hourly" height="120"></canvas>
+			</div>
+
 			<div class="wps-widget-links">
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure' ) ); ?>"><?php esc_html_e( 'Dashboard', 'wp-secure' ); ?></a>
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-traffic' ) ); ?>"><?php esc_html_e( 'Tráfico en Vivo', 'wp-secure' ); ?></a>
@@ -186,6 +193,14 @@ class WPS_Admin_Dashboard {
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-blocks' ) ); ?>"><?php esc_html_e( 'Bloqueos', 'wp-secure' ); ?></a>
 			</div>
 		</div>
+
+		<script>
+		window.wpsWidgetChartData = {
+			labels: <?php echo wp_json_encode( array_column( $hourly, 'label' ) ); ?>,
+			requests: <?php echo wp_json_encode( array_map( 'intval', array_column( $hourly, 'requests' ) ) ); ?>,
+			blocks: <?php echo wp_json_encode( array_map( 'intval', array_column( $hourly, 'blocks' ) ) ); ?>
+		};
+		</script>
 		<?php
 	}
 

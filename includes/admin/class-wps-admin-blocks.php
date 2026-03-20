@@ -150,7 +150,15 @@ class WPS_Admin_Blocks {
                     <?php foreach ( $result['items'] as $block ) : ?>
                         <tr>
                             <td>
-                                <code><?php echo esc_html( $block['ip_address'] ?: $block['cidr'] ?: '—' ); ?></code>
+                                <?php
+                                $display_ip = $block['ip_address'] ?: $block['cidr'] ?: '—';
+                                if ( ! empty( $block['ip_address'] ) ) : ?>
+                                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-traffic&ip=' . urlencode( $block['ip_address'] ) ) ); ?>">
+                                        <code><?php echo esc_html( $display_ip ); ?></code>
+                                    </a>
+                                <?php else : ?>
+                                    <code><?php echo esc_html( $display_ip ); ?></code>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <span class="wps-badge wps-badge-<?php echo esc_attr( $this->type_badge( $block['block_type'] ) ); ?>">
@@ -168,6 +176,11 @@ class WPS_Admin_Blocks {
                             </td>
                             <td><?php echo esc_html( number_format_i18n( (int) $block['hit_count'] ) ); ?></td>
                             <td>
+                                <?php if ( ! empty( $block['ip_address'] ) ) : ?>
+                                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-traffic&ip=' . urlencode( $block['ip_address'] ) ) ); ?>" class="button button-small" title="<?php esc_attr_e( 'Ver detalle', 'wp-secure' ); ?>">
+                                        <span class="dashicons dashicons-visibility" style="font-size:14px;line-height:1.8;"></span>
+                                    </a>
+                                <?php endif; ?>
                                 <a href="<?php echo esc_url( wp_nonce_url(
                                     admin_url( 'admin.php?page=wp-secure-blocks&tab=ips&wps_action=unblock&block_id=' . $block['id'] ),
                                     'wps_unblock_' . $block['id']

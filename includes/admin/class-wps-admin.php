@@ -41,10 +41,6 @@ class WPS_Admin {
 
         // Redirigir al wizard o dashboard después de activar.
         add_action( 'admin_init', array( $this, 'maybe_redirect_after_activation' ) );
-
-        // Inicializar notificador.
-        $notifier = WPS_Admin_Notifier::get_instance( $this->loader );
-        $notifier->init();
     }
 
     /**
@@ -169,6 +165,42 @@ class WPS_Admin {
      * Cargar assets CSS/JS solo en páginas del plugin.
      */
     public function enqueue_assets( string $hook_suffix ): void {
+
+        // Cargar assets en el dashboard principal de WordPress para el widget.
+        if ( 'index.php' === $hook_suffix && current_user_can( $this->capability ) ) {
+            wp_enqueue_style(
+                'wps-admin',
+                WPS_PLUGIN_URL . 'assets/css/wps-admin.css',
+                array(),
+                WPS_VERSION
+            );
+
+            wp_enqueue_script(
+                'chartjs',
+                'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js',
+                array(),
+                '4.4.0',
+                true
+            );
+
+            wp_enqueue_script(
+                'wps-admin',
+                WPS_PLUGIN_URL . 'assets/js/wps-admin.js',
+                array( 'jquery', 'chartjs' ),
+                WPS_VERSION,
+                true
+            );
+
+            wp_localize_script( 'wps-admin', 'wpsAdmin', array(
+                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'nonce'   => wp_create_nonce( 'wps_admin_nonce' ),
+                'page'    => 'index.php',
+                'strings' => array(),
+            ) );
+
+            return;
+        }
+
         if ( ! $this->is_plugin_page( $hook_suffix ) ) {
             return;
         }
@@ -215,16 +247,6 @@ class WPS_Admin {
                 array(),
                 '4.4.0',
                 true
-            );
-        }
-
-        // Cargar estilos en el dashboard principal de WordPress para el widget.
-        if ( 'index.php' === $hook_suffix && current_user_can( $this->capability ) ) {
-            wp_enqueue_style(
-                'wps-admin',
-                WPS_PLUGIN_URL . 'assets/css/wps-admin.css',
-                array(),
-                WPS_VERSION
             );
         }
     }

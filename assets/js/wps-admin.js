@@ -30,6 +30,9 @@
                 if (wpsAdmin.page === 'wp-secure-traffic') {
                     this.initLiveTraffic();
                 }
+                if (wpsAdmin.page === 'index.php') {
+                    this.initWidgetChart();
+                }
             }
         },
 
@@ -113,6 +116,71 @@
                     }
                 });
             }
+        },
+
+        /*──────────────────────────────────────────
+         * Chart.js — Dashboard Widget
+         *──────────────────────────────────────────*/
+
+        initWidgetChart: function () {
+            if (typeof Chart === 'undefined' || typeof window.wpsWidgetChartData === 'undefined') {
+                return;
+            }
+
+            var data = window.wpsWidgetChartData;
+            var ctx = document.getElementById('wps-widget-chart-hourly');
+            if (!ctx) {
+                return;
+            }
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [
+                        {
+                            label: 'Peticiones',
+                            data: data.requests,
+                            borderColor: '#2271b1',
+                            backgroundColor: 'rgba(34,113,177,0.08)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 1.5
+                        },
+                        {
+                            label: 'Bloqueadas',
+                            data: data.blocks,
+                            borderColor: '#d63638',
+                            backgroundColor: 'rgba(214,54,56,0.08)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 1.5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    scales: {
+                        x: {
+                            display: true,
+                            ticks: { font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+                            grid: { display: false }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { font: { size: 9 }, precision: 0 },
+                            grid: { color: 'rgba(0,0,0,0.04)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } }
+                    }
+                }
+            });
         },
 
         /*──────────────────────────────────────────

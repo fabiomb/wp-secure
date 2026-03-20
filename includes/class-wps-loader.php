@@ -49,6 +49,13 @@ class WPS_Loader {
         add_action( 'wps_daily_maintenance', array( 'WPS_Db_Maintenance', 'daily' ) );
         add_action( 'wps_hourly_maintenance', array( 'WPS_Db_Maintenance', 'hourly' ) );
 
+        // Verificar que las tareas cron existen (auto-reparación).
+        WPS_Db_Maintenance::schedule();
+
+        // Inicializar notificador (debe estar fuera de is_admin para que funcione en cron).
+        $notifier = WPS_Admin_Notifier::get_instance( $this );
+        $notifier->init();
+
         // Performance monitor.
         $perf = WPS_Performance_Monitor::get_instance();
         $perf->init( $this );

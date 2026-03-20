@@ -131,8 +131,11 @@ class WPS_Admin_Notifier {
 	 */
 	public function send_daily_summary(): void {
 		if ( ! $this->loader->get_setting( 'notify_daily_summary', true ) ) {
+			error_log( '[WP Seguro] Resumen diario desactivado en configuración.' );
 			return;
 		}
+
+		error_log( '[WP Seguro] Generando resumen diario de seguridad...' );
 
 		$db            = WPS_Db::get_instance();
 		$traffic_table = WPS_Db_Schema::table( 'traffic_log' );
@@ -189,11 +192,20 @@ class WPS_Admin_Notifier {
 		}
 
 		if ( empty( $to ) ) {
+			error_log( '[WP Seguro] Notificación no enviada: no hay email de destino configurado.' );
 			return false;
 		}
 
 		$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
 
-		return wp_mail( $to, $subject, $body, $headers );
+		$result = wp_mail( $to, $subject, $body, $headers );
+
+		if ( $result ) {
+			error_log( sprintf( '[WP Seguro] Email enviado a %s: %s', $to, $subject ) );
+		} else {
+			error_log( sprintf( '[WP Seguro] Error al enviar email a %s: %s', $to, $subject ) );
+		}
+
+		return $result;
 	}
 }

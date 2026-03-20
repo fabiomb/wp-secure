@@ -1,5 +1,16 @@
 # Registro de Cambios
 
+## [0.1.4] — 2026-03-20
+
+### Nuevas funcionalidades
+- **Enlace de detalle de IP en bloqueos**: las IPs en la lista de bloqueos activos ahora son enlaces clicables que llevan a la vista de detalle de IP (geolocalización, historial, tráfico), con botón de visualización rápida en la columna de acciones, consistente con las vistas de tráfico en vivo y eventos.
+- **Gráfico de actividad en widget de escritorio**: el widget de WP Seguro en el dashboard de WordPress ahora incluye un gráfico de líneas con la actividad de peticiones y bloqueos de las últimas 24 horas, además de las estadísticas numéricas existentes.
+
+### Correcciones
+- **Notificaciones no se enviaban**: corregido un error crítico donde el módulo de notificaciones (`WPS_Admin_Notifier`) nunca recibía los eventos de cron (`wps_daily_maintenance`) porque su hook se registraba únicamente dentro del contexto de administración (`is_admin()`), pero WordPress cron se ejecuta fuera de dicho contexto. El registro del hook del notificador se movió al `WPS_Loader::init()` para que esté disponible siempre.
+- **Auto-reparación de tareas cron**: se agregó verificación automática de que las tareas cron (`wps_daily_maintenance`, `wps_hourly_maintenance`) estén programadas en cada carga del plugin, evitando que se pierdan si WordPress las desregistra accidentalmente.
+- **Logging de notificaciones**: se agregó registro en `error_log` para todas las operaciones de envío de email del notificador (éxito, error, configuración desactivada), facilitando el diagnóstico de problemas de entrega.
+
 ## [0.1.3] — 2026-03-16
 
 ### Nuevas funcionalidades

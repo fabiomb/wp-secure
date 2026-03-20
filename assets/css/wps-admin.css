@@ -695,6 +695,12 @@
     text-decoration: none;
 }
 
+.wps-widget-chart {
+    position: relative;
+    height: 120px;
+    margin-bottom: 12px;
+}
+
 /* ─── User Agent expandable ──────────────────── */
 .wps-ua-cell {
     position: relative;
