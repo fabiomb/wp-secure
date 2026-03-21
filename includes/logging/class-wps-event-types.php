@@ -41,6 +41,7 @@ class WPS_Event_Types {
     const MANUAL_BLOCK    = 'manual_block';
     const MANUAL_UNBLOCK  = 'manual_unblock';
     const SETTINGS_CHANGED = 'settings_changed';
+    const CUSTOM_RULE_MATCHED = 'custom_rule_matched';
 
     /** Severidades. */
     const SEVERITY_INFO     = 'info';
@@ -55,6 +56,7 @@ class WPS_Event_Types {
             self::LOGIN_SUCCESS     => self::SEVERITY_INFO,
             self::WHITELIST_BYPASS  => self::SEVERITY_INFO,
             self::SETTINGS_CHANGED  => self::SEVERITY_INFO,
+            self::CUSTOM_RULE_MATCHED => self::SEVERITY_WARNING,
             self::MANUAL_BLOCK      => self::SEVERITY_INFO,
             self::MANUAL_UNBLOCK    => self::SEVERITY_INFO,
 
@@ -110,6 +112,7 @@ class WPS_Event_Types {
             self::MANUAL_BLOCK       => __( 'Bloqueo manual', 'wp-secure' ),
             self::MANUAL_UNBLOCK     => __( 'Desbloqueo manual', 'wp-secure' ),
             self::SETTINGS_CHANGED   => __( 'Configuración cambiada', 'wp-secure' ),
+            self::CUSTOM_RULE_MATCHED => __( 'Regla personalizada', 'wp-secure' ),
             self::RISK_LOW           => __( 'Riesgo bajo', 'wp-secure' ),
             self::RISK_MEDIUM        => __( 'Riesgo medio', 'wp-secure' ),
             self::RISK_HIGH          => __( 'Riesgo alto', 'wp-secure' ),

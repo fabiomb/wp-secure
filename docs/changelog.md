@@ -1,5 +1,24 @@
 # Registro de Cambios
 
+## [0.2.0] — 2026-03-21
+
+### Nuevas funcionalidades
+- **Reglas personalizadas**: nuevo módulo que permite al administrador definir reglas manuales de detección con lógica condicional configurable. Las reglas siguen la estructura `IF (condición 1) AND/OR (condición 2) … THEN (acción)`.
+  - **Condiciones soportadas**: URI, User-Agent, IP, método HTTP, query string, referer, host, país (ISO), tipo de visitante.
+  - **Operadores**: contiene, no contiene, es igual, no es igual, empieza con, termina con, coincide con regex, está en rango CIDR.
+  - **Acciones**: bloqueo permanente, bloqueo temporal (duración configurable), agregar a whitelist, solo registrar (log).
+  - **Prioridad**: cada regla tiene un valor de prioridad que determina el orden de evaluación.
+  - **Panel de administración**: nueva página **WP Seguro → Reglas** con interfaz para crear, editar, activar/desactivar y eliminar reglas. Formulario dinámico para agregar múltiples condiciones encadenadas.
+  - **Contador de hits**: cada regla registra cuántas veces ha coincidido.
+  - **Protección ReDoS**: las expresiones regulares se ejecutan con límite de backtracking para evitar denegación de servicio.
+  - **Nuevo evento `custom_rule_matched`**: se registra en el log de eventos de seguridad cada vez que una regla personalizada coincide.
+- **Nueva tabla de base de datos `wps_custom_rules`**: almacenamiento persistente de reglas personalizadas con soporte para condiciones JSON, prioridad, estado activo/inactivo y contador de hits.
+
+### Documentación
+- Nueva guía completa de [Reglas Personalizadas](custom-rules.md) con explicación de campos, operadores, acciones, ejemplos y consideraciones de seguridad.
+- Regla R14 (Reglas Personalizadas) agregada a la [Referencia de Reglas](rules-reference.md).
+- Índice de documentación actualizado en [README](README.md).
+
 ## [0.1.4] — 2026-03-20
 
 ### Nuevas funcionalidades

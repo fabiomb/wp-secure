@@ -8,10 +8,11 @@ Plugin de seguridad para WordPress orientado a rendimiento y claridad. Detecta, 
 2. [Configuración](configuration.md)
 3. [Capas del Firewall](firewall-layers.md)
 4. [Referencia de Reglas](rules-reference.md)
-5. [Configuración de CDN/Proxy](cdn-proxy-setup.md)
-6. [Solución de Problemas](troubleshooting.md)
-7. [Preguntas Frecuentes](faq.md)
-8. [Registro de Cambios](changelog.md)
+5. [Reglas Personalizadas](custom-rules.md)
+6. [Configuración de CDN/Proxy](cdn-proxy-setup.md)
+7. [Solución de Problemas](troubleshooting.md)
+8. [Preguntas Frecuentes](faq.md)
+9. [Registro de Cambios](changelog.md)
 
 ## Inicio Rápido
 

@@ -72,6 +72,9 @@ class WPS_Loader {
         // Verificar bloqueo de IP actual en cada petición.
         $this->check_current_ip();
 
+        // Evaluar reglas personalizadas del usuario.
+        $this->check_custom_rules();
+
         // Registrar tráfico en cada petición (frontend + admin).
         $this->init_traffic_logging();
 
@@ -304,6 +307,37 @@ class WPS_Loader {
 
             $blocker->send_block_response();
         }
+    }
+
+    /**
+     * Evaluar reglas personalizadas del usuario contra la petición actual.
+     */
+    private function check_custom_rules(): void {
+        if ( defined( 'DOING_CRON' ) && DOING_CRON ) {
+            return;
+        }
+
+        $request = WPS_Request::get_instance();
+        $ip      = $request->ip();
+
+        if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+            return;
+        }
+
+        // Construir contexto geo si está disponible.
+        $context = array();
+        $api_key  = $this->get_setting( 'ipinfo_api_key', '' );
+        $has_mmdb = WPS_Ipdb_Manager::get_instance()->is_local_available();
+
+        if ( ( ! empty( $api_key ) || $has_mmdb ) && ! WPS_Ip_Utils::is_private_ip( $ip ) ) {
+            $geo_data = WPS_Geo::get_instance()->lookup( $ip );
+            if ( ! empty( $geo_data['country'] ) ) {
+                $context['country_code'] = $geo_data['country'];
+            }
+        }
+
+        $custom_rules = WPS_Custom_Rules::get_instance();
+        $custom_rules->evaluate_and_act( $request, $context );
     }
 
     /**

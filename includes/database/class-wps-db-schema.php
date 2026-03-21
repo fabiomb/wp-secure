@@ -164,6 +164,24 @@ class WPS_Db_Schema {
             KEY idx_window (window_start)
         ) {$charset};";
 
+        // ── Reglas manuales personalizadas ──
+        $table = self::table( 'custom_rules' );
+        $sql[] = "CREATE TABLE {$table} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            name varchar(255) NOT NULL,
+            description varchar(500) DEFAULT NULL,
+            conditions longtext NOT NULL,
+            action_type varchar(30) NOT NULL,
+            action_duration int(10) unsigned DEFAULT NULL,
+            is_active tinyint(1) NOT NULL DEFAULT 1,
+            priority int(10) unsigned NOT NULL DEFAULT 10,
+            hit_count bigint(20) unsigned NOT NULL DEFAULT 0,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY idx_active_priority (is_active,priority)
+        ) {$charset};";
+
         foreach ( $sql as $query ) {
             dbDelta( $query );
         }
@@ -185,6 +203,7 @@ class WPS_Db_Schema {
             'security_events',
             'login_attempts',
             'rate_limits',
+            'custom_rules',
         );
 
         foreach ( $tables as $name ) {
@@ -210,6 +229,7 @@ class WPS_Db_Schema {
             'security_events',
             'login_attempts',
             'rate_limits',
+            'custom_rules',
         );
 
         foreach ( $tables as $name ) {

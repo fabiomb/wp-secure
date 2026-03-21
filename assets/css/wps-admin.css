@@ -734,3 +734,74 @@
     padding: 0;
     text-decoration: underline;
 }
+
+/* ─── Custom Rules ───────────────────────────── */
+.wps-badge-danger {
+    background: var(--wps-danger-bg);
+    color: var(--wps-danger);
+}
+
+.wps-badge-muted {
+    background: var(--wps-gray-100);
+    color: var(--wps-gray-400);
+}
+
+.wps-condition-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    background: var(--wps-gray-50);
+    border: 1px solid var(--wps-gray-200);
+    border-radius: var(--wps-radius);
+}
+
+.wps-condition-row select {
+    max-width: 180px;
+}
+
+.wps-condition-logic {
+    width: 70px !important;
+    font-weight: 600;
+    text-align: center;
+}
+
+.wps-condition-logic-label {
+    display: inline-block;
+    width: 70px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--wps-primary);
+}
+
+.wps-condition-value {
+    flex: 1;
+    min-width: 200px;
+}
+
+.wps-remove-condition {
+    color: var(--wps-danger) !important;
+    border-color: var(--wps-danger) !important;
+    padding: 0 4px !important;
+    min-height: 30px;
+}
+
+.wps-remove-condition .dashicons {
+    font-size: 16px;
+    line-height: 1.8;
+}
+
+.wps-rules-table code {
+    font-size: 12px;
+    background: var(--wps-gray-50);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+.wps-rules-table em {
+    color: var(--wps-gray-600);
+    font-style: normal;
+    font-size: 12px;
+}

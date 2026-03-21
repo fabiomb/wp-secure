@@ -150,6 +150,16 @@ class WPS_Admin {
             array( $this, 'render_settings' )
         );
 
+        // Reglas Personalizadas.
+        $this->page_hooks[] = add_submenu_page(
+            $this->menu_slug,
+            __( 'Reglas', 'wp-secure' ),
+            __( 'Reglas', 'wp-secure' ),
+            $this->capability,
+            $this->menu_slug . '-rules',
+            array( $this, 'render_rules' )
+        );
+
         // Wizard (oculto del menú, solo accesible por URL).
         $this->page_hooks[] = add_submenu_page(
             null,
@@ -426,6 +436,17 @@ class WPS_Admin {
         }
         $ipdb = new WPS_Admin_Ipdb( $this->loader );
         $ipdb->render();
+    }
+
+    /**
+     * Reglas Personalizadas.
+     */
+    public function render_rules(): void {
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        $rules = new WPS_Admin_Custom_Rules( $this->loader );
+        $rules->render();
     }
 
 }

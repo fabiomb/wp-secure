@@ -21,6 +21,7 @@
             this.initToggleForms();
             this.initAjaxActions();
             this.initUaToggle();
+            this.initCustomRules();
 
             // Módulos por página.
             if (typeof wpsAdmin !== 'undefined') {
@@ -360,6 +361,48 @@
         },
 
         /*──────────────────────────────────────────
+         * Custom Rules — dynamic conditions
+         *──────────────────────────────────────────*/
+
+        initCustomRules: function () {
+            var $container = $('#wps-conditions-container');
+            if (!$container.length) {
+                return;
+            }
+
+            // Add condition row.
+            $('#wps-add-condition').on('click', function () {
+                var index = $container.find('.wps-condition-row').length;
+                var tmpl = $('#tmpl-wps-condition-row').html();
+                if (!tmpl) return;
+                tmpl = tmpl.replace(/\{\{data\.index\}\}/g, index);
+                $container.append(tmpl);
+            });
+
+            // Remove condition row.
+            $container.on('click', '.wps-remove-condition', function () {
+                $(this).closest('.wps-condition-row').remove();
+                // Reindex remaining rows.
+                $container.find('.wps-condition-row').each(function (i) {
+                    $(this).attr('data-index', i);
+                    $(this).find('[name]').each(function () {
+                        var name = $(this).attr('name');
+                        $(this).attr('name', name.replace(/wps_conditions\[\d+\]/, 'wps_conditions[' + i + ']'));
+                    });
+                });
+            });
+
+            // Show/hide duration field based on action type.
+            $('#wps-rule-action').on('change', function () {
+                if ($(this).val() === 'block_temporary') {
+                    $('#wps-duration-wrap').show();
+                } else {
+                    $('#wps-duration-wrap').hide();
+                }
+            });
+        },
+
+        /*──────────────────────────────────────────
          * Utilidades
          *──────────────────────────────────────────*/
 
@@ -451,6 +494,11 @@
             $('#wps-toggle-add-whitelist').on('click', function (e) {
                 e.preventDefault();
                 $('#wps-add-whitelist-form').slideToggle(200);
+            });
+
+            $('#wps-toggle-add-rule').on('click', function (e) {
+                e.preventDefault();
+                $('#wps-custom-rule-form').slideToggle(200);
             });
         }
     };

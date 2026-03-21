@@ -136,6 +136,18 @@ Bloquea peticiones con métodos HTTP peligrosos o cabeceras faltantes.
 | Detección | Métodos TRACE, TRACK, DEBUG, CONNECT. User-Agent vacío. Cabecera Host faltante. |
 | Acción | Bloqueo de la petición + log. |
 
+### R14 — Reglas Personalizadas
+
+Reglas definidas manualmente por el administrador con condiciones y acciones configurables.
+
+| Aspecto | Detalle |
+|---------|---------|
+| Severidad | Configurable |
+| Detección | Condiciones del tipo IF/AND/OR sobre campos HTTP: URI, User-Agent, IP, método, query string, referer, host, país, tipo de visitante. Operadores: contiene, igual, empieza con, termina con, regex, CIDR. |
+| Acción | Configurable: bloqueo permanente, bloqueo temporal, whitelist, o solo log. |
+
+Consulta la [documentación de Reglas Personalizadas](custom-rules.md) para más detalles.
+
 ---
 
 ## Puntuación de Riesgo
