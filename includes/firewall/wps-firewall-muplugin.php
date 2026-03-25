@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Seguro — Firewall (Capa 1)
  * Description: MU-Plugin del firewall WP Seguro. Se ejecuta antes de plugins y temas.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Author: WP Seguro
  *
  * Este archivo se instala automáticamente en wp-content/mu-plugins/.
@@ -134,7 +134,7 @@ final class WPS_Firewall_MuPlugin {
 			define( 'WPS_DATA_DIR', self::$plugin_dir . '/data/' );
 		}
 		if ( ! defined( 'WPS_VERSION' ) ) {
-			define( 'WPS_VERSION', '0.2.0' );
+			define( 'WPS_VERSION', '0.2.1' );
 		}
 
 		// Cargar clases en el orden necesario (sin autoloader para minimizar carga).

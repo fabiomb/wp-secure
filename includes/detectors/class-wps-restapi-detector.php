@@ -61,6 +61,11 @@ class WPS_Restapi_Detector {
 			return $errors;
 		}
 
+		// Eximido por regla personalizada.
+		if ( WPS_Custom_Rules::is_exempt( 'restapi' ) ) {
+			return $errors;
+		}
+
 		// Verificar namespaces permitidos.
 		$rest_route = $this->get_current_rest_route();
 		if ( $this->is_namespace_allowed( $rest_route ) ) {
@@ -90,6 +95,11 @@ class WPS_Restapi_Detector {
 		}
 
 		if ( is_user_logged_in() ) {
+			return $result;
+		}
+
+		// Eximido por regla personalizada.
+		if ( WPS_Custom_Rules::is_exempt( 'restapi' ) ) {
 			return $result;
 		}
 

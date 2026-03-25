@@ -245,6 +245,7 @@ class WPS_Admin {
                 'block_ok'       => __( 'IP bloqueada.', 'wp-secure' ),
                 'unblock_ok'     => __( 'IP desbloqueada.', 'wp-secure' ),
                 'whitelist_ok'   => __( 'IP agregada a whitelist.', 'wp-secure' ),
+                'confirm_import' => __( '¿Importar esta configuración? Los ajustes actuales serán reemplazados.', 'wp-secure' ),
             ),
         ) );
 

@@ -173,6 +173,7 @@ class WPS_Db_Schema {
             conditions longtext NOT NULL,
             action_type varchar(30) NOT NULL,
             action_duration int(10) unsigned DEFAULT NULL,
+            action_params text DEFAULT NULL,
             is_active tinyint(1) NOT NULL DEFAULT 1,
             priority int(10) unsigned NOT NULL DEFAULT 10,
             hit_count bigint(20) unsigned NOT NULL DEFAULT 0,

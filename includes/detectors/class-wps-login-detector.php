@@ -58,6 +58,11 @@ class WPS_Login_Detector {
             return $user;
         }
 
+        // Eximido por regla personalizada.
+        if ( WPS_Custom_Rules::is_exempt( 'login' ) ) {
+            return $user;
+        }
+
         // Si login solo whitelist está activo, bloquear IPs no listadas.
         if ( $this->loader->get_setting( 'login_whitelist_only', false ) ) {
             $this->logger->event_immediate( WPS_Event_Types::LOGIN_BLOCKED, array(

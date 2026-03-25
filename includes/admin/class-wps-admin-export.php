@@ -2,12 +2,118 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Exportación de logs a CSV.
+ * Exportación de logs a CSV y configuración a JSON.
  *
  * Genera archivos CSV descargables para eventos de seguridad
  * y tráfico, con filtros por rango de fechas.
+ * Permite exportar e importar la configuración completa del plugin en formato JSON.
  */
 class WPS_Admin_Export {
+
+	/**
+	 * Exportar la configuración completa del plugin como JSON.
+	 */
+	public static function export_config(): void {
+		$loader   = WPS_Loader::get_instance();
+		$settings = $loader->get_all_settings();
+
+		// Excluir datos sensibles que no deben exportarse.
+		$exclude_keys = array( 'db_version', 'wizard_completed' );
+		foreach ( $exclude_keys as $key ) {
+			unset( $settings[ $key ] );
+		}
+
+		// Obtener reglas personalizadas.
+		$rules_engine = WPS_Custom_Rules::get_instance();
+		$rules_data   = $rules_engine->get_all( 1, 1000 );
+		$rules        = array();
+		foreach ( $rules_data['items'] as $rule ) {
+			unset( $rule['id'], $rule['hit_count'], $rule['created_at'], $rule['updated_at'] );
+			$rules[] = $rule;
+		}
+
+		$export = array(
+			'plugin'    => 'wp-secure',
+			'version'   => WPS_VERSION,
+			'exported'  => gmdate( 'Y-m-d\TH:i:s\Z' ),
+			'settings'  => $settings,
+			'rules'     => $rules,
+		);
+
+		$filename = 'wp-seguro-config-' . gmdate( 'Y-m-d-His' ) . '.json';
+
+		header( 'Content-Type: application/json; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+		header( 'Pragma: no-cache' );
+		header( 'Expires: 0' );
+
+		echo wp_json_encode( $export, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+		exit;
+	}
+
+	/**
+	 * Importar configuración desde datos JSON.
+	 *
+	 * @param array $data Datos decodificados del JSON.
+	 * @return array{success: bool, message: string, imported_settings: int, imported_rules: int}
+	 */
+	public static function import_config( array $data ): array {
+		// Validar estructura.
+		if ( empty( $data['plugin'] ) || 'wp-secure' !== $data['plugin'] ) {
+			return array(
+				'success'           => false,
+				'message'           => __( 'Archivo de configuración inválido. No corresponde a WP Seguro.', 'wp-secure' ),
+				'imported_settings' => 0,
+				'imported_rules'    => 0,
+			);
+		}
+
+		$loader            = WPS_Loader::get_instance();
+		$imported_settings = 0;
+		$imported_rules    = 0;
+
+		// Importar settings.
+		if ( ! empty( $data['settings'] ) && is_array( $data['settings'] ) ) {
+			$exclude_keys = array( 'db_version', 'wizard_completed' );
+			foreach ( $data['settings'] as $key => $value ) {
+				$key = sanitize_text_field( $key );
+				if ( in_array( $key, $exclude_keys, true ) || '' === $key ) {
+					continue;
+				}
+				if ( is_string( $value ) ) {
+					$value = sanitize_text_field( $value );
+				}
+				$loader->set_setting( $key, $value );
+				$imported_settings++;
+			}
+		}
+
+		// Importar reglas personalizadas.
+		if ( ! empty( $data['rules'] ) && is_array( $data['rules'] ) ) {
+			$rules_engine = WPS_Custom_Rules::get_instance();
+			foreach ( $data['rules'] as $rule ) {
+				if ( empty( $rule['name'] ) || empty( $rule['conditions'] ) || empty( $rule['action_type'] ) ) {
+					continue;
+				}
+				$result = $rules_engine->create( $rule );
+				if ( $result ) {
+					$imported_rules++;
+				}
+			}
+		}
+
+		return array(
+			'success'           => true,
+			'message'           => sprintf(
+				__( 'Importación completada: %1$d ajustes y %2$d reglas importadas.', 'wp-secure' ),
+				$imported_settings,
+				$imported_rules
+			),
+			'imported_settings' => $imported_settings,
+			'imported_rules'    => $imported_rules,
+		);
+	}
 
 	/**
 	 * Exportar eventos de seguridad a CSV.

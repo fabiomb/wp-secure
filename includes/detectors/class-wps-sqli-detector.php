@@ -94,6 +94,11 @@ class WPS_Sqli_Detector {
 			return;
 		}
 
+		// Eximido por regla personalizada.
+		if ( WPS_Custom_Rules::is_exempt( 'sqli' ) ) {
+			return;
+		}
+
 		// Recursos estáticos no se analizan.
 		if ( 'static' === $request->visitor_type() ) {
 			return;

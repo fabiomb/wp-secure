@@ -182,6 +182,27 @@ class WPS_Admin_Custom_Rules {
 									   min="1" max="525600" style="width: 80px;" />
 								<span><?php esc_html_e( 'minutos', 'wp-secure' ); ?></span>
 							</span>
+
+							<?php
+							$detectors      = WPS_Custom_Rules::get_detector_options();
+							$current_params = array();
+							if ( $is_edit && 'exempt' === ( $rule['action_type'] ?? '' ) && ! empty( $rule['action_params'] ) ) {
+								$decoded = is_string( $rule['action_params'] ) ? json_decode( $rule['action_params'], true ) : $rule['action_params'];
+								if ( is_array( $decoded ) ) {
+									$current_params = $decoded;
+								}
+							}
+							?>
+							<div id="wps-exempt-wrap" style="<?php echo 'exempt' === ( $rule['action_type'] ?? '' ) ? '' : 'display:none;'; ?>margin-top:8px;">
+								<p class="description" style="margin-bottom:6px;"><?php esc_html_e( 'Detectores a eximir (la petición no será penalizada por estos detectores si la regla coincide):', 'wp-secure' ); ?></p>
+								<?php foreach ( $detectors as $det_key => $det_label ) : ?>
+									<label style="display:inline-block;margin-right:12px;margin-bottom:4px;">
+										<input type="checkbox" name="wps_rule_exempt_detectors[]" value="<?php echo esc_attr( $det_key ); ?>"
+											<?php checked( in_array( $det_key, $current_params, true ) ); ?> />
+										<?php echo esc_html( $det_label ); ?>
+									</label>
+								<?php endforeach; ?>
+							</div>
 						</td>
 					</tr>
 					<tr>
@@ -298,6 +319,12 @@ class WPS_Admin_Custom_Rules {
 								if ( 'block_temporary' === $rule['action_type'] && $rule['action_duration'] ) {
 									echo '<br><small>' . esc_html( $rule['action_duration'] ) . ' min</small>';
 								}
+								if ( 'exempt' === $rule['action_type'] && ! empty( $rule['action_params'] ) ) {
+									$det_list = is_string( $rule['action_params'] ) ? json_decode( $rule['action_params'], true ) : $rule['action_params'];
+									if ( is_array( $det_list ) ) {
+										echo '<br><small>' . esc_html( implode( ', ', $det_list ) ) . '</small>';
+									}
+								}
 								?>
 							</td>
 							<td><?php echo esc_html( number_format_i18n( $rule['hit_count'] ) ); ?></td>
@@ -398,6 +425,8 @@ class WPS_Admin_Custom_Rules {
 				return 'wps-badge-warning';
 			case 'whitelist':
 				return 'wps-badge-ok';
+			case 'exempt':
+				return 'wps-badge-pending';
 			case 'log_only':
 			default:
 				return 'wps-badge-info';
@@ -509,6 +538,9 @@ class WPS_Admin_Custom_Rules {
 			'conditions'      => $conditions,
 			'action_type'     => sanitize_text_field( wp_unslash( $_POST['wps_rule_action'] ?? '' ) ),
 			'action_duration' => absint( $_POST['wps_rule_duration'] ?? 15 ),
+			'action_params'   => isset( $_POST['wps_rule_exempt_detectors'] ) && is_array( $_POST['wps_rule_exempt_detectors'] )
+				? array_map( 'sanitize_key', $_POST['wps_rule_exempt_detectors'] )
+				: array(),
 			'is_active'       => ! empty( $_POST['wps_rule_active'] ),
 			'priority'        => absint( $_POST['wps_rule_priority'] ?? 10 ),
 		);

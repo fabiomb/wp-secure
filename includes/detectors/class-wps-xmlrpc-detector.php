@@ -58,6 +58,11 @@ class WPS_Xmlrpc_Detector {
             return;
         }
 
+        // Eximido por regla personalizada.
+        if ( WPS_Custom_Rules::is_exempt( 'xmlrpc' ) ) {
+            return;
+        }
+
         // Registrar evento.
         $this->logger->event_immediate( WPS_Event_Types::XMLRPC_BLOCKED, array(
             'ip_address'  => $ip,

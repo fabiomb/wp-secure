@@ -77,6 +77,37 @@ class WPS_Admin_Settings {
                     </div>
                 </div>
             </form>
+
+            <!-- Importar / Exportar Configuración -->
+            <div class="wps-section" style="margin-top:20px;">
+                <h2><span class="dashicons dashicons-download" style="vertical-align:text-bottom;"></span> <?php esc_html_e( 'Exportar / Importar Configuración', 'wp-secure' ); ?></h2>
+                <p class="description"><?php esc_html_e( 'Exporta la configuración completa del plugin (ajustes y reglas personalizadas) como archivo JSON, o importa una configuración previamente exportada.', 'wp-secure' ); ?></p>
+
+                <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;">
+                    <!-- Exportar -->
+                    <div style="flex:1;min-width:280px;">
+                        <h3><?php esc_html_e( 'Exportar', 'wp-secure' ); ?></h3>
+                        <p><?php esc_html_e( 'Descarga un archivo JSON con toda la configuración actual.', 'wp-secure' ); ?></p>
+                        <button type="button" class="button button-primary" id="wps-export-config">
+                            <span class="dashicons dashicons-download" style="vertical-align:text-top;"></span>
+                            <?php esc_html_e( 'Exportar Configuración', 'wp-secure' ); ?>
+                        </button>
+                    </div>
+
+                    <!-- Importar -->
+                    <div style="flex:1;min-width:280px;">
+                        <h3><?php esc_html_e( 'Importar', 'wp-secure' ); ?></h3>
+                        <p><?php esc_html_e( 'Sube un archivo JSON exportado previamente para restaurar la configuración.', 'wp-secure' ); ?></p>
+                        <form id="wps-import-config-form" enctype="multipart/form-data">
+                            <input type="file" name="config_file" id="wps-import-config-file" accept=".json" required />
+                            <button type="submit" class="button" id="wps-import-config-btn">
+                                <span class="dashicons dashicons-upload" style="vertical-align:text-top;"></span>
+                                <?php esc_html_e( 'Importar Configuración', 'wp-secure' ); ?>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
         <?php
     }

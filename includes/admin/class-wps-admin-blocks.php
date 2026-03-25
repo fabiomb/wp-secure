@@ -84,6 +84,10 @@ class WPS_Admin_Blocks {
         <a href="#wps-add-block-form" class="page-title-action" id="wps-toggle-add-block" style="margin: 15px 0; display: inline-block;">
             <?php esc_html_e( 'Bloquear IP', 'wp-secure' ); ?>
         </a>
+        <button type="button" class="page-title-action wps-ajax-action" data-action="wps_clean_expired_blocks" data-wps-confirm="<?php esc_attr_e( '¿Limpiar todos los bloqueos expirados?', 'wp-secure' ); ?>" style="margin: 15px 0; display: inline-block;">
+            <span class="dashicons dashicons-trash" style="vertical-align:text-top;font-size:16px;"></span>
+            <?php esc_html_e( 'Limpiar Expirados', 'wp-secure' ); ?>
+        </button>
 
         <!-- Formulario para bloqueo manual -->
         <div id="wps-add-block-form" class="wps-section" style="display:none;">
@@ -298,6 +302,9 @@ class WPS_Admin_Blocks {
     private function render_asns_tab(): void {
         $blocker      = WPS_Blocker::get_instance();
         $blocked_asns = $blocker->get_blocked_asns();
+
+        $prefill_asn      = isset( $_GET['prefill_asn'] ) ? absint( $_GET['prefill_asn'] ) : 0;
+        $prefill_asn_name = isset( $_GET['prefill_asn_name'] ) ? sanitize_text_field( wp_unslash( $_GET['prefill_asn_name'] ) ) : '';
         ?>
 
         <!-- Formulario para bloquear ASN -->
@@ -311,7 +318,7 @@ class WPS_Admin_Blocks {
                         <th><label for="wps-asn-number"><?php esc_html_e( 'Número ASN', 'wp-secure' ); ?></label></th>
                         <td>
                             <input type="number" id="wps-asn-number" name="wps_asn" class="small-text"
-                                   min="1" placeholder="15169" required />
+                                   min="1" placeholder="15169" required value="<?php echo esc_attr( $prefill_asn ?: '' ); ?>" />
                             <p class="description"><?php esc_html_e( 'Número ASN sin prefijo "AS" (ejemplo: 15169 para Google).', 'wp-secure' ); ?></p>
                         </td>
                     </tr>
@@ -319,7 +326,7 @@ class WPS_Admin_Blocks {
                         <th><label for="wps-asn-name"><?php esc_html_e( 'Nombre / Proveedor', 'wp-secure' ); ?></label></th>
                         <td>
                             <input type="text" id="wps-asn-name" name="wps_asn_name" class="regular-text"
-                                   placeholder="Google LLC" required />
+                                   placeholder="Google LLC" required value="<?php echo esc_attr( $prefill_asn_name ); ?>" />
                         </td>
                     </tr>
                 </table>

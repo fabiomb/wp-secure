@@ -255,6 +255,12 @@ class WPS_Admin_Live_Traffic {
 							<?php esc_html_e( 'Agregar a Whitelist', 'wp-secure' ); ?>
 						</button>
 					<?php endif; ?>
+					<?php if ( ! empty( $geo_data['asn'] ) ) : ?>
+						<a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-blocks&tab=asns&prefill_asn=' . absint( $geo_data['asn'] ) . '&prefill_asn_name=' . urlencode( $geo_data['asn_name'] ?? 'AS' . $geo_data['asn'] ) ) ); ?>" class="button">
+							<span class="dashicons dashicons-networking" style="vertical-align:text-top;"></span>
+							<?php echo esc_html( sprintf( __( 'Bloquear ASN AS%d', 'wp-secure' ), $geo_data['asn'] ) ); ?>
+						</a>
+					<?php endif; ?>
 				</div>
 			</div>
 

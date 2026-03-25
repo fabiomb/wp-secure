@@ -101,6 +101,11 @@ class WPS_Scanner_Detector {
 			return;
 		}
 
+		// Eximido por regla personalizada.
+		if ( WPS_Custom_Rules::is_exempt( 'scanner' ) ) {
+			return;
+		}
+
 		if ( 'static' === $request->visitor_type() ) {
 			return;
 		}

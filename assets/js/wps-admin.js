@@ -22,6 +22,7 @@
             this.initAjaxActions();
             this.initUaToggle();
             this.initCustomRules();
+            this.initExportImport();
 
             // Módulos por página.
             if (typeof wpsAdmin !== 'undefined') {
@@ -399,6 +400,71 @@
                 } else {
                     $('#wps-duration-wrap').hide();
                 }
+                if ($(this).val() === 'exempt') {
+                    $('#wps-exempt-wrap').show();
+                } else {
+                    $('#wps-exempt-wrap').hide();
+                }
+            });
+        },
+
+        /*──────────────────────────────────────────
+         * Export / Import Configuración
+         *──────────────────────────────────────────*/
+
+        initExportImport: function () {
+            // Botón de exportar configuración.
+            $('#wps-export-config').on('click', function (e) {
+                e.preventDefault();
+                // Descargar vía form submission (AJAX con descarga de archivo).
+                var url = wpsAdmin.ajaxUrl + '?action=wps_export_config&nonce=' + encodeURIComponent(wpsAdmin.nonce);
+                window.location.href = url;
+            });
+
+            // Formulario de importar configuración.
+            $('#wps-import-config-form').on('submit', function (e) {
+                e.preventDefault();
+                var $form = $(this);
+                var $btn = $('#wps-import-config-btn');
+                var fileInput = document.getElementById('wps-import-config-file');
+
+                if (!fileInput || !fileInput.files.length) {
+                    WPS.showNotice('Selecciona un archivo JSON.', 'error');
+                    return;
+                }
+
+                if (!confirm(wpsAdmin.strings.confirm_import || '¿Importar esta configuración? Los ajustes actuales serán reemplazados.')) {
+                    return;
+                }
+
+                $btn.prop('disabled', true).css('opacity', '0.6');
+
+                var formData = new FormData();
+                formData.append('action', 'wps_import_config');
+                formData.append('nonce', wpsAdmin.nonce);
+                formData.append('config_file', fileInput.files[0]);
+
+                $.ajax({
+                    url: wpsAdmin.ajaxUrl,
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function (response) {
+                        if (response.success) {
+                            WPS.showNotice(response.data.message, 'success');
+                            setTimeout(function () { location.reload(); }, 2000);
+                        } else {
+                            var msg = (response.data && response.data.message) || 'Error al importar.';
+                            WPS.showNotice(msg, 'error');
+                            $btn.prop('disabled', false).css('opacity', '1');
+                        }
+                    },
+                    error: function () {
+                        WPS.showNotice('Error de conexión.', 'error');
+                        $btn.prop('disabled', false).css('opacity', '1');
+                    }
+                });
             });
         },
 

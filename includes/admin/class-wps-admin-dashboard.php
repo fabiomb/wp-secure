@@ -57,6 +57,11 @@ class WPS_Admin_Dashboard {
 					'dashicons-warning',
 					$stats['critical_events'] > 0 ? 'wps-card-danger' : ''
 				); ?>
+				<?php $this->render_stat_card(
+					__( 'Bloqueos Totales', 'wp-secure' ),
+					$stats['total_blocks'],
+					'dashicons-lock'
+				); ?>
 			</div>
 
 			<!-- Gráficas -->
@@ -233,11 +238,14 @@ class WPS_Admin_Dashboard {
 			 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) AND severity = 'critical'"
 		);
 
+		$total_blocks = WPS_Blocker::get_instance()->count_total_blocks();
+
 		return array(
 			'total_requests'   => $total_requests,
 			'unique_ips'       => $unique_ips,
 			'blocked_requests' => $blocked_requests,
 			'critical_events'  => $critical_events,
+			'total_blocks'     => $total_blocks,
 		);
 	}
 

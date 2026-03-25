@@ -1,5 +1,26 @@
 # Registro de Cambios
 
+## [0.2.1] — 2026-03-25
+
+### Nuevas funcionalidades
+- **Contador de bloqueos totales**: nueva tarjeta en el Dashboard que muestra el número total de bloqueos registrados (histórico completo), complementando las estadísticas de 24 horas existentes.
+- **Exportar configuración JSON**: desde la página de Configuración se puede exportar toda la configuración del plugin (ajustes y reglas personalizadas) como archivo JSON descargable.
+- **Importar configuración JSON**: permite restaurar una configuración previamente exportada subiendo el archivo JSON. Los ajustes se aplican y las reglas personalizadas se crean.
+- **Limpiar bloqueos expirados**: nuevo botón "Limpiar Expirados" en la pantalla de Bloqueos (tab IPs) que desactiva todos los bloqueos temporales que ya expiraron, con un solo clic.
+- **Bloquear ASN desde detalle de IP**: en la vista de detalle de IP (`admin.php?page=wp-secure-traffic&ip=`) se agrega un botón para bloquear el ASN del proveedor de esa IP, que redirige a la pestaña de ASN con los datos precargados.
+- **Acción "Eximir de detección" en reglas personalizadas**: nueva acción `exempt` que permite crear reglas que eximan peticiones específicas de uno o más detectores del firewall (REST API, SQLi, XSS, Path Traversal, Scanner, Login, XML-RPC). Útil para evitar falsos positivos en endpoints legítimos.
+  - Las reglas `exempt` se procesan antes que las demás reglas para registrar las eximiciones.
+  - Cada detector verifica si hay una eximición activa antes de aplicar su detección.
+  - Selector de detectores con checkboxes en el formulario de reglas.
+  - Nueva columna `action_params` en la tabla `wps_custom_rules` para almacenar los parámetros de la acción.
+
+### Mejoras
+- El formulario de bloqueo de ASN acepta datos precargados vía parámetros URL (`prefill_asn`, `prefill_asn_name`).
+- Los strings localizados del panel incluyen la cadena de confirmación de importación.
+
+### Documentación
+- Documentados todos los cambios de la versión 0.2.1 en el changelog.
+
 ## [0.2.0] — 2026-03-21
 
 ### Nuevas funcionalidades

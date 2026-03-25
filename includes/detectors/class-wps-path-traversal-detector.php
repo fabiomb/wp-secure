@@ -91,6 +91,11 @@ class WPS_Path_Traversal_Detector {
 			return;
 		}
 
+		// Eximido por regla personalizada.
+		if ( WPS_Custom_Rules::is_exempt( 'traversal' ) ) {
+			return;
+		}
+
 		if ( 'static' === $request->visitor_type() ) {
 			return;
 		}

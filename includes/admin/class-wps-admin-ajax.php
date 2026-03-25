@@ -32,6 +32,9 @@ class WPS_Admin_Ajax {
         add_action( 'wp_ajax_wps_get_live_traffic', array( $this, 'ajax_get_live_traffic' ) );
         add_action( 'wp_ajax_wps_export_events', array( $this, 'ajax_export_events' ) );
         add_action( 'wp_ajax_wps_export_traffic', array( $this, 'ajax_export_traffic' ) );
+        add_action( 'wp_ajax_wps_export_config', array( $this, 'ajax_export_config' ) );
+        add_action( 'wp_ajax_wps_import_config', array( $this, 'ajax_import_config' ) );
+        add_action( 'wp_ajax_wps_clean_expired_blocks', array( $this, 'ajax_clean_expired_blocks' ) );
     }
 
     /**
@@ -404,6 +407,77 @@ class WPS_Admin_Ajax {
         $visitor_type = sanitize_text_field( wp_unslash( $_POST['visitor_type'] ?? '' ) );
 
         WPS_Admin_Export::export_traffic( $date_from, $date_to, $visitor_type );
+    }
+
+    /**
+     * Exportar configuración como JSON.
+     */
+    public function ajax_export_config(): void {
+        // Verificar nonce desde GET (descarga directa).
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['nonce'] ?? $_POST['nonce'] ?? '' ) ), 'wps_admin_nonce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Nonce inválido.', 'wp-secure' ) ), 403 );
+        }
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Sin permisos.', 'wp-secure' ) ), 403 );
+        }
+
+        WPS_Admin_Export::export_config();
+    }
+
+    /**
+     * Importar configuración desde JSON.
+     */
+    public function ajax_import_config(): void {
+        $this->verify_ajax();
+
+        if ( empty( $_FILES['config_file'] ) ) {
+            wp_send_json_error( array( 'message' => __( 'No se recibió ningún archivo.', 'wp-secure' ) ) );
+        }
+
+        $file = $_FILES['config_file'];
+
+        if ( $file['error'] !== UPLOAD_ERR_OK ) {
+            wp_send_json_error( array( 'message' => __( 'Error al subir el archivo.', 'wp-secure' ) ) );
+        }
+
+        // Validar tipo y tamaño (max 1MB).
+        if ( $file['size'] > 1048576 ) {
+            wp_send_json_error( array( 'message' => __( 'El archivo es demasiado grande. Máximo 1 MB.', 'wp-secure' ) ) );
+        }
+
+        $content = file_get_contents( $file['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+        $data    = json_decode( $content, true );
+
+        if ( ! is_array( $data ) ) {
+            wp_send_json_error( array( 'message' => __( 'El archivo no contiene JSON válido.', 'wp-secure' ) ) );
+        }
+
+        $result = WPS_Admin_Export::import_config( $data );
+
+        if ( $result['success'] ) {
+            wp_send_json_success( array( 'message' => $result['message'] ) );
+        }
+
+        wp_send_json_error( array( 'message' => $result['message'] ) );
+    }
+
+    /**
+     * Limpiar bloqueos expirados via AJAX.
+     */
+    public function ajax_clean_expired_blocks(): void {
+        $this->verify_ajax();
+
+        $blocker = WPS_Blocker::get_instance();
+        $cleaned = $blocker->clean_expired_blocks();
+
+        wp_send_json_success( array(
+            'message' => sprintf(
+                /* translators: %d: number of cleaned blocks */
+                __( 'Se limpiaron %d bloqueos expirados.', 'wp-secure' ),
+                $cleaned
+            ),
+            'cleaned' => $cleaned,
+        ) );
     }
 
     /**

@@ -37,6 +37,9 @@ class WPS_Custom_Rules {
 	/** @var array|null Cache de reglas activas. */
 	private $rules_cache = null;
 
+	/** @var array Detectores eximidos para la petición actual. */
+	private static $exemptions = array();
+
 	private function __construct() {
 		$this->db = WPS_Db::get_instance();
 	}
@@ -78,6 +81,7 @@ class WPS_Custom_Rules {
 			'conditions'      => wp_json_encode( $validated['conditions'] ),
 			'action_type'     => $validated['action_type'],
 			'action_duration' => $validated['action_duration'],
+			'action_params'   => $validated['action_params'],
 			'is_active'       => $validated['is_active'] ? 1 : 0,
 			'priority'        => $validated['priority'],
 		) );
@@ -106,6 +110,7 @@ class WPS_Custom_Rules {
 				'conditions'      => wp_json_encode( $validated['conditions'] ),
 				'action_type'     => $validated['action_type'],
 				'action_duration' => $validated['action_duration'],
+				'action_params'   => $validated['action_params'],
 				'is_active'       => $validated['is_active'] ? 1 : 0,
 				'priority'        => $validated['priority'],
 			),
@@ -245,67 +250,150 @@ class WPS_Custom_Rules {
 	/**
 	 * Evaluar una petición y ejecutar la acción de la primera regla que coincida.
 	 *
+	 * Las reglas con acción `exempt` se procesan primero para registrar eximiciones
+	 * de detectores. Luego se evalúan las demás reglas en orden de prioridad.
+	 *
 	 * @param WPS_Request $request Petición HTTP actual.
 	 * @param array       $context Contexto adicional.
 	 */
 	public function evaluate_and_act( WPS_Request $request, array $context = array() ): void {
-		$matched = $this->evaluate( $request, $context );
-		if ( ! $matched ) {
+		$rules  = $this->get_active_rules();
+		$logger = WPS_Logger::get_instance();
+		$ip     = $request->ip();
+
+		// Fase 1: Recolectar eximiciones (reglas 'exempt' que coincidan).
+		foreach ( $rules as $rule ) {
+			if ( 'exempt' !== $rule['action_type'] ) {
+				continue;
+			}
+			if ( $this->matches_rule( $rule, $request, $context ) ) {
+				$this->increment_hits( (int) $rule['id'] );
+				$this->register_exemption( $rule );
+
+				$logger->event_immediate( WPS_Event_Types::CUSTOM_RULE_MATCHED, array(
+					'ip_address'  => $ip,
+					'request_uri' => $request->uri(),
+					'user_agent'  => $request->user_agent(),
+					'details'     => array(
+						'rule_id'     => $rule['id'],
+						'rule_name'   => $rule['name'],
+						'action_type' => 'exempt',
+						'exempt_detectors' => $rule['action_params'] ?? '',
+					),
+				) );
+			}
+		}
+
+		// Fase 2: Evaluar reglas de acción (no-exempt) en orden de prioridad.
+		foreach ( $rules as $rule ) {
+			if ( 'exempt' === $rule['action_type'] ) {
+				continue;
+			}
+			if ( ! $this->matches_rule( $rule, $request, $context ) ) {
+				continue;
+			}
+
+			$this->increment_hits( (int) $rule['id'] );
+
+			$logger->event_immediate( WPS_Event_Types::CUSTOM_RULE_MATCHED, array(
+				'ip_address'  => $ip,
+				'request_uri' => $request->uri(),
+				'user_agent'  => $request->user_agent(),
+				'details'     => array(
+					'rule_id'     => $rule['id'],
+					'rule_name'   => $rule['name'],
+					'action_type' => $rule['action_type'],
+				),
+			) );
+
+			switch ( $rule['action_type'] ) {
+				case 'block_permanent':
+					$blocker = WPS_Blocker::get_instance();
+					$blocker->block_ip(
+						$ip,
+						'custom_rule',
+						sprintf( 'Regla personalizada: %s', $rule['name'] ),
+						null
+					);
+					$blocker->send_block_response();
+					break;
+
+				case 'block_temporary':
+					$minutes = max( 1, (int) $rule['action_duration'] );
+					$blocker = WPS_Blocker::get_instance();
+					$blocker->block_ip(
+						$ip,
+						'custom_rule',
+						sprintf( 'Regla personalizada: %s', $rule['name'] ),
+						$minutes
+					);
+					$blocker->send_block_response();
+					break;
+
+				case 'whitelist':
+					$whitelist = WPS_Whitelist::get_instance();
+					$whitelist->add_ip(
+						$ip,
+						sprintf( 'Auto: regla %s', $rule['name'] ),
+						'global'
+					);
+					break;
+
+				case 'log_only':
+				default:
+					// Solo se registró el evento arriba.
+					break;
+			}
+
+			return; // Ejecutar solo la primera regla de acción que coincida.
+		}
+	}
+
+	/**
+	 * Registrar eximiciones de detectores desde una regla exempt.
+	 */
+	private function register_exemption( array $rule ): void {
+		$params = $rule['action_params'] ?? '';
+		if ( is_string( $params ) ) {
+			$detectors = json_decode( $params, true );
+		} else {
+			$detectors = $params;
+		}
+
+		if ( ! is_array( $detectors ) ) {
 			return;
 		}
 
-		$ip     = $request->ip();
-		$logger = WPS_Logger::get_instance();
-
-		$logger->event_immediate( WPS_Event_Types::CUSTOM_RULE_MATCHED, array(
-			'ip_address'  => $ip,
-			'request_uri' => $request->uri(),
-			'user_agent'  => $request->user_agent(),
-			'details'     => array(
-				'rule_id'     => $matched['id'],
-				'rule_name'   => $matched['name'],
-				'action_type' => $matched['action_type'],
-			),
-		) );
-
-		switch ( $matched['action_type'] ) {
-			case 'block_permanent':
-				$blocker = WPS_Blocker::get_instance();
-				$blocker->block_ip(
-					$ip,
-					'custom_rule',
-					sprintf( 'Regla personalizada: %s', $matched['name'] ),
-					null
-				);
-				$blocker->send_block_response();
-				break;
-
-			case 'block_temporary':
-				$minutes = max( 1, (int) $matched['action_duration'] );
-				$blocker = WPS_Blocker::get_instance();
-				$blocker->block_ip(
-					$ip,
-					'custom_rule',
-					sprintf( 'Regla personalizada: %s', $matched['name'] ),
-					$minutes
-				);
-				$blocker->send_block_response();
-				break;
-
-			case 'whitelist':
-				$whitelist = WPS_Whitelist::get_instance();
-				$whitelist->add_ip(
-					$ip,
-					sprintf( 'Auto: regla %s', $matched['name'] ),
-					'global'
-				);
-				break;
-
-			case 'log_only':
-			default:
-				// Solo se registró el evento arriba.
-				break;
+		foreach ( $detectors as $detector ) {
+			$detector = sanitize_key( $detector );
+			if ( '' !== $detector ) {
+				self::$exemptions[ $detector ] = true;
+			}
 		}
+	}
+
+	/**
+	 * Verificar si un detector está eximido para la petición actual.
+	 *
+	 * @param string $detector_id Identificador del detector (restapi, sqli, xss, etc.).
+	 */
+	public static function is_exempt( string $detector_id ): bool {
+		return ! empty( self::$exemptions[ $detector_id ] );
+	}
+
+	/**
+	 * Obtener lista de detectores disponibles para eximición.
+	 */
+	public static function get_detector_options(): array {
+		return array(
+			'restapi'   => __( 'REST API (acceso público)', 'wp-secure' ),
+			'sqli'      => __( 'Inyección SQL (SQLi)', 'wp-secure' ),
+			'xss'       => __( 'Cross-Site Scripting (XSS)', 'wp-secure' ),
+			'traversal' => __( 'Path Traversal', 'wp-secure' ),
+			'scanner'   => __( 'Scanner / Bot', 'wp-secure' ),
+			'login'     => __( 'Protección de Login', 'wp-secure' ),
+			'xmlrpc'    => __( 'XML-RPC', 'wp-secure' ),
+		);
 	}
 
 	/*──────────────────────────────────────────────
@@ -508,7 +596,7 @@ class WPS_Custom_Rules {
 			'contains', 'not_contains', 'equals', 'not_equals',
 			'starts_with', 'ends_with', 'regex', 'cidr',
 		);
-		$valid_actions = array( 'block_permanent', 'block_temporary', 'whitelist', 'log_only' );
+		$valid_actions = array( 'block_permanent', 'block_temporary', 'whitelist', 'log_only', 'exempt' );
 		$valid_logics  = array( 'AND', 'OR' );
 
 		// Validar cada condición.
@@ -571,12 +659,33 @@ class WPS_Custom_Rules {
 			$action_duration = max( 1, absint( $data['action_duration'] ?? 15 ) );
 		}
 
+		// Parámetros de acción adicionales (para exempt: lista de detectores).
+		$action_params = null;
+		if ( 'exempt' === $action_type ) {
+			$raw_params    = $data['action_params'] ?? array();
+			$valid_detectors = array_keys( self::get_detector_options() );
+			$clean_params  = array();
+			if ( is_array( $raw_params ) ) {
+				foreach ( $raw_params as $det ) {
+					$det = sanitize_key( $det );
+					if ( in_array( $det, $valid_detectors, true ) ) {
+						$clean_params[] = $det;
+					}
+				}
+			}
+			if ( empty( $clean_params ) ) {
+				return false; // exempt sin detectores no es válido.
+			}
+			$action_params = wp_json_encode( $clean_params );
+		}
+
 		return array(
 			'name'            => sanitize_text_field( $name ),
 			'description'     => sanitize_text_field( $data['description'] ?? '' ),
 			'conditions'      => $sanitized_conditions,
 			'action_type'     => $action_type,
 			'action_duration' => $action_duration,
+			'action_params'   => $action_params,
 			'is_active'       => ! empty( $data['is_active'] ),
 			'priority'        => absint( $data['priority'] ?? 10 ),
 		);
@@ -624,6 +733,7 @@ class WPS_Custom_Rules {
 			'block_temporary' => __( 'Bloqueo temporal', 'wp-secure' ),
 			'whitelist'       => __( 'Agregar a whitelist', 'wp-secure' ),
 			'log_only'        => __( 'Solo registrar (log)', 'wp-secure' ),
+			'exempt'          => __( 'Eximir de detección', 'wp-secure' ),
 		);
 	}
 }

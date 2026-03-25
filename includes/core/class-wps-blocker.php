@@ -250,6 +250,29 @@ class WPS_Blocker {
     }
 
     /**
+     * Contar el total de bloqueos registrados (histórico completo).
+     */
+    public function count_total_blocks(): int {
+        $table = WPS_Db_Schema::table( 'blocked_ips' );
+        return (int) $this->db->get_var(
+            "SELECT COUNT(*) FROM {$table}"
+        );
+    }
+
+    /**
+     * Limpiar bloqueos expirados (is_active=1 con expires_at en el pasado).
+     *
+     * @return int Cantidad de bloqueos desactivados.
+     */
+    public function clean_expired_blocks(): int {
+        $table = WPS_Db_Schema::table( 'blocked_ips' );
+        return (int) $this->db->query(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "UPDATE {$table} SET is_active = 0 WHERE is_active = 1 AND expires_at IS NOT NULL AND expires_at <= NOW()"
+        );
+    }
+
+    /**
      * Emitir respuesta de bloqueo y detener ejecución.
      */
     public function send_block_response( string $reason = '' ): void {
