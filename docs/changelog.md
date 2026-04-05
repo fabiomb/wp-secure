@@ -1,5 +1,28 @@
 # Registro de Cambios
 
+## [0.2.2] — 2026-04-05
+
+### Nuevo: Modo Inseguro (Learning Mode)
+- Botón de un click en el Dashboard → tarjeta "Estado del Sistema" para activar/desactivar el Modo Inseguro.
+- Cuando está activo, el firewall **detecta y registra** todos los eventos normalmente pero **no bloquea** ninguna petición (no envía respuesta 403/503 ni hace `exit()`). Útil para auditorías, pruebas de rendimiento o depuración sin interrumpir el tráfico real.
+- El estado se almacena en `wp_options` (`wps_unsafe_mode`) para acceso rápido sin consulta a la tabla de settings.
+- Aviso de administrador permanente y visible en todas las páginas de WordPress cuando el modo está activo, con botón de desactivación directa.
+- La activación/desactivación se registra en el log de eventos de seguridad.
+- El estado del Modo Inseguro se muestra en la tarjeta "Estado del Sistema" del dashboard con badge diferenciado.
+
+### Nuevo: Condición `login_username` en Reglas Personalizadas
+- Nuevo campo disponible en el editor de reglas: **"Usuario de login (solo en intento de autenticación)"**.
+- Permite definir reglas del tipo: `IF login_username equals admin THEN block_temporary 60 min`.
+- Soporta todos los operadores existentes: `equals`, `not_equals`, `contains`, `not_contains`, `starts_with`, `ends_with`, `regex`.
+- Las reglas con este campo **solo se evalúan durante intentos de autenticación** (filtro `authenticate` de WordPress). En el ciclo normal de petición HTTP se omiten para evitar falsos positivos con operadores negativos como `not_equals`.
+- Se muestra un aviso informativo en el formulario de reglas cuando se selecciona este campo.
+- La acción se aplica directamente desde `WPS_Login_Detector` sin llamar a `send_block_response()`, devolviendo un `WP_Error` al formulario de login de WordPress.
+
+### Interno
+- Versión actualizada a `0.2.2` en cabecera del plugin y constante `WPS_VERSION`.
+- Nuevo método público `WPS_Custom_Rules::apply_login_rule_action()` para ejecutar acciones de reglas durante el flujo de autenticación de WordPress.
+
+
 ## [0.2.1] — 2026-03-25
 
 ### Nuevas funcionalidades

@@ -342,6 +342,7 @@ class WPS_Admin_Dashboard {
 	 * Tarjeta de estado del sistema.
 	 */
 	private function render_status_card(): void {
+		$unsafe_mode = (bool) get_option( 'wps_unsafe_mode', false );
 		$tables_ok = WPS_Db_Schema::tables_exist();
 		$ipdb      = WPS_Ipdb_Manager::get_instance();
 		$has_mmdb  = $ipdb->is_local_available();
@@ -373,12 +374,38 @@ class WPS_Admin_Dashboard {
 		$blocked_countries = count( $blocker->get_blocked_countries() );
 		$blocked_asns      = count( $blocker->get_blocked_asns() );
 		?>
-		<div class="wps-card wps-card-wide">
-			<h3><span class="dashicons dashicons-shield-alt"></span> <?php esc_html_e( 'Estado del Sistema', 'wp-secure' ); ?></h3>
+		<div class="wps-card wps-card-wide <?php echo $unsafe_mode ? 'wps-card-danger' : ''; ?>">
+			<h3>
+				<span class="dashicons dashicons-shield-alt"></span>
+				<?php esc_html_e( 'Estado del Sistema', 'wp-secure' ); ?>
+				<?php if ( $unsafe_mode ) : ?>
+					<span class="wps-badge wps-badge-danger" style="margin-left:8px;font-size:11px;">
+						<?php esc_html_e( 'MODO INSEGURO', 'wp-secure' ); ?>
+					</span>
+				<?php endif; ?>
+			</h3>
 			<table class="wps-status-table">
 				<tr>
 					<td><?php esc_html_e( 'Plugin', 'wp-secure' ); ?></td>
 					<td><span class="wps-badge wps-badge-ok"><?php echo esc_html( 'v' . WPS_VERSION ); ?></span></td>
+				</tr>
+				<tr>
+					<td><?php esc_html_e( 'Modo Inseguro', 'wp-secure' ); ?></td>
+					<td>
+						<?php if ( $unsafe_mode ) : ?>
+							<span class="wps-badge wps-badge-danger"><?php esc_html_e( 'Activo — Solo detecta', 'wp-secure' ); ?></span>
+						<?php else : ?>
+							<span class="wps-badge wps-badge-ok"><?php esc_html_e( 'Inactivo — Bloqueo normal', 'wp-secure' ); ?></span>
+						<?php endif; ?>
+						<button type="button"
+							class="button button-small wps-unsafe-toggle-btn"
+							data-nonce="<?php echo esc_attr( wp_create_nonce( 'wps_admin_nonce' ) ); ?>"
+							style="margin-left:8px;">
+							<?php echo $unsafe_mode
+								? esc_html__( 'Desactivar', 'wp-secure' )
+								: esc_html__( 'Activar Modo Inseguro', 'wp-secure' ); ?>
+						</button>
+					</td>
 				</tr>
 				<tr>
 					<td><?php esc_html_e( 'Base de Datos', 'wp-secure' ); ?></td>

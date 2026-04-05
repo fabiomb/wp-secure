@@ -274,8 +274,16 @@ class WPS_Blocker {
 
     /**
      * Emitir respuesta de bloqueo y detener ejecución.
+     *
+     * En Modo Inseguro la función retorna sin bloquear, permitiendo que
+     * la detección y el log continúen funcionando normalmente.
      */
     public function send_block_response( string $reason = '' ): void {
+        // Modo inseguro activo: detectar y registrar, pero no bloquear.
+        if ( get_option( 'wps_unsafe_mode', false ) ) {
+            return;
+        }
+
         $code         = (int) $this->loader->get_setting( 'block_response_code', 403 );
         $redirect_url = $this->loader->get_setting( 'block_redirect_url', '' );
 

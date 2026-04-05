@@ -163,6 +163,10 @@ class WPS_Admin_Custom_Rules {
 								<span class="dashicons dashicons-plus-alt2" style="vertical-align: text-top;"></span>
 								<?php esc_html_e( 'Agregar condición', 'wp-secure' ); ?>
 							</button>
+							<p class="description wps-login-username-hint" style="display:none;margin-top:6px;color:#996800;">
+								<span class="dashicons dashicons-info" style="font-size:14px;vertical-align:text-bottom;"></span>
+								<?php esc_html_e( 'El campo "Usuario de login" solo se evalúa durante intentos de autenticación. Usa "equals" con el nombre exacto del usuario (ej: admin) o "contains" para coincidencias parciales.', 'wp-secure' ); ?>
+							</p>
 						</td>
 					</tr>
 					<tr>

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Seguro — Firewall (Capa 1)
  * Description: MU-Plugin del firewall WP Seguro. Se ejecuta antes de plugins y temas.
- * Version: 0.2.1
+ * Version: 0.2.2
  * Author: WP Seguro
  *
  * Este archivo se instala automáticamente en wp-content/mu-plugins/.

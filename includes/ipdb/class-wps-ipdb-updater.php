@@ -37,7 +37,7 @@ class WPS_Ipdb_Updater {
 	 * @return array{success: bool, message: string}
 	 */
 	public function download(): array {
-		$api_key = $this->loader->get_setting( 'ipinfo_api_key', '' );
+		$api_key = trim( $this->loader->get_setting( 'ipinfo_api_key', '' ) );
 		if ( empty( $api_key ) ) {
 			return array(
 				'success' => false,
@@ -59,6 +59,8 @@ class WPS_Ipdb_Updater {
 		}
 
 		// ipinfo.io MMDB download URL for Country+ASN database.
+		// Token va tanto en query string como en Authorization header para
+		// que funcione aunque ipinfo.io redirija a un CDN sin query string.
 		$url = sprintf(
 			'https://ipinfo.io/data/free/country_asn.mmdb?token=%s',
 			rawurlencode( $api_key )
@@ -67,29 +69,91 @@ class WPS_Ipdb_Updater {
 		$temp_path  = $data_dir . self::MMDB_TEMP_FILENAME;
 		$final_path = $data_dir . self::MMDB_FILENAME;
 
-		// Download to temp file.
+		// Paso 1: HEAD sin stream para verificar el token antes de descargar.
+		// Esto detecta 401/403 sin escribir basura en el archivo temporal.
+		$head = wp_remote_head( $url, array(
+			'timeout'     => 15,
+			'redirection' => 5,
+			'sslverify'   => true,
+			'headers'     => array(
+				'Authorization' => 'Bearer ' . $api_key,
+			),
+		) );
+
+		if ( ! is_wp_error( $head ) ) {
+			$head_code = (int) wp_remote_retrieve_response_code( $head );
+			if ( 401 === $head_code || 403 === $head_code ) {
+				return array(
+					'success' => false,
+					'message' => $this->explain_auth_error( $head_code, wp_remote_retrieve_body( $head ) ),
+				);
+			}
+		}
+
+		// Paso 2: Descarga real al archivo temporal.
 		$response = wp_remote_get( $url, array(
-			'timeout'  => 120,
-			'stream'   => true,
-			'filename' => $temp_path,
-			'sslverify' => true,
+			'timeout'     => 120,
+			'redirection' => 5,
+			'stream'      => true,
+			'filename'    => $temp_path,
+			'sslverify'   => true,
+			'headers'     => array(
+				'Authorization' => 'Bearer ' . $api_key,
+			),
 		) );
 
 		if ( is_wp_error( $response ) ) {
 			$this->cleanup_temp( $temp_path );
-			return array(
-				'success' => false,
-				'message' => sprintf(
-					/* translators: %s: error message */
-					__( 'Error de descarga: %s', 'wp-secure' ),
-					$response->get_error_message()
-				),
-			);
+			$error_msg = $response->get_error_message();
+
+			// En localhost, el error más común es SSL. Reintentar sin verificación.
+			if ( false !== strpos( $error_msg, 'SSL' ) || false !== strpos( $error_msg, 'certificate' ) ) {
+				$response = wp_remote_get( $url, array(
+					'timeout'     => 120,
+					'redirection' => 5,
+					'stream'      => true,
+					'filename'    => $temp_path,
+					'sslverify'   => false,
+					'headers'     => array(
+						'Authorization' => 'Bearer ' . $api_key,
+					),
+				) );
+
+				if ( is_wp_error( $response ) ) {
+					$this->cleanup_temp( $temp_path );
+					return array(
+						'success' => false,
+						'message' => sprintf(
+							/* translators: %s: error message */
+							__( 'Error de conexión: %s', 'wp-secure' ),
+							$response->get_error_message()
+						),
+					);
+				}
+			} else {
+				return array(
+					'success' => false,
+					'message' => sprintf(
+						/* translators: %s: error message */
+						__( 'Error de descarga: %s', 'wp-secure' ),
+						$error_msg
+					),
+				);
+			}
 		}
 
-		$code = wp_remote_retrieve_response_code( $response );
+		$code = (int) wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
 			$this->cleanup_temp( $temp_path );
+
+			if ( 401 === $code || 403 === $code ) {
+				// Con stream:true el body no está disponible; usar mensaje explicativo.
+				return array(
+					'success' => false,
+					'message' => $this->explain_auth_error( $code, '' ),
+				);
+			}
+
 			return array(
 				'success' => false,
 				'message' => sprintf(
@@ -178,5 +242,56 @@ class WPS_Ipdb_Updater {
 		if ( is_file( $path ) ) {
 			wp_delete_file( $path );
 		}
+	}
+
+	/**
+	 * Devolver un mensaje de error explicativo para 401/403 de ipinfo.io.
+	 *
+	 * ipinfo.io devuelve 401 cuando:
+	 * - El token es inválido o tiene espacios extra.
+	 * - El plan no incluye descarga de bases de datos MMDB.
+	 * - La cuenta requiere activar "Database Downloads" en el panel.
+	 *
+	 * @param int    $code HTTP status code (401 or 403).
+	 * @param string $body Response body (puede estar vacío con stream:true).
+	 * @return string Mensaje de error para mostrar al usuario.
+	 */
+	private function explain_auth_error( int $code, string $body ): string {
+		// Intentar extraer mensaje de ipinfo.io del body JSON.
+		$remote_message = '';
+		if ( ! empty( $body ) ) {
+			$decoded = json_decode( $body, true );
+			if ( isset( $decoded['error']['message'] ) ) {
+				$remote_message = $decoded['error']['message'];
+			} elseif ( isset( $decoded['message'] ) ) {
+				$remote_message = $decoded['message'];
+			} elseif ( is_string( $decoded ) ) {
+				$remote_message = $decoded;
+			}
+		}
+
+		$hint = implode( ' ', array(
+			__( 'Verifica que:', 'wp-secure' ),
+			'(1) ' . __( 'La API key no tenga espacios extra.', 'wp-secure' ),
+			'(2) ' . __( 'Tu cuenta de ipinfo.io tiene habilitado "Database Downloads" (panel → Account → Downloads).', 'wp-secure' ),
+			'(3) ' . __( 'El plan incluye descarga de bases de datos MMDB (el plan gratuito requiere registro en ipinfo.io/account/data-downloads).', 'wp-secure' ),
+		) );
+
+		if ( $remote_message ) {
+			return sprintf(
+				/* translators: 1: HTTP code, 2: remote message, 3: hint */
+				__( 'Error %1$d de ipinfo.io: "%2$s". %3$s', 'wp-secure' ),
+				$code,
+				$remote_message,
+				$hint
+			);
+		}
+
+		return sprintf(
+			/* translators: 1: HTTP code, 2: hint */
+			__( 'Error %1$d: Token no autorizado para descargar bases de datos. %2$s', 'wp-secure' ),
+			$code,
+			$hint
+		);
 	}
 }

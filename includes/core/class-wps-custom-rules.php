@@ -350,6 +350,70 @@ class WPS_Custom_Rules {
 	}
 
 	/**
+	 * Ejecutar la acción de una regla que coincidió durante un intento de login.
+	 *
+	 * Se usa en lugar de evaluate_and_act() para evitar llamar a send_block_response()
+	 * (que haría exit()) desde dentro del filtro `authenticate` de WordPress.
+	 * El bloqueo se registra en la BD; WPS_Login_Detector devuelve WP_Error al caller.
+	 *
+	 * @param array       $rule    Regla que coincidió.
+	 * @param string      $ip      IP del visitante.
+	 * @param WPS_Request $request Petición actual.
+	 */
+	public function apply_login_rule_action( array $rule, string $ip, WPS_Request $request ): void {
+		$logger = WPS_Logger::get_instance();
+
+		$logger->event_immediate( WPS_Event_Types::CUSTOM_RULE_MATCHED, array(
+			'ip_address'  => $ip,
+			'request_uri' => $request->uri(),
+			'user_agent'  => $request->user_agent(),
+			'details'     => array(
+				'rule_id'     => $rule['id'],
+				'rule_name'   => $rule['name'],
+				'action_type' => $rule['action_type'],
+				'context'     => 'login',
+			),
+		) );
+
+		switch ( $rule['action_type'] ) {
+			case 'block_permanent':
+				$blocker = WPS_Blocker::get_instance();
+				$blocker->block_ip(
+					$ip,
+					'custom_rule',
+					sprintf( 'Regla personalizada (login): %s', $rule['name'] ),
+					null
+				);
+				break;
+
+			case 'block_temporary':
+				$minutes = max( 1, (int) $rule['action_duration'] );
+				$blocker = WPS_Blocker::get_instance();
+				$blocker->block_ip(
+					$ip,
+					'custom_rule',
+					sprintf( 'Regla personalizada (login): %s', $rule['name'] ),
+					$minutes
+				);
+				break;
+
+			case 'whitelist':
+				$whitelist = WPS_Whitelist::get_instance();
+				$whitelist->add_ip(
+					$ip,
+					sprintf( 'Auto: regla %s', $rule['name'] ),
+					'login'
+				);
+				break;
+
+			case 'log_only':
+			default:
+				// Solo el evento ya fue registrado arriba.
+				break;
+		}
+	}
+
+	/**
 	 * Registrar eximiciones de detectores desde una regla exempt.
 	 */
 	private function register_exemption( array $rule ): void {
@@ -411,11 +475,22 @@ class WPS_Custom_Rules {
 	 *
 	 * La primera condición siempre es el punto de partida.
 	 * Las siguientes se encadenan con AND u OR respecto al resultado acumulado.
+	 *
+	 * Las reglas que contienen condiciones `login_username` solo se evalúan
+	 * cuando el contexto incluye esa clave (es decir, desde WPS_Login_Detector).
+	 * En el ciclo normal de petición HTTP se omiten para evitar falsos positivos.
 	 */
 	private function matches_rule( array $rule, WPS_Request $request, array $context ): bool {
 		$conditions = $rule['conditions'] ?? array();
 		if ( empty( $conditions ) || ! is_array( $conditions ) ) {
 			return false;
+		}
+
+		// Reglas con login_username solo aplican durante intentos de login.
+		foreach ( $conditions as $cond ) {
+			if ( 'login_username' === ( $cond['field'] ?? '' ) && ! isset( $context['login_username'] ) ) {
+				return false;
+			}
 		}
 
 		$result = null;
@@ -518,6 +593,9 @@ class WPS_Custom_Rules {
 			case 'visitor_type':
 				return $request->visitor_type();
 
+			case 'login_username':
+				return $context['login_username'] ?? '';
+
 			default:
 				// Buscar en headers si el campo empieza con "header:".
 				if ( 0 === strpos( $field, 'header:' ) ) {
@@ -590,7 +668,7 @@ class WPS_Custom_Rules {
 
 		$valid_fields = array(
 			'uri', 'user_agent', 'ip', 'method', 'query_string',
-			'referer', 'host', 'country', 'visitor_type',
+			'referer', 'host', 'country', 'visitor_type', 'login_username',
 		);
 		$valid_operators = array(
 			'contains', 'not_contains', 'equals', 'not_equals',
@@ -696,15 +774,16 @@ class WPS_Custom_Rules {
 	 */
 	public static function get_field_options(): array {
 		return array(
-			'uri'          => __( 'URI de la petición', 'wp-secure' ),
-			'user_agent'   => __( 'User-Agent', 'wp-secure' ),
-			'ip'           => __( 'Dirección IP', 'wp-secure' ),
-			'method'       => __( 'Método HTTP', 'wp-secure' ),
-			'query_string' => __( 'Query String', 'wp-secure' ),
-			'referer'      => __( 'Referer', 'wp-secure' ),
-			'host'         => __( 'Host', 'wp-secure' ),
-			'country'      => __( 'País (código ISO)', 'wp-secure' ),
-			'visitor_type' => __( 'Tipo de visitante', 'wp-secure' ),
+			'uri'            => __( 'URI de la petición', 'wp-secure' ),
+			'user_agent'     => __( 'User-Agent', 'wp-secure' ),
+			'ip'             => __( 'Dirección IP', 'wp-secure' ),
+			'method'         => __( 'Método HTTP', 'wp-secure' ),
+			'query_string'   => __( 'Query String', 'wp-secure' ),
+			'referer'        => __( 'Referer', 'wp-secure' ),
+			'host'           => __( 'Host', 'wp-secure' ),
+			'country'        => __( 'País (código ISO)', 'wp-secure' ),
+			'visitor_type'   => __( 'Tipo de visitante', 'wp-secure' ),
+			'login_username' => __( 'Usuario de login (solo en intento de autenticación)', 'wp-secure' ),
 		);
 	}
 

@@ -20,6 +20,7 @@
             this.initConfirmActions();
             this.initToggleForms();
             this.initAjaxActions();
+            this.initUnsafeMode();
             this.initUaToggle();
             this.initCustomRules();
             this.initExportImport();
@@ -309,6 +310,38 @@
          * Acciones AJAX genéricas (botones con data-action)
          *──────────────────────────────────────────*/
 
+        /*──────────────────────────────────────────
+         * Modo Inseguro — toggle con un click
+         *──────────────────────────────────────────*/
+
+        initUnsafeMode: function () {
+            $(document).on('click', '.wps-unsafe-toggle-btn', function (e) {
+                e.preventDefault();
+                var $btn = $(this);
+                var nonce = $btn.data('nonce');
+                if ($btn.prop('disabled')) return;
+
+                $btn.prop('disabled', true).css('opacity', '0.6');
+
+                $.post(wpsAdmin.ajaxUrl, {
+                    action: 'wps_toggle_unsafe_mode',
+                    nonce: nonce
+                }, function (response) {
+                    if (response.success) {
+                        WPS.showNotice(response.data.message, 'success');
+                        setTimeout(function () { location.reload(); }, 800);
+                    } else {
+                        var msg = (response.data && response.data.message) || wpsAdmin.strings.error;
+                        WPS.showNotice(msg, 'error');
+                        $btn.prop('disabled', false).css('opacity', '1');
+                    }
+                }).fail(function () {
+                    WPS.showNotice(wpsAdmin.strings.error, 'error');
+                    $btn.prop('disabled', false).css('opacity', '1');
+                });
+            });
+        },
+
         initAjaxActions: function () {
             $(document).on('click', '.wps-ajax-action', function (e) {
                 e.preventDefault();
@@ -406,6 +439,23 @@
                     $('#wps-exempt-wrap').hide();
                 }
             });
+
+            // Show login_username hint when that field is selected in any condition.
+            function checkLoginUsernameHint() {
+                var hasLoginField = false;
+                $container.find('.wps-condition-field').each(function () {
+                    if ($(this).val() === 'login_username') {
+                        hasLoginField = true;
+                    }
+                });
+                $('.wps-login-username-hint').toggle(hasLoginField);
+            }
+
+            $container.on('change', '.wps-condition-field', checkLoginUsernameHint);
+            $container.on('click', '.wps-remove-condition', function () {
+                setTimeout(checkLoginUsernameHint, 50);
+            });
+            checkLoginUsernameHint();
         },
 
         /*──────────────────────────────────────────

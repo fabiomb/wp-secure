@@ -163,6 +163,26 @@ class WPS_Admin_Ipdb {
 						</p>
 					</div>
 				<?php else : ?>
+					<div class="notice notice-info inline" style="margin:0 0 12px;padding:10px 14px;">
+						<p>
+							<strong><?php esc_html_e( 'Requisito previo:', 'wp-secure' ); ?></strong>
+							<?php esc_html_e( 'La descarga del archivo MMDB requiere activar "Database Downloads" en tu cuenta de ipinfo.io. Sin ese paso el servidor devuelve error 401 aunque la API key sea correcta.', 'wp-secure' ); ?>
+						</p>
+						<ol style="margin:6px 0 0 18px;">
+							<li>
+								<?php
+								printf(
+									/* translators: %s: link to ipinfo.io account */
+									esc_html__( 'Inicia sesión en %s y ve a Account → Data Downloads.', 'wp-secure' ),
+									'<a href="https://ipinfo.io/account/data-downloads" target="_blank" rel="noopener noreferrer">ipinfo.io</a>'
+								);
+								?>
+							</li>
+							<li><?php esc_html_e( 'Activa la descarga de "Country + ASN Database" (country_asn.mmdb) en el panel.', 'wp-secure' ); ?></li>
+							<li><?php esc_html_e( 'Usa la misma API key que tienes configurada arriba y pulsa "Descargar".', 'wp-secure' ); ?></li>
+						</ol>
+					</div>
+
 					<form method="post" style="display:inline-block; margin-right: 10px;">
 						<?php wp_nonce_field( 'wps_ipdb_download', 'wps_ipdb_nonce' ); ?>
 						<input type="hidden" name="wps_action" value="download_mmdb" />

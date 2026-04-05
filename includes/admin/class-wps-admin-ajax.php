@@ -35,6 +35,7 @@ class WPS_Admin_Ajax {
         add_action( 'wp_ajax_wps_export_config', array( $this, 'ajax_export_config' ) );
         add_action( 'wp_ajax_wps_import_config', array( $this, 'ajax_import_config' ) );
         add_action( 'wp_ajax_wps_clean_expired_blocks', array( $this, 'ajax_clean_expired_blocks' ) );
+        add_action( 'wp_ajax_wps_toggle_unsafe_mode', array( $this, 'ajax_toggle_unsafe_mode' ) );
     }
 
     /**
@@ -477,6 +478,37 @@ class WPS_Admin_Ajax {
                 $cleaned
             ),
             'cleaned' => $cleaned,
+        ) );
+    }
+
+    /**
+     * Activar/desactivar el Modo Inseguro via AJAX.
+     *
+     * En modo inseguro el firewall detecta y registra eventos pero no bloquea
+     * ninguna petición — útil para auditorías y pruebas.
+     */
+    public function ajax_toggle_unsafe_mode(): void {
+        $this->verify_ajax();
+
+        $current = (bool) get_option( 'wps_unsafe_mode', false );
+        $new     = ! $current;
+
+        update_option( 'wps_unsafe_mode', $new, false );
+
+        $logger = WPS_Logger::get_instance();
+        $logger->event_immediate( WPS_Event_Types::SETTINGS_CHANGED, array(
+            'wp_user_id' => get_current_user_id(),
+            'details'    => array(
+                'action'      => 'unsafe_mode_toggled',
+                'unsafe_mode' => $new,
+            ),
+        ), WPS_Event_Types::SEVERITY_INFO );
+
+        wp_send_json_success( array(
+            'unsafe_mode' => $new,
+            'message'     => $new
+                ? __( 'Modo Inseguro activado. El firewall solo detecta y registra.', 'wp-secure' )
+                : __( 'Modo Inseguro desactivado. El firewall bloquea normalmente.', 'wp-secure' ),
         ) );
     }
 

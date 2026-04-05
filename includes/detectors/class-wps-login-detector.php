@@ -88,6 +88,20 @@ class WPS_Login_Detector {
             );
         }
 
+        // Evaluar reglas personalizadas con condición login_username.
+        $login_context = array( 'login_username' => $username );
+        $custom_rules  = WPS_Custom_Rules::get_instance();
+        $matched_rule  = $custom_rules->evaluate( $request, $login_context );
+        if ( $matched_rule ) {
+            $custom_rules->apply_login_rule_action( $matched_rule, $ip, $request );
+            if ( in_array( $matched_rule['action_type'], array( 'block_permanent', 'block_temporary' ), true ) ) {
+                return new \WP_Error(
+                    'wps_blocked',
+                    __( 'Acceso bloqueado por una regla de seguridad personalizada.', 'wp-secure' )
+                );
+            }
+        }
+
         // Bloquear IP inmediatamente si el usuario no existe en WordPress.
         if ( $this->loader->get_setting( 'login_block_unknown_user', true ) ) {
             $user_exists = ( get_user_by( 'login', $username ) || get_user_by( 'email', $username ) );

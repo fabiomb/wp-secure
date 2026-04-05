@@ -36,11 +36,40 @@ class WPS_Admin {
         add_action( 'admin_init', array( $this, 'handle_settings_save' ) );
         add_action( 'admin_init', array( $this, 'handle_export' ) );
 
+        // Aviso global cuando el Modo Inseguro está activo.
+        add_action( 'admin_notices', array( $this, 'maybe_show_unsafe_mode_notice' ) );
+
         // Widget en el dashboard de WordPress.
         add_action( 'wp_dashboard_setup', array( $this, 'register_dashboard_widget' ) );
 
         // Redirigir al wizard o dashboard después de activar.
         add_action( 'admin_init', array( $this, 'maybe_redirect_after_activation' ) );
+    }
+
+    /**
+     * Mostrar aviso prominente cuando el Modo Inseguro está activo.
+     */
+    public function maybe_show_unsafe_mode_notice(): void {
+        if ( ! get_option( 'wps_unsafe_mode', false ) ) {
+            return;
+        }
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        $toggle_url = admin_url( 'admin.php?page=' . $this->menu_slug );
+        ?>
+        <div class="notice notice-error wps-unsafe-mode-notice" style="border-left-color:#d63638;padding:12px 16px;display:flex;align-items:center;gap:16px;">
+            <span class="dashicons dashicons-warning" style="font-size:28px;color:#d63638;flex-shrink:0;"></span>
+            <div style="flex:1;">
+                <strong><?php esc_html_e( 'WP Seguro — Modo Inseguro ACTIVO', 'wp-secure' ); ?></strong><br>
+                <?php esc_html_e( 'El firewall está en modo de solo detección. Las amenazas se registran pero no se bloquean. Desactívalo en el Dashboard cuando termines tu auditoría.', 'wp-secure' ); ?>
+            </div>
+            <a href="<?php echo esc_url( $toggle_url ); ?>" class="button button-primary wps-unsafe-toggle-btn"
+               data-nonce="<?php echo esc_attr( wp_create_nonce( 'wps_admin_nonce' ) ); ?>">
+                <?php esc_html_e( 'Desactivar Modo Inseguro', 'wp-secure' ); ?>
+            </a>
+        </div>
+        <?php
     }
 
     /**
