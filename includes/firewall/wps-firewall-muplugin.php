@@ -131,7 +131,7 @@ final class WPS_Firewall_MuPlugin {
 			define( 'WPS_INCLUDES_DIR', $includes . '/' );
 		}
 		if ( ! defined( 'WPS_DATA_DIR' ) ) {
-			define( 'WPS_DATA_DIR', self::$plugin_dir . '/data/' );
+			define( 'WPS_DATA_DIR', dirname( self::$plugin_dir, 2 ) . '/wps-data/' );
 		}
 		if ( ! defined( 'WPS_VERSION' ) ) {
 			define( 'WPS_VERSION', '0.2.1' );

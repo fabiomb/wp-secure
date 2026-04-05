@@ -88,6 +88,10 @@ class WPS_Admin_Blocks {
             <span class="dashicons dashicons-trash" style="vertical-align:text-top;font-size:16px;"></span>
             <?php esc_html_e( 'Limpiar Expirados', 'wp-secure' ); ?>
         </button>
+        <button type="button" class="page-title-action wps-ajax-action" data-action="wps_sync_blocked_ips" data-wps-confirm="<?php esc_attr_e( '¿Sincronizar el archivo de Capa 0 con la base de datos?', 'wp-secure' ); ?>" style="margin: 15px 0; display: inline-block;">
+            <span class="dashicons dashicons-update" style="vertical-align:text-top;font-size:16px;"></span>
+            <?php esc_html_e( 'Sincronizar Capa 0', 'wp-secure' ); ?>
+        </button>
 
         <!-- Formulario para bloqueo manual -->
         <div id="wps-add-block-form" class="wps-section" style="display:none;">

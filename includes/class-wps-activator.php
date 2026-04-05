@@ -13,6 +13,7 @@ class WPS_Activator {
         self::check_requirements();
         self::create_tables();
         self::set_defaults();
+        self::migrate_data_dir();
         self::protect_data_dir();
         self::schedule_maintenance();
         self::install_muplugin();
@@ -184,6 +185,78 @@ class WPS_Activator {
         $file = WPS_DATA_DIR . 'wps-blocked-ips.php';
         if ( ! is_file( $file ) ) {
             self::sync_blocked_ips_file();
+        }
+    }
+
+    /**
+     * Callback para upgrader_process_complete.
+     * Regenera el archivo de Capa 0 después de actualizar este plugin.
+     *
+     * @param WP_Upgrader $upgrader Instancia del actualizador.
+     * @param array        $hook_extra Información sobre la actualización.
+     */
+    public static function on_upgrade_complete( $upgrader, $hook_extra ): void {
+        if ( 'plugin' !== ( $hook_extra['type'] ?? '' ) ) {
+            return;
+        }
+
+        $our_basename = plugin_basename( WPS_PLUGIN_FILE );
+        $plugins      = array();
+
+        if ( 'update' === ( $hook_extra['action'] ?? '' ) ) {
+            // Bulk update → array de plugins.
+            if ( ! empty( $hook_extra['plugins'] ) ) {
+                $plugins = (array) $hook_extra['plugins'];
+            }
+            // Single update → plugin field.
+            if ( ! empty( $hook_extra['plugin'] ) ) {
+                $plugins[] = $hook_extra['plugin'];
+            }
+        }
+
+        if ( in_array( $our_basename, $plugins, true ) ) {
+            self::migrate_data_dir();
+            self::protect_data_dir();
+            self::sync_blocked_ips_file();
+            self::install_muplugin();
+        }
+    }
+
+    /**
+     * Migrar archivos de datos desde la ubicación antigua (plugin/data/)
+     * a la nueva ubicación (wp-content/wps-data/).
+     *
+     * Se ejecuta en upgrade y en activación para cubrir ambos escenarios.
+     */
+    public static function migrate_data_dir(): void {
+        $old_dir = WPS_PLUGIN_DIR . 'data/';
+        $new_dir = WPS_DATA_DIR; // wp-content/wps-data/
+
+        // Si la carpeta nueva ya tiene el archivo, no hay nada que migrar.
+        if ( is_file( $new_dir . 'wps-blocked-ips.php' ) ) {
+            return;
+        }
+
+        // Crear la carpeta nueva si no existe.
+        if ( ! is_dir( $new_dir ) ) {
+            wp_mkdir_p( $new_dir );
+        }
+
+        // Archivos a migrar desde la ubicación antigua.
+        $files_to_migrate = array(
+            'wps-blocked-ips.php',
+            'country_asn.mmdb',
+            'wps-firewall.log',
+        );
+
+        foreach ( $files_to_migrate as $filename ) {
+            $old_path = $old_dir . $filename;
+            $new_path = $new_dir . $filename;
+
+            if ( is_file( $old_path ) && ! is_file( $new_path ) ) {
+                @copy( $old_path, $new_path );
+                @unlink( $old_path );
+            }
         }
     }
 

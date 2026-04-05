@@ -42,8 +42,8 @@ final class WPS_Firewall_Prepend {
 	 * Ejecutar el firewall.
 	 */
 	public static function run(): void {
-		// Calcular ruta al data file.
-		self::$data_file = dirname( __DIR__ ) . '/data/wps-blocked-ips.php';
+		// Calcular ruta al data file (fuera del directorio del plugin para sobrevivir updates).
+		self::$data_file = self::resolve_data_dir() . 'wps-blocked-ips.php';
 
 		// Si el data file no existe, no hay nada que bloquear.
 		if ( ! is_file( self::$data_file ) ) {
@@ -70,6 +70,17 @@ final class WPS_Firewall_Prepend {
 		if ( self::is_blocked( $ip, $data ) ) {
 			self::block_response( $ip );
 		}
+	}
+
+	/**
+	 * Resolver la ruta al directorio de datos wps-data/.
+	 *
+	 * Este archivo vive en: wp-content/plugins/wp-secure/includes/firewall/
+	 * El directorio de datos está en: wp-content/wps-data/
+	 * Se sube 4 niveles para llegar a wp-content.
+	 */
+	private static function resolve_data_dir(): string {
+		return dirname( __DIR__, 4 ) . '/wps-data/';
 	}
 
 	/**

@@ -24,7 +24,7 @@ defined( 'WPS_PLUGIN_FILE' )     || define( 'WPS_PLUGIN_FILE', __FILE__ );
 defined( 'WPS_PLUGIN_DIR' )      || define( 'WPS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 defined( 'WPS_PLUGIN_URL' )      || define( 'WPS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 defined( 'WPS_PLUGIN_BASENAME' ) || define( 'WPS_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
-defined( 'WPS_DATA_DIR' )        || define( 'WPS_DATA_DIR', WPS_PLUGIN_DIR . 'data/' );
+defined( 'WPS_DATA_DIR' )        || define( 'WPS_DATA_DIR', WP_CONTENT_DIR . '/wps-data/' );
 defined( 'WPS_INCLUDES_DIR' )    || define( 'WPS_INCLUDES_DIR', WPS_PLUGIN_DIR . 'includes/' );
 
 /*──────────────────────────────────────────────

@@ -21,6 +21,10 @@
 ### Interno
 - Versión actualizada a `0.2.2` en cabecera del plugin y constante `WPS_VERSION`.
 - Nuevo método público `WPS_Custom_Rules::apply_login_rule_action()` para ejecutar acciones de reglas durante el flujo de autenticación de WordPress.
+- **Directorio de datos movido a `wp-content/wps-data/`**: el archivo `wps-blocked-ips.php` (Capa 0) y la base MMDB ahora se almacenan fuera del directorio del plugin, evitando que se pierdan al actualizar desde WordPress.
+- **Firewall prepend actualizado**: nuevo método `resolve_data_dir()` que calcula la ruta a `wp-content/wps-data/` de forma autónoma, sin depender de constantes de WordPress (inexistentes en Capa 0).
+- **Regeneración automática post-update**: hook `upgrader_process_complete` que regenera el archivo de Capa 0, protege el directorio y reinstala el MU-plugin después de cada actualización del plugin.
+- **Botón "Sincronizar Capa 0"** en la página de Bloqueos (tab IPs): permite forzar manualmente la sincronización del archivo de IPs bloqueadas con la base de datos, sin esperar al cron horario. Nuevo endpoint AJAX `wps_sync_blocked_ips`.
 
 
 ## [0.2.1] — 2026-03-25

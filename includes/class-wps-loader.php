@@ -49,6 +49,9 @@ class WPS_Loader {
         add_action( 'wps_daily_maintenance', array( 'WPS_Db_Maintenance', 'daily' ) );
         add_action( 'wps_hourly_maintenance', array( 'WPS_Db_Maintenance', 'hourly' ) );
 
+        // Regenerar archivo de Capa 0 después de actualizar el plugin.
+        add_action( 'upgrader_process_complete', array( 'WPS_Activator', 'on_upgrade_complete' ), 10, 2 );
+
         // Verificar que las tareas cron existen (auto-reparación).
         WPS_Db_Maintenance::schedule();
 

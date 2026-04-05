@@ -36,6 +36,7 @@ class WPS_Admin_Ajax {
         add_action( 'wp_ajax_wps_import_config', array( $this, 'ajax_import_config' ) );
         add_action( 'wp_ajax_wps_clean_expired_blocks', array( $this, 'ajax_clean_expired_blocks' ) );
         add_action( 'wp_ajax_wps_toggle_unsafe_mode', array( $this, 'ajax_toggle_unsafe_mode' ) );
+        add_action( 'wp_ajax_wps_sync_blocked_ips', array( $this, 'ajax_sync_blocked_ips' ) );
     }
 
     /**
@@ -509,6 +510,26 @@ class WPS_Admin_Ajax {
             'message'     => $new
                 ? __( 'Modo Inseguro activado. El firewall solo detecta y registra.', 'wp-secure' )
                 : __( 'Modo Inseguro desactivado. El firewall bloquea normalmente.', 'wp-secure' ),
+        ) );
+    }
+
+    /**
+     * Sincronizar manualmente el archivo de IPs bloqueadas para Capa 0.
+     */
+    public function ajax_sync_blocked_ips(): void {
+        $this->verify_ajax();
+
+        WPS_Activator::sync_blocked_ips_file();
+
+        $file    = WPS_DATA_DIR . 'wps-blocked-ips.php';
+        $exists  = is_file( $file );
+        $updated = $exists ? filemtime( $file ) : 0;
+
+        wp_send_json_success( array(
+            'message' => $exists
+                ? __( 'Archivo de Capa 0 sincronizado correctamente.', 'wp-secure' )
+                : __( 'Error: no se pudo crear el archivo.', 'wp-secure' ),
+            'updated' => $updated,
         ) );
     }
 
