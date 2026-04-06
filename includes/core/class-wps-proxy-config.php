@@ -85,7 +85,7 @@ class WPS_Proxy_Config {
 	 * @return string IP del visitante real.
 	 */
 	public function get_real_ip(): string {
-		$remote_addr = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+		$remote_addr = WPS_Ip_Utils::strip_port( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
 
 		$proxy_mode = $this->get_setting( 'proxy_mode', 'auto' );
 
@@ -249,7 +249,7 @@ class WPS_Proxy_Config {
 	private function extract_ip( string $header_value ): ?string {
 		$parts = explode( ',', $header_value );
 		foreach ( $parts as $part ) {
-			$ip = trim( $part );
+			$ip = WPS_Ip_Utils::strip_port( trim( $part ) );
 			if ( WPS_Ip_Utils::is_valid_ip( $ip ) && ! WPS_Ip_Utils::is_private_ip( $ip ) ) {
 				return $ip;
 			}

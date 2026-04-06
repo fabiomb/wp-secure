@@ -131,6 +131,36 @@ class Test_WPS_Ip_Utils extends \PHPUnit\Framework\TestCase {
 	}
 
 	/*──────────────────────────────────────────────
+	 * strip_port
+	 *──────────────────────────────────────────────*/
+
+	public function test_strip_port_ipv4_with_port(): void {
+		$this->assertEquals( '69.171.230.40', WPS_Ip_Utils::strip_port( '69.171.230.40:53776' ) );
+		$this->assertEquals( '173.252.70.9', WPS_Ip_Utils::strip_port( '173.252.70.9:40020' ) );
+		$this->assertEquals( '69.171.234.17', WPS_Ip_Utils::strip_port( '69.171.234.17:54572' ) );
+		$this->assertEquals( '1.2.3.4', WPS_Ip_Utils::strip_port( '1.2.3.4:80' ) );
+	}
+
+	public function test_strip_port_plain_ipv4_unchanged(): void {
+		$this->assertEquals( '1.2.3.4', WPS_Ip_Utils::strip_port( '1.2.3.4' ) );
+		$this->assertEquals( '203.0.113.50', WPS_Ip_Utils::strip_port( '203.0.113.50' ) );
+	}
+
+	public function test_strip_port_ipv6_with_brackets_and_port(): void {
+		$this->assertEquals( '2001:db8::1', WPS_Ip_Utils::strip_port( '[2001:db8::1]:80' ) );
+		$this->assertEquals( '::1', WPS_Ip_Utils::strip_port( '[::1]:443' ) );
+	}
+
+	public function test_strip_port_plain_ipv6_unchanged(): void {
+		$this->assertEquals( '2001:db8::1', WPS_Ip_Utils::strip_port( '2001:db8::1' ) );
+		$this->assertEquals( '::1', WPS_Ip_Utils::strip_port( '::1' ) );
+	}
+
+	public function test_strip_port_trims_whitespace(): void {
+		$this->assertEquals( '1.2.3.4', WPS_Ip_Utils::strip_port( '  1.2.3.4:8080  ' ) );
+	}
+
+	/*──────────────────────────────────────────────
 	 * Network
 	 *──────────────────────────────────────────────*/
 

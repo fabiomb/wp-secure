@@ -1,2 +1,7 @@
 CLAUDE.md
 proyecto.md
+wp-secure.zip
+composer.json
+composer.lock
+vendor/*
+.phpunit.result.cache

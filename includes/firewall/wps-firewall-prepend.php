@@ -90,7 +90,11 @@ final class WPS_Firewall_Prepend {
 	 * se configura en la Capa 1/2 donde hay acceso a la configuración.
 	 */
 	private static function get_client_ip(): string {
-		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? trim( $_SERVER['REMOTE_ADDR'] ) : '';
+		// Eliminar puerto si viene en formato IPv4:puerto (exactamente un colon).
+		if ( 1 === substr_count( $ip, ':' ) ) {
+			$ip = (string) strstr( $ip, ':', true );
+		}
 		// Validar que sea una IP real.
 		if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
 			return $ip;

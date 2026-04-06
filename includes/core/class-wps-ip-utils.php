@@ -220,6 +220,34 @@ class WPS_Ip_Utils {
     }
 
     /**
+     * Eliminar el número de puerto de una cadena IP si viene en formato ip:puerto.
+     *
+     * Soporta IPv4 con puerto (1.2.3.4:5678) e IPv6 en notación de corchetes ([::1]:80).
+     * Las IPs IPv6 puras (múltiples colons sin corchetes) no se modifican.
+     *
+     * @param string $value Valor que puede contener IP:puerto.
+     * @return string IP sin puerto.
+     */
+    public static function strip_port( string $value ): string {
+        $value = trim( $value );
+
+        // IPv6 con puerto en notación de corchetes: [2001:db8::1]:80
+        if ( 0 === strpos( $value, '[' ) ) {
+            $bracket_end = strpos( $value, ']' );
+            if ( false !== $bracket_end ) {
+                return substr( $value, 1, $bracket_end - 1 );
+            }
+        }
+
+        // IPv4 con puerto: exactamente un colon → separar y descartar puerto.
+        if ( 1 === substr_count( $value, ':' ) ) {
+            return (string) strstr( $value, ':', true );
+        }
+
+        return $value;
+    }
+
+    /**
      * Anonimizar una IP (para mostrar parcialmente).
      * 1.2.3.4 → 1.2.3.***
      */

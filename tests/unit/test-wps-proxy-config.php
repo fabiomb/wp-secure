@@ -103,4 +103,33 @@ class Test_WPS_Proxy_Config extends \PHPUnit\Framework\TestCase {
 
 		unset( $_SERVER['HTTP_CF_CONNECTING_IP'] );
 	}
+
+	public function test_get_real_ip_strips_port_from_remote_addr(): void {
+		$proxy = WPS_Proxy_Config::get_instance();
+		$_SERVER['REMOTE_ADDR'] = '69.171.230.40:53776';
+		unset( $_SERVER['HTTP_CF_CONNECTING_IP'] );
+		unset( $_SERVER['HTTP_X_REAL_IP'] );
+		unset( $_SERVER['HTTP_X_FORWARDED_FOR'] );
+		unset( $_SERVER['HTTP_X_SUCURI_CLIENTIP'] );
+
+		$ip = $proxy->get_real_ip();
+		$this->assertEquals( '69.171.230.40', $ip );
+	}
+
+	public function test_get_real_ip_strips_port_same_ip_different_ports(): void {
+		$proxy = WPS_Proxy_Config::get_instance();
+		unset( $_SERVER['HTTP_CF_CONNECTING_IP'] );
+		unset( $_SERVER['HTTP_X_REAL_IP'] );
+		unset( $_SERVER['HTTP_X_FORWARDED_FOR'] );
+		unset( $_SERVER['HTTP_X_SUCURI_CLIENTIP'] );
+
+		$_SERVER['REMOTE_ADDR'] = '173.252.70.9:40020';
+		$ip1 = $proxy->get_real_ip();
+
+		$_SERVER['REMOTE_ADDR'] = '173.252.70.9:65000';
+		$ip2 = $proxy->get_real_ip();
+
+		$this->assertEquals( $ip1, $ip2, 'El mismo IP con distintos puertos debe resolverse igual' );
+		$this->assertEquals( '173.252.70.9', $ip1 );
+	}
 }
