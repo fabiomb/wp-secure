@@ -20,7 +20,7 @@ class WPS_Admin_Events {
         $page     = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
         $severity = isset( $_GET['severity'] ) ? sanitize_text_field( wp_unslash( $_GET['severity'] ) ) : '';
         $etype    = isset( $_GET['event_type'] ) ? sanitize_text_field( wp_unslash( $_GET['event_type'] ) ) : '';
-        $ip       = isset( $_GET['ip'] ) ? sanitize_text_field( wp_unslash( $_GET['ip'] ) ) : '';
+        $ip       = isset( $_GET['ip'] ) ? WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_GET['ip'] ) ) ) : '';
         $result   = $this->get_events( $page, 30, $severity, $etype, $ip );
         ?>
         <div class="wrap wps-wrap">
@@ -240,7 +240,7 @@ class WPS_Admin_Events {
             return;
         }
 
-        $block_ip = isset( $_GET['block_ip'] ) ? sanitize_text_field( wp_unslash( $_GET['block_ip'] ) ) : '';
+        $block_ip = isset( $_GET['block_ip'] ) ? WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_GET['block_ip'] ) ) ) : '';
         if ( ! $block_ip || ! WPS_Ip_Utils::is_valid_ip( $block_ip ) ) {
             return;
         }

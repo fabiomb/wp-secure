@@ -45,7 +45,7 @@ class WPS_Admin_Ajax {
     public function ajax_block_ip(): void {
         $this->verify_ajax();
 
-        $ip       = sanitize_text_field( wp_unslash( $_POST['ip'] ?? '' ) );
+        $ip       = WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_POST['ip'] ?? '' ) ) );
         $reason   = sanitize_text_field( wp_unslash( $_POST['reason'] ?? __( 'Bloqueo manual', 'wp-secure' ) ) );
         $duration = absint( $_POST['duration'] ?? 0 );
         $minutes  = $duration > 0 ? $duration : null;
@@ -108,7 +108,7 @@ class WPS_Admin_Ajax {
     public function ajax_whitelist_add(): void {
         $this->verify_ajax();
 
-        $ip    = sanitize_text_field( wp_unslash( $_POST['ip'] ?? '' ) );
+        $ip    = WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_POST['ip'] ?? '' ) ) );
         $label = sanitize_text_field( wp_unslash( $_POST['label'] ?? '' ) );
         $type  = sanitize_text_field( wp_unslash( $_POST['type'] ?? 'global' ) );
 
@@ -275,7 +275,7 @@ class WPS_Admin_Ajax {
     public function ajax_geo_lookup(): void {
         $this->verify_ajax();
 
-        $ip = sanitize_text_field( wp_unslash( $_POST['ip'] ?? '' ) );
+        $ip = WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_POST['ip'] ?? '' ) ) );
         if ( empty( $ip ) || ! WPS_Ip_Utils::is_valid_ip( $ip ) ) {
             wp_send_json_error( array( 'message' => __( 'IP no válida.', 'wp-secure' ) ) );
         }

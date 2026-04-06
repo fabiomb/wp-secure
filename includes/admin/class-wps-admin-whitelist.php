@@ -171,7 +171,7 @@ class WPS_Admin_Whitelist {
                 return array( 'type' => 'error', 'text' => __( 'Nonce inválido.', 'wp-secure' ) );
             }
 
-            $ip    = sanitize_text_field( wp_unslash( $_POST['wps_ip'] ?? '' ) );
+            $ip    = WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_POST['wps_ip'] ?? '' ) ) );
             $label = sanitize_text_field( wp_unslash( $_POST['wps_label'] ?? '' ) );
             $type  = sanitize_text_field( wp_unslash( $_POST['wps_type'] ?? 'global' ) );
 

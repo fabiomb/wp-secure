@@ -248,6 +248,20 @@ class WPS_Ip_Utils {
     }
 
     /**
+     * Sanitizar un string que puede contener IP:puerto.
+     *
+     * Elimina puerto si está presente, luego valida.
+     * Devuelve la IP limpia o null si no es válida.
+     */
+    public static function sanitize_ip( string $value ): ?string {
+        $ip = self::strip_port( $value );
+        if ( self::is_valid_ip( $ip ) ) {
+            return $ip;
+        }
+        return null;
+    }
+
+    /**
      * Anonimizar una IP (para mostrar parcialmente).
      * 1.2.3.4 → 1.2.3.***
      */

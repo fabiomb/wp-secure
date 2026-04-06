@@ -220,14 +220,14 @@ class WPS_Request {
 
         foreach ( $headers as $header ) {
             if ( ! empty( $_SERVER[ $header ] ) ) {
-                $ip = trim( explode( ',', $_SERVER[ $header ] )[0] );
-                if ( WPS_Ip_Utils::is_valid_ip( $ip ) && ! WPS_Ip_Utils::is_private_ip( $ip ) ) {
+                $ip = WPS_Ip_Utils::sanitize_ip( explode( ',', $_SERVER[ $header ] )[0] );
+                if ( $ip && ! WPS_Ip_Utils::is_private_ip( $ip ) ) {
                     return $ip;
                 }
             }
         }
 
-        return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+        return WPS_Ip_Utils::strip_port( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
     }
 
     /**

@@ -161,6 +161,31 @@ class Test_WPS_Ip_Utils extends \PHPUnit\Framework\TestCase {
 	}
 
 	/*──────────────────────────────────────────────
+	 * sanitize_ip
+	 *──────────────────────────────────────────────*/
+
+	public function test_sanitize_ip_with_port(): void {
+		$this->assertEquals( '69.171.230.40', WPS_Ip_Utils::sanitize_ip( '69.171.230.40:53776' ) );
+		$this->assertEquals( '173.252.70.9', WPS_Ip_Utils::sanitize_ip( '173.252.70.9:40020' ) );
+		$this->assertEquals( '69.171.234.17', WPS_Ip_Utils::sanitize_ip( '69.171.234.17:54572' ) );
+	}
+
+	public function test_sanitize_ip_without_port(): void {
+		$this->assertEquals( '1.2.3.4', WPS_Ip_Utils::sanitize_ip( '1.2.3.4' ) );
+		$this->assertEquals( '2001:db8::1', WPS_Ip_Utils::sanitize_ip( '2001:db8::1' ) );
+	}
+
+	public function test_sanitize_ip_invalid_returns_null(): void {
+		$this->assertNull( WPS_Ip_Utils::sanitize_ip( 'not-an-ip' ) );
+		$this->assertNull( WPS_Ip_Utils::sanitize_ip( '' ) );
+		$this->assertNull( WPS_Ip_Utils::sanitize_ip( '999.999.999.999:80' ) );
+	}
+
+	public function test_sanitize_ip_ipv6_bracket_port(): void {
+		$this->assertEquals( '2001:db8::1', WPS_Ip_Utils::sanitize_ip( '[2001:db8::1]:443' ) );
+	}
+
+	/*──────────────────────────────────────────────
 	 * Network
 	 *──────────────────────────────────────────────*/
 

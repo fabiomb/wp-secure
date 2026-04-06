@@ -1,5 +1,29 @@
 # Registro de Cambios
 
+## [0.2.3] — 2026-04-06
+
+### Corrección: IP con puerto rompe funcionamiento general del plugin
+Ciertos servidores informan `REMOTE_ADDR` con el número de puerto incluido (ej: `69.171.230.40:53776`). Esto provocaba que un mismo visitante con distintos puertos fuera tratado como IPs diferentes, rompiendo filtros, estadísticas, bloqueos, whitelist y todas las funcionalidades que dependen de la identidad IP.
+
+- **Nuevo método `WPS_Ip_Utils::sanitize_ip()`**: combina `strip_port()` + validación en una sola llamada. Devuelve la IP limpia o `null` si no es válida.
+- **Corregido `WPS_Request::resolve_ip()`**: el path de fallback (cuando `WPS_Proxy_Config` no está disponible) ahora aplica `sanitize_ip()` a los headers de proxy y `strip_port()` al `REMOTE_ADDR` final. Este era el punto de entrada principal del bug.
+- **Corregido `WPS_Proxy_Config::get_real_ip()`**: ya aplicaba `strip_port()` desde v0.2.2 (parcial).
+- **Corregido `WPS_Proxy_Config::extract_ip()`**: ya aplicaba `strip_port()` desde v0.2.2 (parcial).
+- **Corregida Capa 0 (`wps-firewall-prepend.php`)**: ya aplicaba strip inline desde v0.2.2 (parcial).
+- **Corregidos todos los puntos de entrada de IP en admin**:
+  - `WPS_Admin_Ajax::ajax_block_ip()` — bloqueo manual vía AJAX.
+  - `WPS_Admin_Ajax::ajax_whitelist_add()` — agregar a whitelist vía AJAX.
+  - `WPS_Admin_Ajax::ajax_geo_lookup()` — lookup de geolocalización vía AJAX.
+  - `WPS_Admin_Events::render()` — filtro de IP en visor de eventos.
+  - `WPS_Admin_Events::handle_block_from_events()` — bloqueo rápido desde eventos.
+  - `WPS_Admin_Live_Traffic::render()` — filtro de IP en tráfico en vivo.
+  - `WPS_Admin_Blocks::handle_actions()` — formulario de bloqueo manual.
+  - `WPS_Admin_Whitelist` — formulario de agregar a whitelist.
+
+### Interno
+- Versión actualizada a `0.2.3` en cabecera del plugin, constante `WPS_VERSION` y MU-plugin.
+- Nuevos tests unitarios para `sanitize_ip()` en `test-wps-ip-utils.php`.
+
 ## [0.2.2] — 2026-04-05
 
 ### Nuevo: Modo Inseguro (Learning Mode)

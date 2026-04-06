@@ -441,7 +441,7 @@ class WPS_Admin_Blocks {
                 return array( 'type' => 'error', 'text' => __( 'Nonce inválido.', 'wp-secure' ) );
             }
 
-            $ip       = sanitize_text_field( wp_unslash( $_POST['wps_ip'] ?? '' ) );
+            $ip       = WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_POST['wps_ip'] ?? '' ) ) );
             $reason   = sanitize_text_field( wp_unslash( $_POST['wps_reason'] ?? '' ) );
             $duration = absint( $_POST['wps_duration'] ?? 0 );
             $minutes  = $duration > 0 ? $duration : null;

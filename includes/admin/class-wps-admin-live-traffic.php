@@ -26,7 +26,7 @@ class WPS_Admin_Live_Traffic {
 	public function render(): void {
 		// Si hay parámetro ip, mostrar detalle.
 		if ( isset( $_GET['ip'] ) ) {
-			$ip = sanitize_text_field( wp_unslash( $_GET['ip'] ) );
+			$ip = WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_GET['ip'] ) ) );
 			if ( WPS_Ip_Utils::is_valid_ip( $ip ) ) {
 				$this->render_ip_detail( $ip );
 				return;
