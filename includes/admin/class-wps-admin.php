@@ -191,7 +191,7 @@ class WPS_Admin {
 
         // Wizard (oculto del menú, solo accesible por URL).
         $this->page_hooks[] = add_submenu_page(
-            null,
+            '',
             __( 'Asistente de Configuración', 'wp-secure' ),
             '',
             $this->capability,

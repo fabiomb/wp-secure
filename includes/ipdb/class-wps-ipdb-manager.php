@@ -78,6 +78,10 @@ class WPS_Ipdb_Manager {
 			}
 		} else {
 			$result = $this->lookup_api( $ip );
+			// Fallback to local DB if API returned empty and local file exists.
+			if ( null === $result['country'] && null === $result['asn'] && $this->is_local_available() ) {
+				$result = $this->lookup_local( $ip );
+			}
 		}
 
 		$this->cache[ $ip ] = $result;

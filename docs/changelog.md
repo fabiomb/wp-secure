@@ -1,5 +1,20 @@
 # Registro de Cambios
 
+## [0.2.4] — 2026-04-09
+
+### Corrección: Fallback de API a base de datos local cuando la API no devuelve resultados
+Cuando el modo de resolución IP estaba configurado como "API" y la API de ipinfo.io alcanzaba su límite diario (o devolvía respuestas vacías), el plugin no consultaba la base de datos local MMDB aunque estuviera disponible. Esto provocaba que IPs legítimas (como las de Facebook) fueran identificadas erróneamente como crawlers falsificados (`auto_crawler_spoof`) al no poder resolver su ASN.
+
+- **`WPS_Ipdb_Manager::lookup()`**: cuando el modo es `api` y la respuesta no contiene país ni ASN, ahora se intenta automáticamente una búsqueda en la base de datos local MMDB si el archivo está disponible. Esto complementa el fallback inverso (local→API) que ya existía.
+
+### Corrección: Deprecation warnings en PHP 8.1+ por parámetros null
+`add_submenu_page()` de WordPress usa internamente `str_replace()` y `strpos()` sobre el slug del menú padre. Pasar `null` como primer argumento (para páginas ocultas) genera warnings de deprecación en PHP 8.1+.
+
+- **`WPS_Admin::register_menu()`**: cambiado el primer argumento de `add_submenu_page()` de `null` a `''` (string vacío) para la página del Wizard, eliminando los warnings de `str_replace()` y `strpos()` con parámetro null.
+
+### Interno
+- Versión actualizada a `0.2.4` en cabecera del plugin, constante `WPS_VERSION` y MU-plugin.
+
 ## [0.2.3] — 2026-04-06
 
 ### Corrección: IP con puerto rompe funcionamiento general del plugin
