@@ -314,6 +314,11 @@ class WPS_Request {
             return 'ajax';
         }
 
+        // WooCommerce frontend AJAX (wc-ajax=action).
+        if ( isset( $_GET['wc-ajax'] ) ) {
+            return 'ajax';
+        }
+
         // Admin.
         if ( false !== strpos( $path, '/wp-admin/' ) ) {
             return 'admin';

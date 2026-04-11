@@ -670,6 +670,63 @@ class WPS_Admin_Settings {
                 ),
             ),
 
+            'detectors' => array(
+                'title'       => __( 'Detectores', 'wp-secure' ),
+                'icon'        => 'dashicons-visibility',
+                'description' => __( 'Activa o desactiva los detectores de amenazas individualmente. Desactivar un detector evita que analice las peticiones entrantes. Útil para evitar falsos positivos o limitar el alcance del firewall.', 'wp-secure' ),
+                'fields'      => array(
+                    array(
+                        'key'            => 'detector_login_enabled',
+                        'label'          => __( 'Login (Fuerza Bruta)', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Detectar ataques de fuerza bruta al login de WordPress', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'            => 'detector_xmlrpc_enabled',
+                        'label'          => __( 'XML-RPC', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Detectar y bloquear accesos a xmlrpc.php', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'            => 'detector_sqli_enabled',
+                        'label'          => __( 'SQL Injection', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Detectar intentos de inyección SQL en parámetros y URIs', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'            => 'detector_xss_enabled',
+                        'label'          => __( 'XSS (Cross-Site Scripting)', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Detectar intentos de inyección de scripts maliciosos', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'            => 'detector_path_traversal_enabled',
+                        'label'          => __( 'Path Traversal', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Detectar intentos de recorrido de directorios y acceso a archivos sensibles', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'            => 'detector_scanner_enabled',
+                        'label'          => __( 'Scanner', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Detectar herramientas de escaneo de vulnerabilidades y enumeración', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'            => 'detector_restapi_enabled',
+                        'label'          => __( 'REST API', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Detectar abuso de la REST API de WordPress', 'wp-secure' ),
+                    ),
+                ),
+            ),
+
             'notifications' => array(
                 'title'       => __( 'Notificaciones', 'wp-secure' ),
                 'icon'        => 'dashicons-email-alt',

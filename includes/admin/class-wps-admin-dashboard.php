@@ -387,7 +387,16 @@ class WPS_Admin_Dashboard {
 			<table class="wps-status-table">
 				<tr>
 					<td><?php esc_html_e( 'Plugin', 'wp-secure' ); ?></td>
-					<td><span class="wps-badge wps-badge-ok"><?php echo esc_html( 'v' . WPS_VERSION ); ?></span></td>
+					<td>
+						<?php
+						// Usar get_plugin_data() para leer la versión real del archivo principal,
+						// evitando mostrar la constante WPS_VERSION que puede estar contaminada
+						// por un MU-plugin desactualizado que la definió primero.
+						$plugin_data    = get_plugin_data( WPS_PLUGIN_FILE, false, false );
+						$plugin_version = ! empty( $plugin_data['Version'] ) ? $plugin_data['Version'] : WPS_VERSION;
+						?>
+						<span class="wps-badge wps-badge-ok"><?php echo esc_html( 'v' . $plugin_version ); ?></span>
+					</td>
 				</tr>
 				<tr>
 					<td><?php esc_html_e( 'Modo Inseguro', 'wp-secure' ); ?></td>

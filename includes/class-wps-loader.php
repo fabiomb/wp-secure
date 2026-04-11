@@ -38,6 +38,9 @@ class WPS_Loader {
         // Verificar migraciones de BD.
         $this->maybe_upgrade();
 
+        // Sincronizar MU-plugin si la versión instalada difiere del fuente.
+        $this->maybe_sync_muplugin();
+
         // Cargar settings en cache.
         $this->load_settings();
 
@@ -95,28 +98,42 @@ class WPS_Loader {
      * Inicializar detectores de seguridad y componentes de firewall.
      */
     private function init_detectors(): void {
-        $login_detector = new WPS_Login_Detector( $this );
-        $login_detector->init();
+        if ( $this->get_setting( 'detector_login_enabled', true ) ) {
+            $login_detector = new WPS_Login_Detector( $this );
+            $login_detector->init();
+        }
 
-        $xmlrpc_detector = new WPS_Xmlrpc_Detector( $this );
-        $xmlrpc_detector->init();
+        if ( $this->get_setting( 'detector_xmlrpc_enabled', true ) ) {
+            $xmlrpc_detector = new WPS_Xmlrpc_Detector( $this );
+            $xmlrpc_detector->init();
+        }
 
         // Detectores de Fase 4.
-        $sqli_detector = new WPS_Sqli_Detector( $this );
-        $sqli_detector->init();
+        if ( $this->get_setting( 'detector_sqli_enabled', true ) ) {
+            $sqli_detector = new WPS_Sqli_Detector( $this );
+            $sqli_detector->init();
+        }
 
-        $xss_detector = new WPS_Xss_Detector( $this );
-        $xss_detector->init();
+        if ( $this->get_setting( 'detector_xss_enabled', true ) ) {
+            $xss_detector = new WPS_Xss_Detector( $this );
+            $xss_detector->init();
+        }
 
-        $traversal_detector = new WPS_Path_Traversal_Detector( $this );
-        $traversal_detector->init();
+        if ( $this->get_setting( 'detector_path_traversal_enabled', true ) ) {
+            $traversal_detector = new WPS_Path_Traversal_Detector( $this );
+            $traversal_detector->init();
+        }
 
-        $scanner_detector = new WPS_Scanner_Detector( $this );
-        $scanner_detector->init();
+        if ( $this->get_setting( 'detector_scanner_enabled', true ) ) {
+            $scanner_detector = new WPS_Scanner_Detector( $this );
+            $scanner_detector->init();
+        }
 
         // Detector de REST API (Fase 6).
-        $restapi_detector = new WPS_Restapi_Detector( $this );
-        $restapi_detector->init();
+        if ( $this->get_setting( 'detector_restapi_enabled', true ) ) {
+            $restapi_detector = new WPS_Restapi_Detector( $this );
+            $restapi_detector->init();
+        }
 
         // Rate Limiter: registrar hooks para conteo de peticiones.
         $this->init_rate_limiting();
@@ -353,6 +370,38 @@ class WPS_Loader {
             WPS_Activator::install_muplugin();
             update_option( 'wps_version', WPS_VERSION );
         }
+    }
+
+    /**
+     * Comparar la versión del MU-plugin instalado contra el fuente.
+     * Si difieren, reemplazar el archivo instalado.
+     */
+    private function maybe_sync_muplugin(): void {
+        $installed = WPMU_PLUGIN_DIR . '/wps-firewall-muplugin.php';
+        $source    = WPS_INCLUDES_DIR . 'firewall/wps-firewall-muplugin.php';
+
+        if ( ! is_file( $installed ) || ! is_file( $source ) ) {
+            return;
+        }
+
+        $installed_version = $this->get_file_header_version( $installed );
+        $source_version    = $this->get_file_header_version( $source );
+
+        if ( $source_version && $installed_version !== $source_version ) {
+            WPS_Activator::install_muplugin();
+        }
+    }
+
+    /**
+     * Extraer la versión del header "Version:" de un archivo PHP de plugin.
+     */
+    private function get_file_header_version( string $file ): ?string {
+        // Leer solo los primeros 2 KB para buscar el header.
+        $content = file_get_contents( $file, false, null, 0, 2048 );
+        if ( $content && preg_match( '/^\s*\*?\s*Version:\s*(.+)$/mi', $content, $matches ) ) {
+            return trim( $matches[1] );
+        }
+        return null;
     }
 
     /**

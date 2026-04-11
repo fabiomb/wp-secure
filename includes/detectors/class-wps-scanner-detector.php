@@ -68,7 +68,6 @@ class WPS_Scanner_Detector {
 		'/\/\.(env|aws|docker|kube)\b/i',
 		// Common vulnerability paths.
 		'/\/(?:cgi-bin|cgi|fcgi)\//i',
-		'/\/(?:\.well-known\/security\.txt)\b/i',
 		// Typical scanner probes.
 		'/\/(?:test|testing|temp|tmp|old|backup|bak|copy)\.(php|html?|zip|sql)\b/i',
 	);

@@ -1,5 +1,27 @@
 # Registro de Cambios
 
+## [0.2.5] — 2026-04-10
+
+### Corrección: Falsos positivos con peticiones WooCommerce AJAX
+Las peticiones con parámetro `?wc-ajax=` (como `get_refreshed_fragments`) eran clasificadas como tipo `page` en lugar de `ajax`, lo que provocaba que contaran hacia los límites de rate limiting de páginas y generaran bloqueos falsos en sitios con WooCommerce.
+
+- **`WPS_Request::classify_visitor_type()`**: ahora detecta el parámetro `wc-ajax` en la query string y clasifica estas peticiones como tipo `ajax`, evitando que cuenten como páginas en el rate limiter.
+
+### Corrección: Falso positivo con /.well-known/security.txt
+El acceso a `/.well-known/security.txt` (RFC 9116) era detectado erróneamente por el Scanner Detector como ruta de escaneo sospechosa, bloqueando un recurso estándar y legítimo.
+
+- **`WPS_Scanner_Detector::$scanner_paths`**: eliminado el patrón que coincidía con `/.well-known/security.txt` de la lista de rutas de scanner.
+
+### Nuevo: Configuración individual de detectores
+Nuevo panel de configuración que permite activar o desactivar individualmente cada detector del firewall. Todos los detectores vienen activados por defecto.
+
+- **Nueva sección "Detectores"** en la página de Configuración con checkboxes para: Login (Fuerza Bruta), XML-RPC, SQL Injection, XSS, Path Traversal, Scanner y REST API.
+- **`WPS_Loader::init_detectors()`**: cada detector consulta su setting (`detector_*_enabled`) antes de inicializarse. Si está desactivado, no se registran sus hooks y no analiza peticiones.
+- Útil para evitar falsos positivos o limitar el alcance del firewall en entornos específicos.
+
+### Interno
+- Versión actualizada a `0.2.5` en cabecera del plugin, constante `WPS_VERSION` y MU-plugin.
+
 ## [0.2.4] — 2026-04-09
 
 ### Corrección: Fallback de API a base de datos local cuando la API no devuelve resultados
