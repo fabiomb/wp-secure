@@ -1,5 +1,9 @@
 # Registro de Cambios
 
+## [0.2.6] — 2026-04-19
+
+Indicadores de IP previamente bloqueados en pantalla de eventos
+
 ## [0.2.5] — 2026-04-10
 
 ### Corrección: Falsos positivos con peticiones WooCommerce AJAX

@@ -22,6 +22,7 @@ class WPS_Admin_Events {
         $etype    = isset( $_GET['event_type'] ) ? sanitize_text_field( wp_unslash( $_GET['event_type'] ) ) : '';
         $ip       = isset( $_GET['ip'] ) ? WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_GET['ip'] ) ) ) : '';
         $result   = $this->get_events( $page, 30, $severity, $etype, $ip );
+        $blocked_map = $this->get_blocked_status_map( $result['items'] );
         ?>
         <div class="wrap wps-wrap">
             <h1><?php esc_html_e( 'WP Seguro — Eventos de Seguridad', 'wp-secure' ); ?></h1>
@@ -125,6 +126,21 @@ class WPS_Admin_Events {
                                         <a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-traffic&ip=' . urlencode( $event['ip_address'] ) ) ); ?>" class="button button-small" style="margin-left:4px;padding:0 4px;min-height:24px;line-height:22px;" title="<?php esc_attr_e( 'Ver detalle IP', 'wp-secure' ); ?>">
                                             <span class="dashicons dashicons-visibility" style="font-size:14px;width:14px;height:14px;line-height:1.6;"></span>
                                         </a>
+                                        <?php
+                                        $block_status = $blocked_map[ $event['ip_address'] ] ?? null;
+                                        if ( $block_status ) :
+                                            $is_permanent = empty( $block_status['expires_at'] );
+                                            $icon_class   = $is_permanent ? 'wps-block-permanent' : 'wps-block-temporary';
+                                            $icon_title   = $is_permanent
+                                                ? __( 'IP bloqueada permanentemente', 'wp-secure' )
+                                                : sprintf(
+                                                    /* translators: %s: expiration date */
+                                                    __( 'IP bloqueada temporalmente hasta %s', 'wp-secure' ),
+                                                    wp_date( 'Y-m-d H:i', strtotime( $block_status['expires_at'] ) )
+                                                );
+                                        ?>
+                                            <span class="dashicons dashicons-lock <?php echo esc_attr( $icon_class ); ?>" title="<?php echo esc_attr( $icon_title ); ?>"></span>
+                                        <?php endif; ?>
                                     <?php else : ?>
                                         —
                                     <?php endif; ?>
@@ -230,6 +246,46 @@ class WPS_Admin_Events {
             'page'     => $page,
             'per_page' => $per_page,
         );
+    }
+
+    /**
+     * Obtener mapa de estado de bloqueo para las IPs de los eventos.
+     *
+     * @param array $items Eventos con campo ip_address.
+     * @return array Mapa IP => row del bloqueo activo (o vacío si no está bloqueada).
+     */
+    private function get_blocked_status_map( array $items ): array {
+        $ips = array();
+        foreach ( $items as $event ) {
+            if ( ! empty( $event['ip_address'] ) ) {
+                $ips[ $event['ip_address'] ] = true;
+            }
+        }
+
+        if ( empty( $ips ) ) {
+            return array();
+        }
+
+        $db    = WPS_Db::get_instance();
+        $table = WPS_Db_Schema::table( 'blocked_ips' );
+        $unique_ips = array_keys( $ips );
+        $placeholders = implode( ',', array_fill( 0, count( $unique_ips ), '%s' ) );
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $rows = $db->get_results(
+            "SELECT ip_address, expires_at FROM {$table}
+             WHERE ip_address IN ({$placeholders})
+             AND is_active = 1
+             AND (expires_at IS NULL OR expires_at > NOW())",
+            ...$unique_ips
+        );
+
+        $map = array();
+        foreach ( $rows as $row ) {
+            $map[ $row['ip_address'] ] = $row;
+        }
+
+        return $map;
     }
 
     /**
