@@ -85,7 +85,7 @@ class WPS_Admin_Custom_Rules {
 		?>
 		<div id="wps-custom-rule-form" class="wps-section" style="<?php echo $is_edit ? '' : 'display:none;'; ?>">
 			<h2><?php echo $is_edit ? esc_html__( 'Editar Regla', 'wp-secure' ) : esc_html__( 'Nueva Regla', 'wp-secure' ); ?></h2>
-			<form method="post" id="wps-rule-form">
+			<form method="post" id="wps-rule-form" action="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-rules' ) ); ?>">
 				<?php wp_nonce_field( 'wps_custom_rule', 'wps_rule_nonce' ); ?>
 				<input type="hidden" name="wps_action" value="<?php echo $is_edit ? 'edit_rule' : 'add_rule'; ?>" />
 				<?php if ( $is_edit ) : ?>

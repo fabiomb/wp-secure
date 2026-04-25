@@ -1,5 +1,18 @@
 # Registro de Cambios
 
+## [0.2.7] — 2026-04-25
+
+### Corrección: Editar regla personalizada no guardaba los cambios
+El formulario de edición de reglas en la pantalla **WP Seguro → Reglas** hacía `POST` a la misma URL que incluía `?wps_action=edit&rule_id=X` como parámetros GET. En `handle_actions()`, el bloque que procesa `wps_action=edit` por GET se ejecutaba antes que el bloque POST, por lo que al pulsar "Guardar Cambios" el código recargaba el formulario de edición en lugar de persistir los datos.
+
+- **`WPS_Admin_Custom_Rules::render_rule_form()`**: añadido atributo `action` explícito en el formulario apuntando a la URL limpia de la página (`admin.php?page=wp-secure-rules`), eliminando los parámetros GET que interferían con el POST.
+
+### Corrección: Bloquear IP desde eventos perdía la página y los filtros activos
+Al pulsar el botón de bloqueo manual de una IP en la pantalla **WP Seguro → Eventos**, el redirect posterior siempre devolvía al usuario a la primera página de eventos sin filtros, aunque estuviera en una página intermedia con filtros de severidad, tipo o IP aplicados.
+
+- **`WPS_Admin_Events::handle_block_from_events()`**: el `wp_safe_redirect` ahora conserva los parámetros `paged`, `severity`, `event_type` e `ip` del request original, devolviendo al usuario exactamente a la misma página y filtros que tenía activos antes del bloqueo.
+
+
 ## [0.2.6] — 2026-04-19
 
 Indicadores de IP previamente bloqueados en pantalla de eventos

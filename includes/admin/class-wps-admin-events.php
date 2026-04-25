@@ -308,7 +308,13 @@ class WPS_Admin_Events {
         $blocker = WPS_Blocker::get_instance();
         $blocker->block_ip( $block_ip, 'manual', __( 'Bloqueado desde visor de eventos', 'wp-secure' ) );
 
-        wp_safe_redirect( admin_url( 'admin.php?page=wp-secure-events' ) );
+        $redirect_args = array( 'page' => 'wp-secure-events' );
+        foreach ( array( 'paged', 'severity', 'event_type', 'ip' ) as $param ) {
+            if ( ! empty( $_GET[ $param ] ) ) {
+                $redirect_args[ $param ] = sanitize_text_field( wp_unslash( $_GET[ $param ] ) );
+            }
+        }
+        wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) );
         exit;
     }
 
