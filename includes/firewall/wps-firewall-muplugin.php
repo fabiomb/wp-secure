@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Seguro — Firewall (Capa 1)
  * Description: MU-Plugin del firewall WP Seguro. Se ejecuta antes de plugins y temas.
- * Version: 0.2.7
+ * Version: 0.2.8
  * Author: WP Seguro
  *
  * Este archivo se instala automáticamente en wp-content/mu-plugins/.
@@ -101,8 +101,18 @@ final class WPS_Firewall_MuPlugin {
 			return;
 		}
 
-		// Rate limiting para la petición actual (si el rate limiter está cargado).
-		if ( class_exists( 'WPS_Rate_Limiter', false ) && class_exists( 'WPS_Loader', false ) ) {
+		// En muplugins_loaded la autenticación de WP aún no está disponible.
+		// Se detecta sesión activa mediante la cookie de WordPress como proxy.
+		$has_wp_session = false;
+		foreach ( array_keys( $_COOKIE ) as $cookie_name ) {
+			if ( 0 === strpos( $cookie_name, 'wordpress_logged_in_' ) ) {
+				$has_wp_session = true;
+				break;
+			}
+		}
+
+		// Rate limiting para la petición actual (si el rate limiter está cargado y no hay sesión activa).
+		if ( ! $has_wp_session && class_exists( 'WPS_Rate_Limiter', false ) && class_exists( 'WPS_Loader', false ) ) {
 			$loader       = WPS_Loader::get_instance();
 			$rate_limiter = WPS_Rate_Limiter::get_instance( $loader );
 			$visitor_type = $request->visitor_type();

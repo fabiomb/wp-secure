@@ -81,8 +81,8 @@ class WPS_Sqli_Detector {
 	 * Analizar la petición actual.
 	 */
 	public function check_request(): void {
-		// No analizar admin autenticados en wp-admin (falsos positivos).
-		if ( is_admin() && current_user_can( 'manage_options' ) ) {
+		// No analizar administradores logueados (cualquier página, no solo wp-admin).
+		if ( current_user_can( 'manage_options' ) ) {
 			return;
 		}
 

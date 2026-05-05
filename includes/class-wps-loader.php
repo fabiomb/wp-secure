@@ -144,7 +144,8 @@ class WPS_Loader {
      */
     private function init_rate_limiting(): void {
         add_action( 'init', function () {
-            if ( is_admin() && current_user_can( 'manage_options' ) ) {
+            // No aplicar rate limiting a administradores logueados (cualquier página).
+            if ( current_user_can( 'manage_options' ) ) {
                 return;
             }
 
@@ -182,6 +183,11 @@ class WPS_Loader {
             $ip      = $request->ip();
 
             if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+                return;
+            }
+
+            // No contabilizar 404 para administradores logueados.
+            if ( current_user_can( 'manage_options' ) ) {
                 return;
             }
 
@@ -341,6 +347,11 @@ class WPS_Loader {
         $ip      = $request->ip();
 
         if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+            return;
+        }
+
+        // No aplicar reglas personalizadas a administradores logueados.
+        if ( current_user_can( 'manage_options' ) ) {
             return;
         }
 

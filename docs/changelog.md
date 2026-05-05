@@ -1,5 +1,23 @@
 # Registro de Cambios
 
+## [0.2.8] — 2026-05-05
+
+### Corrección: Administradores logueados podían ser bloqueados por el firewall
+
+Los detectores de inyección SQL, XSS, Path Traversal y Scanner excluían el análisis únicamente cuando el administrador estaba en el área `/wp-admin`, pero no cuando navegaba por el frontend. Esto provocaba que peticiones legítimas del admin (editores de bloques, previsualizaciones, REST API de WooCommerce, etc.) pudieran activar detecciones falsas y generar bloqueos temporales o permanentes.
+
+- **`WPS_Sqli_Detector::check_request()`**, **`WPS_Xss_Detector::check_request()`**, **`WPS_Path_Traversal_Detector::check_request()`**, **`WPS_Scanner_Detector::check_request()`**: eliminada la condición `is_admin() &&` del guard inicial; ahora se omite el análisis para cualquier usuario con capacidad `manage_options`, independientemente de la página visitada.
+- **`WPS_Loader::init_rate_limiting()`** (`init` hook): eliminada la condición `is_admin() &&` del guard; el rate limiting de páginas y total ya no contabiliza peticiones de administradores logueados en ninguna parte del sitio.
+- **`WPS_Loader::init_rate_limiting()`** (`template_redirect` hook): añadido guard `current_user_can('manage_options')` para que los errores 404 que genere un administrador tampoco cuenten hacia el rate limit.
+- **`WPS_Loader::check_custom_rules()`**: añadido guard `current_user_can('manage_options')` para que las reglas personalizadas no se evalúen contra administradores logueados.
+- **`WPS_Firewall_MuPlugin::firewall_check()`** (Capa 1, MU-plugin): añadida detección de cookie `wordpress_logged_in_` antes del bloque de rate limiting. Como en `muplugins_loaded` la autenticación de WordPress aún no está disponible, se usa la presencia de dicha cookie como señal de sesión activa para omitir el conteo de hits.
+
+### Confirmado: Reglas ya no se aplican a IPs en la whitelist
+
+Se verificó que tanto `WPS_Loader::check_custom_rules()` como `WPS_Loader::check_current_ip()` y `WPS_Firewall_MuPlugin::firewall_check()` comprueban la whitelist antes de cualquier evaluación. El comportamiento era correcto; se documenta explícitamente para claridad.
+
+---
+
 ## [0.2.7] — 2026-04-25
 
 ### Corrección: Editar regla personalizada no guardaba los cambios
