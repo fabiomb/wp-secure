@@ -46,8 +46,12 @@ class WPS_Sqli_Detector {
 		'/\bSYS(?:OBJECTS|COLUMNS|TABLES)\b/i',
 		// SQL comments used for injection (standalone, not inside words).
 		'/(?:--|\/\*!|\/\*\*\/)\s*(?:UNION|SELECT|DROP|INSERT|UPDATE|DELETE|OR|AND)\b/i',
-		// Hex-encoded injection.
-		'/0x[0-9a-f]{8,}/i',
+		// Hex-encoded injection – must appear in a SQL context to avoid false
+		// positives on legitimate hex values (e.g. WooCommerce cart hashes,
+		// session tokens). Matches only when a SQL keyword or operator
+		// immediately precedes or follows the hex literal.
+		'/(?:\b(?:SELECT|UNION|CHAR|CONVERT|FROM|WHERE)\b|=)\s*0x[0-9a-f]{8,}/i',
+		'/0x[0-9a-f]{8,}\s*(?:--|;\s*\b(?:SELECT|DROP|INSERT|UPDATE|DELETE)\b|\b(?:UNION|SELECT|FROM)\b)/i',
 		// Common function abuse.
 		'/\b(?:CHAR|CHR|CONCAT|GROUP_CONCAT|EXTRACTVALUE|UPDATEXML)\s*\(/i',
 	);

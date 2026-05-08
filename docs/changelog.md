@@ -1,5 +1,9 @@
 # Registro de Cambios
 
+## [0.2.9] — 2026-05-08
+
+- Fix para detección exagerada de SQL injections
+
 ## [0.2.8] — 2026-05-05
 
 ### Corrección: Administradores logueados podían ser bloqueados por el firewall
