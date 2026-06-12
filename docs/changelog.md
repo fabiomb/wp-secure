@@ -1,5 +1,14 @@
 # Registro de Cambios
 
+## [0.2.10] — 2026-06-12
+
+### Corrección: Falso positivo de spoofing de Facebook/Twitter en navegadores reales
+
+Algunos navegadores reales (p. ej. webviews in-app de iOS/Safari) anexan tokens de bots de previsualización social al final de un User-Agent de navegador completo, como `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) Version/9.0.1 Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0`. El verificador de crawlers identificaba estos UAs como `facebookbot`, la verificación rDNS fallaba (porque la IP es de un visitante real) y la petición se bloqueaba como crawler falsificado.
+
+- **`WPS_Crawler_Verifier::identify_crawler_ua()`**: ya no identifica como `facebookbot` los User-Agents que contienen la firma de un navegador interactivo real.
+- **`WPS_Crawler_Verifier::is_interactive_browser_ua()`** (nuevo): detecta navegadores reales mediante el token de versión de Safari (`Version/x.y … Safari/`) y marcadores de webview de iOS (`CriOS`, `FxiOS`, `EdgiOS`, `GSA`). Los bots sociales legítimos y Googlebot nunca emiten estos tokens, por lo que la verificación de spoofing real no se ve afectada.
+
 ## [0.2.9] — 2026-05-08
 
 - Fix para detección exagerada de SQL injections

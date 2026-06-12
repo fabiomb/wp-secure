@@ -77,10 +77,13 @@ return array(
 
 	// User-Agents de crawlers.
 	'crawler_uas' => array(
-		'googlebot' => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-		'bingbot'   => 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
-		'yandexbot' => 'Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)',
-		'normal'    => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+		'googlebot'        => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+		'bingbot'          => 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+		'yandexbot'        => 'Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)',
+		'normal'           => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+		'facebookbot'      => 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+		// Navegador real de iOS/Safari que anexa tokens de bots sociales (falso positivo).
+		'ios_safari_appended_bots' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) Version/9.0.1 Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0',
 	),
 
 	// User-Agents de scanners.

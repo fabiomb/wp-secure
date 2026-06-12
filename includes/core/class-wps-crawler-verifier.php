@@ -117,10 +117,45 @@ class WPS_Crawler_Verifier {
 	public function identify_crawler_ua( string $user_agent ): ?string {
 		foreach ( self::$crawlers as $id => $def ) {
 			if ( preg_match( $def['ua'], $user_agent ) ) {
+				// Evitar falsos positivos: algunos navegadores reales (p. ej.
+				// webviews in-app de iOS) anexan tokens de bots de previsualización
+				// social ("facebookexternalhit", "Facebot", "Twitterbot") al final
+				// de un User-Agent de navegador completo. Esos tokens NO implican
+				// que la petición sea del bot. Si el UA contiene la firma de un
+				// navegador interactivo real, no lo tratamos como crawler.
+				if ( 'facebookbot' === $id && $this->is_interactive_browser_ua( $user_agent ) ) {
+					continue;
+				}
 				return $id;
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Detectar si un User-Agent corresponde a un navegador interactivo real.
+	 *
+	 * Los bots de previsualización social legítimos (facebookexternalhit, Facebot,
+	 * Twitterbot) nunca emiten el token de versión de Safari ("Version/x.y Safari/")
+	 * ni los marcadores de webview de iOS ("Mobile/xxxxx ... Safari"). Googlebot y
+	 * otros crawlers tampoco emiten "Version/", por lo que esta comprobación no los
+	 * afecta.
+	 *
+	 * @param string $user_agent User-Agent de la petición.
+	 * @return bool true si parece un navegador interactivo real.
+	 */
+	private function is_interactive_browser_ua( string $user_agent ): bool {
+		// Firma de Safari de escritorio/iOS: "Version/9.0.1 ... Safari/601.2.4".
+		if ( preg_match( '#\bVersion/\d[\d.]*\s+(Mobile/\S+\s+)?Safari/#i', $user_agent ) ) {
+			return true;
+		}
+
+		// Webviews/navegadores in-app de iOS basados en otros motores.
+		if ( preg_match( '#\b(CriOS|FxiOS|EdgiOS|GSA)/\d#i', $user_agent ) ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**

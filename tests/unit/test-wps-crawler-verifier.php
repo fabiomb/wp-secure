@@ -39,6 +39,25 @@ class Test_WPS_Crawler_Verifier extends \PHPUnit\Framework\TestCase {
 		$this->assertNull( $verifier->identify_crawler_ua( $ua ) );
 	}
 
+	public function test_identify_genuine_facebookbot_ua(): void {
+		$verifier = WPS_Crawler_Verifier::get_instance();
+		$ua       = $this->fixtures['crawler_uas']['facebookbot'];
+		$this->assertEquals( 'facebookbot', $verifier->identify_crawler_ua( $ua ) );
+	}
+
+	public function test_ios_safari_with_appended_bot_tokens_not_treated_as_crawler(): void {
+		// Navegador real de iOS/Safari que anexa "facebookexternalhit Facebot
+		// Twitterbot" al final NO debe identificarse como crawler (falso positivo
+		// que bloqueaba visitantes legítimos).
+		$verifier = WPS_Crawler_Verifier::get_instance();
+		$ua       = $this->fixtures['crawler_uas']['ios_safari_appended_bots'];
+		$this->assertNull( $verifier->identify_crawler_ua( $ua ) );
+		$this->assertEquals(
+			WPS_Crawler_Verifier::RESULT_UNKNOWN,
+			$verifier->verify( '203.0.113.50', $ua )
+		);
+	}
+
 	public function test_identify_empty_ua_returns_null(): void {
 		$verifier = WPS_Crawler_Verifier::get_instance();
 		$this->assertNull( $verifier->identify_crawler_ua( '' ) );
