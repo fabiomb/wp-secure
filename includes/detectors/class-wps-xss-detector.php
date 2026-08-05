@@ -27,39 +27,29 @@ class WPS_Xss_Detector {
 		// Script tags.
 		'/<\s*script\b/i',
 		'/<\s*\/\s*script\s*>/i',
-		// Event handlers.
-		'/\bon(?:error|load|click|mouseover|focus|blur|submit|change|input|keyup|keydown|mouseout|mouseenter|mouseleave|dblclick|contextmenu|resize|unload|beforeunload)\s*=/i',
-		// JavaScript protocol.
-		'/javascript\s*:/i',
-		// VBScript protocol.
-		'/vbscript\s*:/i',
-		// Data URI with script content.
+		// Manejadores de evento. Sólo cuentan dentro de una etiqueta: "el
+		// evento onchange = no se dispara" es prosa, "<img onerror=" es ataque.
+		'/<[^>]*\bon(?:error|load|click|mouseover|focus|blur|submit|change|input|keyup|keydown|mouseout|mouseenter|mouseleave|dblclick|contextmenu|toggle|animationstart|beforescriptexecute|pointerover|start)\s*=/i',
+		// Protocolos ejecutables. Se exige que el payload siga pegado a los dos
+		// puntos: en prosa ("JavaScript: The Good Parts") siempre hay un espacio.
+		'/javascript:(?!\s|$)/i',
+		'/vbscript:(?!\s|$)/i',
+		// Data URI con HTML embebido.
 		'/data\s*:\s*text\/html/i',
 		// Expression (IE legacy).
 		'/expression\s*\(/i',
-		// Eval / Function constructor.
-		'/\beval\s*\(/i',
-		'/\bFunction\s*\(/i',
-		// document object access.
-		'/\bdocument\s*\.\s*(?:cookie|domain|write|location|referrer)\b/i',
-		// window object abuse.
-		'/\bwindow\s*\.\s*(?:location|open|eval|execScript)\b/i',
-		// innerHTML / outerHTML.
-		'/\.(?:innerHTML|outerHTML)\s*=/i',
-		// SVG onload.
-		'/<\s*svg\b[^>]*\bonload\s*=/i',
-		// IMG onerror.
-		'/<\s*img\b[^>]*\bon(?:error|load)\s*=/i',
-		// IFRAME / OBJECT / EMBED injection.
-		'/<\s*(?:iframe|object|embed|applet|form|input|button|textarea|select)\b/i',
+		// Acceso a la cookie de sesión: el objetivo real de la exfiltración.
+		'/\bdocument\s*\.\s*cookie\b/i',
+		// Etiquetas que ejecutan o embeben contenido remoto. form, input,
+		// button, textarea y select quedan fuera: aparecen constantemente en
+		// texto normal sobre desarrollo web.
+		'/<\s*(?:iframe|object|embed|applet)\b/i',
 		// fromCharCode obfuscation.
 		'/String\s*\.\s*fromCharCode\s*\(/i',
-		// atob / btoa base64 abuse.
-		'/\b(?:atob|btoa)\s*\(/i',
 		// Set-Cookie via meta.
 		'/<\s*meta\b[^>]*http-equiv\s*=\s*["\']?set-cookie/i',
 		// Style-based XSS.
-		'/<\s*style\b[^>]*>.*?(?:expression|javascript|vbscript|url\s*\()/is',
+		'/<\s*style\b[^>]*>.*?(?:expression\s*\(|javascript:|vbscript:)/is',
 	);
 
 	public function __construct( WPS_Loader $loader ) {
@@ -79,8 +69,9 @@ class WPS_Xss_Detector {
 	 * Analizar la petición actual en busca de XSS.
 	 */
 	public function check_request(): void {
-		// No analizar administradores logueados (cualquier página, no solo wp-admin).
-		if ( current_user_can( 'manage_options' ) ) {
+		// No analizar a quien edita el sitio: su propio contenido dispara los
+		// mismos patrones que un ataque.
+		if ( WPS_Request::is_trusted_user() ) {
 			return;
 		}
 
@@ -120,14 +111,23 @@ class WPS_Xss_Detector {
 				continue;
 			}
 
-			$decoded = $this->decode_input( $input );
-			$pattern = $this->match_patterns( $decoded );
+			$pattern = self::detect( $input );
 			if ( $pattern ) {
 				return $pattern;
 			}
 		}
 
 		return null;
+	}
+
+	/**
+	 * Analizar un valor suelto en busca de XSS.
+	 *
+	 * @param string $value Valor crudo tal como llegó en la petición.
+	 * @return string|null Patrón que coincidió, o null si el valor es inocuo.
+	 */
+	public static function detect( string $value ): ?string {
+		return self::match_patterns( self::decode_input( $value ) );
 	}
 
 	/**
@@ -181,7 +181,7 @@ class WPS_Xss_Detector {
 	/**
 	 * Decodificar para detectar evasión por encoding.
 	 */
-	private function decode_input( string $input ): string {
+	private static function decode_input( string $input ): string {
 		$decoded = rawurldecode( rawurldecode( $input ) );
 		$decoded = str_replace( "\0", '', $decoded );
 		$decoded = html_entity_decode( $decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
@@ -198,7 +198,7 @@ class WPS_Xss_Detector {
 	 *
 	 * @return string|null El patrón que coincidió.
 	 */
-	private function match_patterns( string $input ): ?string {
+	private static function match_patterns( string $input ): ?string {
 		if ( strlen( $input ) < 4 ) {
 			return null;
 		}

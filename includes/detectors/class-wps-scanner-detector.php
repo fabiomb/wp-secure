@@ -89,8 +89,9 @@ class WPS_Scanner_Detector {
 	 * Analizar la petición actual.
 	 */
 	public function check_request(): void {
-		// No analizar administradores logueados (cualquier página, no solo wp-admin).
-		if ( current_user_can( 'manage_options' ) ) {
+		// No analizar a quien edita el sitio: su propio contenido dispara los
+		// mismos patrones que un ataque.
+		if ( WPS_Request::is_trusted_user() ) {
 			return;
 		}
 

@@ -27,22 +27,22 @@ class WPS_Sqli_Detector {
 	 */
 	private static $patterns = array(
 		// UNION-based injection.
-		'/\bUNION\s+(ALL\s+)?SELECT\b/i',
-		// Boolean-based blind.
-		'/\b(?:OR|AND)\s+[\d\'"]+=[\d\'"]+/i',
+		'/\bUNION\s+(?:ALL\s+)?SELECT\b/i',
+		// Boolean-based blind. Se exige un delimitador de cierre antes de la
+		// tautología: "1' OR 1=1" es inyección, "llevás 1 y 1 = 2" es prosa.
+		'/[\'")]\s*(?:OR|AND)\s+[\d\'"]+\s*=\s*[\d\'"]+/i',
 		'/\'\s*OR\s+\'/i',
-		// Stacked queries / destructive.
-		'/\b(?:DROP|ALTER|TRUNCATE)\s+(?:TABLE|DATABASE|INDEX)\b/i',
-		'/\bINSERT\s+INTO\b/i',
-		'/\bUPDATE\s+\S+\s+SET\b/i',
-		'/\bDELETE\s+FROM\b/i',
+		// Stacked queries. Las sentencias destructivas sólo cuentan cuando
+		// aparecen después de cerrar el valor original; un texto que menciona
+		// "DELETE FROM" o "drop table" no es un ataque.
+		'/[\'");]\s*;\s*(?:DROP|ALTER|TRUNCATE|INSERT|UPDATE|DELETE|SELECT)\b/i',
 		// Time-based blind.
 		'/\b(?:SLEEP|BENCHMARK|WAITFOR\s+DELAY|pg_sleep)\s*\(/i',
 		// File operations.
 		'/\bLOAD_FILE\s*\(/i',
 		'/\bINTO\s+(?:OUT|DUMP)FILE\b/i',
-		// Information schema / metadata.
-		'/\bINFORMATION_SCHEMA\b/i',
+		// Metadata. Se exige la referencia a la tabla, no la palabra suelta.
+		'/\bINFORMATION_SCHEMA\s*\./i',
 		'/\bSYS(?:OBJECTS|COLUMNS|TABLES)\b/i',
 		// SQL comments used for injection (standalone, not inside words).
 		'/(?:--|\/\*!|\/\*\*\/)\s*(?:UNION|SELECT|DROP|INSERT|UPDATE|DELETE|OR|AND)\b/i',
@@ -52,8 +52,10 @@ class WPS_Sqli_Detector {
 		// immediately precedes or follows the hex literal.
 		'/(?:\b(?:SELECT|UNION|CHAR|CONVERT|FROM|WHERE)\b|=)\s*0x[0-9a-f]{8,}/i',
 		'/0x[0-9a-f]{8,}\s*(?:--|;\s*\b(?:SELECT|DROP|INSERT|UPDATE|DELETE)\b|\b(?:UNION|SELECT|FROM)\b)/i',
-		// Common function abuse.
-		'/\b(?:CHAR|CHR|CONCAT|GROUP_CONCAT|EXTRACTVALUE|UPDATEXML)\s*\(/i',
+		// Funciones que sólo aparecen al explotar una inyección. CHAR, CONCAT y
+		// GROUP_CONCAT quedan fuera a propósito: son demasiado comunes en texto
+		// normal y en código que los usuarios pegan en formularios.
+		'/\b(?:EXTRACTVALUE|UPDATEXML)\s*\(/i',
 	);
 
 	/**
@@ -64,8 +66,6 @@ class WPS_Sqli_Detector {
 	private static $strict_patterns = array(
 		// Tautologies with quotes.
 		'/[\'"]\s*(?:OR|AND)\s*[\'"]\s*[\'"]\s*=/i',
-		// Closing quote + SQL keyword.
-		'/[\'"]\s*;\s*(?:DROP|SELECT|INSERT|UPDATE|DELETE|UNION)\b/i',
 	);
 
 	public function __construct( WPS_Loader $loader ) {
@@ -85,8 +85,9 @@ class WPS_Sqli_Detector {
 	 * Analizar la petición actual.
 	 */
 	public function check_request(): void {
-		// No analizar administradores logueados (cualquier página, no solo wp-admin).
-		if ( current_user_can( 'manage_options' ) ) {
+		// No analizar a quien edita el sitio: su propio contenido dispara los
+		// mismos patrones que un ataque.
+		if ( WPS_Request::is_trusted_user() ) {
 			return;
 		}
 
@@ -128,16 +129,23 @@ class WPS_Sqli_Detector {
 				continue;
 			}
 
-			// Decodificar para detectar evasión por encoding.
-			$decoded = $this->decode_input( $input );
-
-			$pattern = $this->match_patterns( $decoded );
+			$pattern = self::detect( $input );
 			if ( $pattern ) {
 				return $pattern;
 			}
 		}
 
 		return null;
+	}
+
+	/**
+	 * Analizar un valor suelto en busca de inyección SQL.
+	 *
+	 * @param string $value Valor crudo tal como llegó en la petición.
+	 * @return string|null Patrón que coincidió, o null si el valor es inocuo.
+	 */
+	public static function detect( string $value ): ?string {
+		return self::match_patterns( self::decode_input( $value ) );
 	}
 
 	/**
@@ -189,7 +197,7 @@ class WPS_Sqli_Detector {
 	/**
 	 * Decodificar input para detectar evasión por encoding.
 	 */
-	private function decode_input( string $input ): string {
+	private static function decode_input( string $input ): string {
 		// URL decode (double decode).
 		$decoded = rawurldecode( rawurldecode( $input ) );
 
@@ -207,7 +215,7 @@ class WPS_Sqli_Detector {
 	 *
 	 * @return string|null El patrón que coincidió.
 	 */
-	private function match_patterns( string $input ): ?string {
+	private static function match_patterns( string $input ): ?string {
 		// Skip inputs too short to be an injection.
 		if ( strlen( $input ) < 5 ) {
 			return null;
