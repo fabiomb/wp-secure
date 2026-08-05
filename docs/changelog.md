@@ -1,5 +1,106 @@
 # Registro de Cambios
 
+## [0.2.11] — 2026-08-05
+
+Revisión completa del código. Los cambios de seguridad de esta versión afectan cómo se determina la IP del visitante, así que conviene verificar en **WP Seguro → Tráfico en Vivo** que se registran IPs de visitantes reales y variadas antes de dar por buena la actualización en un sitio en producción.
+
+### Seguridad: La IP de origen podía falsificarse con un header
+
+Era posible tanto esquivar el firewall como provocar el bloqueo de un tercero: bastaba enviar `X-Forwarded-For` con la IP de una víctima junto a un patrón de ataque para que el plugin bloqueara esa IP. Se corrigieron cuatro causas independientes.
+
+- **`WPS_Firewall_MuPlugin::load_dependencies()`**: ahora carga `core/class-wps-proxy-config.php`, y lo hace antes que `core/class-wps-request.php`. El MU-plugin carga sus clases a mano porque el autoloader del plugin todavía no está registrado en esa fase; al faltar `WPS_Proxy_Config`, el `class_exists()` de `WPS_Request::resolve_ip()` daba `false` y la resolución caía a un respaldo que leía los headers sin verificar el proxy. Como `WPS_Request` es singleton, la Capa 2 reutilizaba esa misma instancia y el ajuste `proxy_mode` del sitio no se aplicaba nunca.
+- **`WPS_Firewall_MuPlugin::firewall_check()`**: inyecta el loader en `WPS_Proxy_Config` antes de construir la petición, para que la configuración de proxy del sitio rija también en la Capa 1.
+- **`WPS_Proxy_Config::extract_ip()`**: nuevo parámetro `$from_closest_hop`. `X-Forwarded-For` se recorre ahora de derecha a izquierda. El proxy agrega la IP real de la conexión al final de la cadena, así que la primera IP pública —la que se tomaba antes— es justamente la que el cliente puede prefijar.
+- **`WPS_Proxy_Config::extract_from_generic_headers()`**: `X-Forwarded-For` pasa a tener prioridad sobre `X-Real-IP`. Este último es trivial de falsificar si el proxy no lo sobrescribe, y no tiene cadena que permita descartar el valor inyectado por el cliente.
+- **`WPS_Proxy_Config::get_real_ip()`**: en modo `auto`, consultar headers genéricos exige ahora que `REMOTE_ADDR` sea una IP privada **válida**. Antes bastaba con que `is_private_ip()` devolviera `true`, cosa que también ocurre con valores ausentes o malformados.
+- **`WPS_Proxy_Config::extract_from_configured_header()`**: el modo `custom` aplica el mismo criterio de salto más cercano cuando el header configurado es `X-Forwarded-For`.
+- **`WPS_Request::resolve_ip()`**: eliminado el respaldo que leía `CF-Connecting-IP`, `X-Real-IP` y `X-Forwarded-For` por su cuenta. La resolución pasa siempre por `WPS_Proxy_Config`; sin él, sólo se confía en la conexión real.
+
+### Seguridad: Faltaban los rangos IPv6 de Cloudflare
+
+`WPS_Proxy_Config::$cdn_ranges` no incluía ningún rango IPv6. En un origen con registro AAAA, Cloudflare conecta por IPv6, `detect_cdn()` no reconocía la petición como del CDN y `get_real_ip()` devolvía la IP del edge en lugar de la del visitante. El efecto es que todo el tráfico del sitio colapsa en un puñado de direcciones, el rate limiter las bloquea y el sitio queda fuera de servicio.
+
+- **`WPS_Proxy_Config::$cdn_ranges`**: añadidos los siete rangos IPv6 oficiales de Cloudflare (`2400:cb00::/32`, `2606:4700::/32`, `2803:f800::/32`, `2405:b500::/32`, `2405:8100::/32`, `2a06:98c0::/29`, `2c0f:f248::/32`).
+
+### Seguridad: El formulario de login revelaba si una cuenta existía
+
+Un intento con un usuario inexistente devolvía un mensaje propio, distinto del error habitual de WordPress. Eso convierte al login en un oráculo: probando nombres y observando cuál responde distinto se enumeran las cuentas válidas del sitio. Además, el bloqueo se aplicaba al primer intento, de modo que equivocarse de usuario una vez alcanzaba para quedar bloqueado.
+
+- **`WPS_Login_Detector::denied_message()`** (nuevo): mensaje único para todas las rutas de rechazo.
+- **`WPS_Login_Detector::should_block_unknown_user()`** (nuevo) y **`count_recent_unknown_user_attempts()`** (nuevo): el bloqueo por usuario inexistente exige superar un umbral de intentos en la última hora. Por debajo del umbral la petición sigue el flujo normal de WordPress, que responde igual que ante una contraseña incorrecta.
+- **Nuevo ajuste `login_unknown_user_threshold`** (por defecto `3`, `0` desactiva este bloqueo), en Configuración → Login.
+
+### Corrección: Texto legítimo se detectaba como ataque
+
+Los detectores bloquean la IP de origen, y con `critical_block_mode` en `permanent` lo hacen para siempre. Varios patrones coincidían con prosa común, de modo que escribir un comentario sobre programación bastaba para quedar bloqueado en el propio sitio.
+
+- **`WPS_Xss_Detector::$patterns`**: eliminados los patrones de `Function(`, `eval(`, `atob(`, `innerHTML=`, `window.*` y `document.write`, que coinciden con cualquier texto que hable de JavaScript. Los manejadores `on*=` exigen ahora estar dentro de una etiqueta, para no marcar frases como «el evento onchange = no se dispara». Los protocolos `javascript:` y `vbscript:` exigen que el payload siga pegado a los dos puntos, ya que en prosa siempre hay un espacio («JavaScript: The Good Parts»). La lista de etiquetas se reduce a `iframe`, `object`, `embed` y `applet`: `form`, `input`, `button`, `textarea` y `select` aparecen constantemente en texto normal. Se conserva `document.cookie`, que es el objetivo real de la exfiltración.
+- **`WPS_Sqli_Detector::$patterns`**: eliminados `CHAR`, `CHR`, `CONCAT` y `GROUP_CONCAT` de la lista de funciones. `INSERT INTO`, `DELETE FROM`, `UPDATE … SET` y `DROP TABLE` ya no cuentan sueltos: exigen aparecer tras cerrar el valor original, que es lo que distingue una *stacked query* de una frase que menciona SQL. `INFORMATION_SCHEMA` exige la referencia a la tabla. Las tautologías exigen un delimitador previo, para no marcar «llevás 1 y 1 = 2 productos».
+- **`WPS_Request::is_trusted_user()`** (nuevo): los detectores de SQLi, XSS, Path Traversal y Scanner eximen ahora a cualquier usuario con capacidad `edit_posts`, no sólo a `manage_options`. Quien publica contenido manipula código como parte de su trabajo, y bloquearle la IP le rompe el sitio que edita.
+- **`WPS_Sqli_Detector::detect()`** y **`WPS_Xss_Detector::detect()`** (nuevos): exponen el análisis de un valor suelto, lo que permite cubrir los patrones con tests.
+
+### Corrección: Peticiones REST sin permalinks quedaban mal clasificadas
+
+- **`WPS_Request::classify_visitor_type()`**: buscaba `?rest_route=` dentro del path ya procesado por `wp_parse_url(PHP_URL_PATH)`, que nunca contiene el query string, de modo que la condición no se cumplía jamás. Estas peticiones se clasificaban como `page` y el hardener les bloqueaba `PUT`, `DELETE` y `PATCH`. Ahora se busca sobre la URI completa.
+
+### Rendimiento: Consultas repetidas en cada petición
+
+- **`WPS_Whitelist::is_whitelisted()`**: ejecutaba dos consultas por llamada, y se invoca una decena de veces por petición (loader, cada detector, hardener, rate limiter). La propiedad de cache existía y se invalidaba, pero nunca se leía. Ahora la whitelist se carga entera una vez por petición y las coincidencias se resuelven en memoria. Medido: 8 consultas para 4 comprobaciones, ahora 1.
+- **`WPS_Whitelist::matches_entries()`** (nuevo): lógica de coincidencia extraída, sin dependencia de la base de datos.
+- **`WPS_Db_Schema::tables_exist()`**: preguntaba tabla por tabla con `SHOW TABLES`, diez consultas en cada carga desde `WPS_Loader::load_settings()`. Ahora resuelve con una sola consulta y memoriza el resultado.
+- **`WPS_Db_Schema::table_names()`** (nuevo): lista canónica de tablas, que estaba duplicada entre `drop_tables()` y `tables_exist()`. **`flush_table_cache()`** (nuevo) invalida el resultado memorizado tras crear o eliminar tablas.
+- **`WPS_Rate_Limiter::increment()`**: hacía `INSERT` más `SELECT` para recuperar el contador, y se ejecuta dos veces por visita (`total` y `pages`). Ahora recupera el valor en la misma consulta con `LAST_INSERT_ID(request_count + 1)`, distinguiendo alta de actualización por las filas afectadas que devuelve MySQL.
+
+### Corrección: Ajustes que se guardaban pero no controlaban nada
+
+Tres casillas de Configuración se persistían y se mostraban marcadas sin tener efecto alguno sobre el comportamiento del plugin.
+
+- **`WPS_Loader::should_log_traffic()`** (nuevo): `exclude_static_from_log` decide ahora si los recursos estáticos llegan al log de tráfico.
+- **`WPS_Loader::is_layer_enabled()`** (nuevo): `firewall_layer1_enabled` apaga realmente el MU-plugin, verificado en `WPS_Firewall_MuPlugin::firewall_check()`. `firewall_layer0_enabled` controla el mantenimiento del archivo de bloqueos en `WPS_Activator::sync_blocked_ips_file()`.
+- **`WPS_Db_Migrations::adopt_existing_layer0()`** (nuevo): como el archivo de Capa 0 se escribía siempre, un sitio con la capa configurada en `.htaccess` perdería protección al actualizar. La migración da el ajuste por activado cuando el archivo de datos ya existe.
+
+### Corrección: Log de tráfico sin código de respuesta ni tiempo real
+
+- **`WPS_Loader::log_current_request()`** (nuevo): el registro de tráfico se difiere al `shutdown`. Al hacerse en `plugins_loaded`, `response_time_ms` medía siempre cerca de cero y `http_status` nunca se llenaba, aunque la interfaz mostrara ambas columnas.
+
+### Corrección: Visor de eventos
+
+- **`WPS_Admin_Events::handle_block_from_events()`**: se ejecutaba al final del render, con el HTML ya emitido, de modo que el `wp_safe_redirect()` posterior fallaba con las cabeceras enviadas y la tabla seguía mostrando el estado previo al bloqueo. Pasa a ejecutarse en `admin_init`, e incorpora la verificación de capacidad que antes cubría únicamente el registro del menú.
+- **`WPS_Event_Types::all()`** (nuevo): el filtro de tipos listaba ocho de veintisiete, así que no se podía filtrar por scanner, SQLi, XSS ni reglas personalizadas. La lista se deriva ahora por reflexión de las constantes de la clase.
+- **`WPS_Admin_Events::render_pagination()`**: imprimía un botón por página. Con decenas de miles de eventos eso son cientos de enlaces; ahora muestra una ventana alrededor de la página actual.
+- **`WPS_Admin_Events::get_events()`**: nuevo filtro por URI, que enlaza la vista de patrones con los eventos concretos que la componen.
+
+### Nuevo: Motor de puntuación de riesgo
+
+`WPS_Rules_Engine` no se instanciaba en ninguna parte fuera de los tests. La tabla de puntajes y los umbrales 31/51/81/100 documentados como el núcleo del plugin eran código muerto, igual que el ajuste `risky_countries`, que sólo esa clase consultaba.
+
+- **Nuevo ajuste `risk_engine_mode`**, en Configuración → Firewall Avanzado, con tres valores:
+  - `off` (por defecto): no evalúa nada. Reproduce exactamente el comportamiento y el costo de versiones anteriores.
+  - `shadow`: puntúa cada petición y registra el evento con el puntaje y los factores que lo formaron, sin bloquear nunca.
+  - `enforce`: aplica la acción correspondiente al puntaje.
+- El motor viene apagado a propósito. Los puntajes por defecto nunca corrieron contra tráfico real, así que activarlos de golpe empezaría a bloquear visitantes con umbrales que nadie calibró. El camino previsto es encender `shadow`, observar unos días qué puntajes saca el tráfico legítimo del sitio y con qué factores, y recién entonces pasar a `enforce`.
+- **`WPS_Rules_Engine::assess()`** (nuevo): devuelve puntaje, factores y acción. `evaluate()` delega en él y mantiene su firma.
+- **`WPS_Rules_Engine::mode()`**, **`is_enabled()`**, **`is_enforcing()`**, **`action_for_score()`** (nuevos).
+- **`WPS_Rules_Engine::get_instance()`**: ya no falla cuando se lo llama sin loader.
+- **`WPS_Loader::init_risk_engine()`** (nuevo): engancha el motor en `init` con prioridad 3, después de los detectores. Si está apagado no registra el hook.
+- **`WPS_Loader::build_risk_context()`** y **`resolve_country()`** (nuevos): contexto geográfico compartido. `check_custom_rules()` los reutiliza en lugar de duplicar la resolución.
+
+### Nuevo: Patrones recurrentes y creación de reglas desde un evento
+
+Ver un barrido de bots en el log y actuar sobre él eran dos tareas desconectadas: había que bloquear IP por IP a mano, o escribir la regla desde cero en otra pantalla sin ningún dato del evento delante.
+
+- **Nueva pantalla WP Seguro → Patrones** (`WPS_Admin_Patterns`): agrupa los eventos de seguridad por ruta y muestra intentos, IPs distintas y última aparición, con filtros de período y mínimo de intentos. Una ruta con diez o más IPs distintas se marca como barrido automatizado.
+- **`WPS_Custom_Rules::suggest_condition_from_uri()`** y **`suggest_condition_from_user_agent()`** (nuevos): derivan una condición a partir de un evento. Devuelven `null` cuando el valor es demasiado genérico —la raíz, algo vacío, menos de tres caracteres—, porque una regla «uri contiene /» con acción de bloqueo deja el sitio fuera de servicio.
+- **`WPS_Custom_Rules::path_is_covered()`** (nuevo): marca los patrones que ya tienen una regla actuando sobre ellos, para no revisar dos veces lo mismo. Las reglas `exempt` y `log_only` no cuentan como cobertura, porque no bloquean.
+- **`WPS_Admin_Custom_Rules::prefilled_rule_from_request()`** (nuevo): el botón «Crear regla», disponible en la pantalla de Patrones y en cada fila del visor de eventos, abre el formulario precargado con la condición derivada. No crea nada por su cuenta: la sugerencia automática puede resultar demasiado amplia, así que la decisión final queda en manos del administrador.
+- **`WPS_Admin_Custom_Rules::render_rule_form()`**: el modo edición se determina por la presencia de un id, de modo que una regla precargada sin id se trata como alta.
+
+### Interno
+
+- Suite de tests ampliada de 52 a 190 casos. Se corrigen además dos tests que ya fallaban: uno por falta de un stub y otro que afirmaba que `WPS_Rules_Engine` tenía constantes cuando no tiene ninguna, reemplazado por 21 tests de comportamiento.
+- **`tests/bootstrap.php`**: stubs de `wp_parse_url`, `current_user_can`, `is_user_logged_in` y transients, constantes `ARRAY_A`, `OBJECT`, `DAY_IN_SECONDS` y `HOUR_IN_SECONDS`, y un doble de `$wpdb` que registra las consultas ejecutadas. Esto permite verificar el costo de acceso a base de datos como comportamiento medible y no como estimación.
+- Versión actualizada a `0.2.11` en cabecera del plugin, constante `WPS_VERSION` y MU-plugin, cuyo respaldo de versión había quedado desincronizado en `0.2.7`.
+
 ## [0.2.10] — 2026-06-12
 
 ### Corrección: Falso positivo de spoofing de Facebook/Twitter en navegadores reales
