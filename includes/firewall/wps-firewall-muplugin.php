@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Seguro — Firewall (Capa 1)
  * Description: MU-Plugin del firewall WP Seguro. Se ejecuta antes de plugins y temas.
- * Version: 0.2.10
+ * Version: 0.2.11
  * Author: WP Seguro
  *
  * Este archivo se instala automáticamente en wp-content/mu-plugins/.
@@ -80,6 +80,24 @@ final class WPS_Firewall_MuPlugin {
 			return;
 		}
 
+		if ( ! class_exists( 'WPS_Loader', false ) ) {
+			return;
+		}
+
+		$loader = WPS_Loader::get_instance();
+
+		// Respetar el interruptor de Capa 1 de la configuración.
+		if ( ! $loader->is_layer_enabled( 1 ) ) {
+			return;
+		}
+
+		// Conectar el loader a la config de proxy antes de construir la
+		// petición: WPS_Request resuelve la IP en su constructor y sin esto
+		// el ajuste `proxy_mode` del sitio no se aplicaría en esta capa.
+		if ( class_exists( 'WPS_Proxy_Config', false ) ) {
+			WPS_Proxy_Config::get_instance()->set_loader( $loader );
+		}
+
 		// Clases esenciales para la evaluación.
 		$request = WPS_Request::get_instance();
 		$ip      = $request->ip();
@@ -112,8 +130,7 @@ final class WPS_Firewall_MuPlugin {
 		}
 
 		// Rate limiting para la petición actual (si el rate limiter está cargado y no hay sesión activa).
-		if ( ! $has_wp_session && class_exists( 'WPS_Rate_Limiter', false ) && class_exists( 'WPS_Loader', false ) ) {
-			$loader       = WPS_Loader::get_instance();
+		if ( ! $has_wp_session && class_exists( 'WPS_Rate_Limiter', false ) ) {
 			$rate_limiter = WPS_Rate_Limiter::get_instance( $loader );
 			$visitor_type = $request->visitor_type();
 
@@ -144,7 +161,7 @@ final class WPS_Firewall_MuPlugin {
 			define( 'WPS_DATA_DIR', dirname( self::$plugin_dir, 2 ) . '/wps-data/' );
 		}
 		if ( ! defined( 'WPS_VERSION' ) ) {
-			define( 'WPS_VERSION', '0.2.7' );
+			define( 'WPS_VERSION', '0.2.11' );
 		}
 
 		// Cargar clases en el orden necesario (sin autoloader para minimizar carga).
@@ -154,11 +171,14 @@ final class WPS_Firewall_MuPlugin {
 			'logging/class-wps-event-types.php',
 			'logging/class-wps-logger.php',
 			'core/class-wps-ip-utils.php',
+			'class-wps-loader.php',
+			// Debe cargarse antes que WPS_Request: la petición resuelve la IP
+			// del visitante en su constructor y delega esa decisión acá.
+			'core/class-wps-proxy-config.php',
 			'core/class-wps-request.php',
 			'core/class-wps-whitelist.php',
 			'core/class-wps-blocker.php',
 			'core/class-wps-rate-limiter.php',
-			'class-wps-loader.php',
 		);
 
 		foreach ( $classes as $class_file ) {

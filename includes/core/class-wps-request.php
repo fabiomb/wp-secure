@@ -115,6 +115,25 @@ class WPS_Request {
     }
 
     /**
+     * ¿El usuario autenticado actual es de confianza para los detectores?
+     *
+     * Los detectores de patrones bloquean la IP de origen. Aplicárselos a quien
+     * edita el sitio genera falsos positivos caros: un autor que escribe sobre
+     * SQL o pega un fragmento de HTML en un post dispara los mismos patrones
+     * que un atacante, y termina bloqueado en su propio sitio.
+     *
+     * Se toma `edit_posts` (colaborador en adelante) como límite: publicar
+     * contenido implica manipular código como parte del trabajo normal.
+     */
+    public static function is_trusted_user(): bool {
+        if ( ! function_exists( 'current_user_can' ) ) {
+            return false;
+        }
+
+        return current_user_can( 'edit_posts' );
+    }
+
+    /**
      * ¿El visitante tiene cookie de sesión WordPress activa?
      */
     public function has_wp_cookie(): bool {
@@ -200,34 +219,25 @@ class WPS_Request {
 
     /**
      * Determinar la IP real del visitante, delegando a WPS_Proxy_Config.
+     *
+     * La resolución pasa siempre por WPS_Proxy_Config, que es quien decide si
+     * los headers de proxy son confiables para esta petición. No existe una
+     * ruta alternativa que los lea directamente: un respaldo así ignoraría la
+     * configuración `proxy_mode` y permitiría falsificar la IP de origen
+     * enviando un header cualquiera.
      */
     private function resolve_ip(): string {
-        // Usar WPS_Proxy_Config si está disponible (Capa 2 con loader configurado).
         if ( class_exists( 'WPS_Proxy_Config' ) ) {
-            $proxy = WPS_Proxy_Config::get_instance();
-            $ip    = $proxy->get_real_ip();
+            $ip = WPS_Proxy_Config::get_instance()->get_real_ip();
             if ( WPS_Ip_Utils::is_valid_ip( $ip ) ) {
                 return $ip;
             }
         }
 
-        // Fallback: lectura directa (Layer 0/1 o si proxy no está configurado).
-        $headers = array(
-            'HTTP_CF_CONNECTING_IP',
-            'HTTP_X_REAL_IP',
-            'HTTP_X_FORWARDED_FOR',
-        );
+        // Sin proxy config disponible sólo se confía en la conexión real.
+        $remote_addr = WPS_Ip_Utils::strip_port( $_SERVER['REMOTE_ADDR'] ?? '' );
 
-        foreach ( $headers as $header ) {
-            if ( ! empty( $_SERVER[ $header ] ) ) {
-                $ip = WPS_Ip_Utils::sanitize_ip( explode( ',', $_SERVER[ $header ] )[0] );
-                if ( $ip && ! WPS_Ip_Utils::is_private_ip( $ip ) ) {
-                    return $ip;
-                }
-            }
-        }
-
-        return WPS_Ip_Utils::strip_port( $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' );
+        return WPS_Ip_Utils::is_valid_ip( $remote_addr ) ? $remote_addr : '0.0.0.0';
     }
 
     /**
@@ -299,8 +309,9 @@ class WPS_Request {
             return 'xmlrpc';
         }
 
-        // REST API.
-        if ( false !== strpos( $path, '/wp-json/' ) || false !== strpos( $path, '?rest_route=' ) ) {
+        // REST API. `rest_route` viaja en el query string, que $path ya no
+        // contiene, así que se busca sobre la URI completa.
+        if ( false !== strpos( $path, '/wp-json/' ) || false !== strpos( $uri, 'rest_route=' ) ) {
             return 'restapi';
         }
 

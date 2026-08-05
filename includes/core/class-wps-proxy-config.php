@@ -23,6 +23,19 @@ class WPS_Proxy_Config {
 	 */
 	private static $cdn_ranges = array(
 		'cloudflare' => array(
+			// IPv6. Cloudflare alcanza el origen por IPv6 siempre que el
+			// servidor tenga registro AAAA. Sin estos rangos la petición no se
+			// reconoce como del CDN, get_real_ip() devuelve la IP del edge y
+			// todo el tráfico del sitio colapsa en un puñado de direcciones:
+			// el rate limiter las bloquea y el sitio se cae para todos.
+			'2400:cb00::/32',
+			'2606:4700::/32',
+			'2803:f800::/32',
+			'2405:b500::/32',
+			'2405:8100::/32',
+			'2a06:98c0::/29',
+			'2c0f:f248::/32',
+			// IPv4.
 			'173.245.48.0/20',
 			'103.21.244.0/22',
 			'103.22.200.0/22',
@@ -107,8 +120,12 @@ class WPS_Proxy_Config {
 				}
 			}
 
-			// Auto: también probar headers genéricos si REMOTE_ADDR es privada (load balancer local).
-			if ( WPS_Ip_Utils::is_private_ip( $remote_addr ) ) {
+			// Auto: también probar headers genéricos si REMOTE_ADDR es privada
+			// (load balancer local). Se exige que sea una IP privada *válida*:
+			// un REMOTE_ADDR ausente o malformado no es evidencia de que haya
+			// un proxy delante, y tomarlo como tal habilitaría a falsificar la
+			// IP de origen con un header.
+			if ( WPS_Ip_Utils::is_valid_ip( $remote_addr ) && WPS_Ip_Utils::is_private_ip( $remote_addr ) ) {
 				return $this->extract_from_generic_headers( $remote_addr );
 			}
 
@@ -211,7 +228,12 @@ class WPS_Proxy_Config {
 		$server_key = $header_map[ $header ] ?? $header;
 
 		if ( ! empty( $_SERVER[ $server_key ] ) ) {
-			$ip = $this->extract_ip( $_SERVER[ $server_key ] );
+			// X-Forwarded-For es una cadena de saltos que el cliente puede
+			// prefijar; el resto de los headers llevan un único valor puesto
+			// por el proxy.
+			$from_closest_hop = ( 'HTTP_X_FORWARDED_FOR' === $server_key );
+
+			$ip = $this->extract_ip( $_SERVER[ $server_key ], $from_closest_hop );
 			if ( $ip ) {
 				return $ip;
 			}
@@ -221,9 +243,24 @@ class WPS_Proxy_Config {
 	}
 
 	/**
-	 * Extraer IP de headers genéricos (X-Real-IP, X-Forwarded-For).
+	 * Extraer IP de headers genéricos (X-Forwarded-For, X-Real-IP).
+	 *
+	 * X-Forwarded-For tiene prioridad porque es el único header cuya cadena
+	 * permite descartar los valores que inyecta el propio cliente: el proxy
+	 * agrega la IP de la conexión al final, así que el salto de la derecha es
+	 * el único que no controla el visitante. X-Real-IP se usa sólo como
+	 * respaldo, ya que un cliente puede enviarlo y el proxy podría no
+	 * sobrescribirlo.
 	 */
 	private function extract_from_generic_headers( string $fallback ): string {
+		// X-Forwarded-For: usar el salto más cercano al proxy (derecha).
+		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+			$ip = $this->extract_ip( $_SERVER['HTTP_X_FORWARDED_FOR'], true );
+			if ( $ip ) {
+				return $ip;
+			}
+		}
+
 		// X-Real-IP.
 		if ( ! empty( $_SERVER['HTTP_X_REAL_IP'] ) ) {
 			$ip = $this->extract_ip( $_SERVER['HTTP_X_REAL_IP'] );
@@ -232,22 +269,23 @@ class WPS_Proxy_Config {
 			}
 		}
 
-		// X-Forwarded-For: usar la primera IP pública.
-		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$ip = $this->extract_ip( $_SERVER['HTTP_X_FORWARDED_FOR'] );
-			if ( $ip ) {
-				return $ip;
-			}
-		}
-
 		return $fallback;
 	}
 
 	/**
-	 * Extraer la primera IP pública válida de un valor de header.
+	 * Extraer una IP pública válida de un valor de header.
+	 *
+	 * @param string $header_value Valor crudo del header.
+	 * @param bool   $from_closest_hop Recorrer la cadena de derecha a izquierda,
+	 *                                 para headers que el cliente puede prefijar.
 	 */
-	private function extract_ip( string $header_value ): ?string {
+	private function extract_ip( string $header_value, bool $from_closest_hop = false ): ?string {
 		$parts = explode( ',', $header_value );
+
+		if ( $from_closest_hop ) {
+			$parts = array_reverse( $parts );
+		}
+
 		foreach ( $parts as $part ) {
 			$ip = WPS_Ip_Utils::strip_port( trim( $part ) );
 			if ( WPS_Ip_Utils::is_valid_ip( $ip ) && ! WPS_Ip_Utils::is_private_ip( $ip ) ) {
