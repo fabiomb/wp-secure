@@ -140,6 +140,44 @@ class Test_WPS_Rule_Suggestions extends \PHPUnit\Framework\TestCase {
 		);
 	}
 
+	/*──────────────────────────────────────────────
+	 * Estado del formulario de reglas
+	 *
+	 * Son dos preguntas distintas: si el formulario debe estar visible y si lo
+	 * que se está haciendo es una edición. Confundirlas dejaba el formulario
+	 * precargado renderizado pero oculto, sin botón que lo abriera.
+	 *──────────────────────────────────────────────*/
+
+	public function test_form_is_closed_without_a_rule(): void {
+		$this->assertFalse( WPS_Admin_Custom_Rules::form_is_open( null ) );
+	}
+
+	public function test_form_is_open_for_a_prefilled_rule(): void {
+		$this->assertTrue(
+			WPS_Admin_Custom_Rules::form_is_open( array( 'id' => 0, 'name' => 'Bloquear /admin.php' ) ),
+			'Una regla precargada desde un evento debe abrir el formulario.'
+		);
+	}
+
+	public function test_form_is_open_when_editing(): void {
+		$this->assertTrue( WPS_Admin_Custom_Rules::form_is_open( array( 'id' => 7, 'name' => 'Regla existente' ) ) );
+	}
+
+	public function test_prefilled_rule_is_not_an_edit(): void {
+		$this->assertFalse(
+			WPS_Admin_Custom_Rules::form_is_edit( array( 'id' => 0, 'name' => 'Bloquear /admin.php' ) ),
+			'Sin id es un alta: el formulario debe postear add_rule.'
+		);
+	}
+
+	public function test_rule_with_id_is_an_edit(): void {
+		$this->assertTrue( WPS_Admin_Custom_Rules::form_is_edit( array( 'id' => 7, 'name' => 'Regla existente' ) ) );
+	}
+
+	public function test_no_rule_is_not_an_edit(): void {
+		$this->assertFalse( WPS_Admin_Custom_Rules::form_is_edit( null ) );
+	}
+
 	public function test_rules_on_other_fields_do_not_count_as_coverage(): void {
 		$rules = array(
 			$this->rule( array(

@@ -64,11 +64,36 @@ class WPS_Admin_Custom_Rules {
 	}
 
 	/**
+	 * ¿El formulario debe mostrarse abierto?
+	 *
+	 * Cualquier regla que llegue —una existente para editar o una precargada
+	 * desde un evento— abre el formulario. Es una pregunta distinta de si se
+	 * trata de una edición: confundir ambas dejaba el formulario precargado
+	 * renderizado con display:none y sin botón que lo abriera.
+	 *
+	 * @param array|null $rule Regla a mostrar, si hay alguna.
+	 */
+	public static function form_is_open( ?array $rule ): bool {
+		return ! empty( $rule );
+	}
+
+	/**
+	 * ¿Lo que se está haciendo es editar una regla existente?
+	 *
+	 * Una regla precargada desde un evento llega sin id: es un alta.
+	 *
+	 * @param array|null $rule Regla a mostrar, si hay alguna.
+	 */
+	public static function form_is_edit( ?array $rule ): bool {
+		return ! empty( $rule['id'] );
+	}
+
+	/**
 	 * Formulario para crear/editar regla.
 	 */
 	private function render_rule_form( ?array $edit_rule = null ): void {
-		// Una regla precargada desde un evento llega sin id: es alta, no edición.
-		$is_edit  = ! empty( $edit_rule['id'] );
+		$is_open  = self::form_is_open( $edit_rule );
+		$is_edit  = self::form_is_edit( $edit_rule );
 		$rule     = $edit_rule ?? array(
 			'id'              => 0,
 			'name'            => '',
@@ -84,7 +109,7 @@ class WPS_Admin_Custom_Rules {
 		$operators = WPS_Custom_Rules::get_operator_options();
 		$actions   = WPS_Custom_Rules::get_action_options();
 		?>
-		<div id="wps-custom-rule-form" class="wps-section" style="<?php echo $is_edit ? '' : 'display:none;'; ?>">
+		<div id="wps-custom-rule-form" class="wps-section" style="<?php echo $is_open ? '' : 'display:none;'; ?>">
 			<h2><?php echo $is_edit ? esc_html__( 'Editar Regla', 'wp-secure' ) : esc_html__( 'Nueva Regla', 'wp-secure' ); ?></h2>
 			<form method="post" id="wps-rule-form" action="<?php echo esc_url( admin_url( 'admin.php?page=wp-secure-rules' ) ); ?>">
 				<?php wp_nonce_field( 'wps_custom_rule', 'wps_rule_nonce' ); ?>
@@ -537,7 +562,13 @@ class WPS_Admin_Custom_Rules {
 		}
 
 		$field = sanitize_text_field( wp_unslash( $_GET['field'] ?? 'uri' ) );
-		$value = rawurldecode( sanitize_text_field( wp_unslash( $_GET['value'] ?? '' ) ) );
+
+		// add_query_arg() no codifica los valores (build_query pasa false a
+		// _http_build_query), así que el rawurlencode() del constructor de la
+		// URL es la única codificación y PHP ya la deshizo al llenar $_GET.
+		// Decodificar otra vez acá rompería una ruta con un % literal, que es
+		// justamente lo que mandan los scanners.
+		$value = sanitize_text_field( wp_unslash( $_GET['value'] ?? '' ) );
 
 		$condition = 'user_agent' === $field
 			? WPS_Custom_Rules::suggest_condition_from_user_agent( $value )
