@@ -14,8 +14,28 @@ defined( 'ABSPATH' ) || exit;
  *  51-80  → Rate limiting estricto
  *  81-100 → Bloqueo temporal
  *  >100   → Bloqueo inmediato
+ *
+ * Modos de operación (ajuste `risk_engine_mode`):
+ *   off     → no se evalúa nada; comportamiento y costo idénticos a no tenerlo.
+ *   shadow  → puntúa y registra qué habría hecho, sin bloquear nunca.
+ *   enforce → puntúa y aplica la acción correspondiente.
+ *
+ * El default es `off` a propósito. Los puntajes de esta tabla nunca corrieron
+ * contra tráfico real, así que activarlos de golpe en un sitio en producción
+ * empezaría a bloquear visitantes con umbrales que nadie calibró. El camino
+ * previsto es: encender `shadow`, mirar los eventos registrados durante unos
+ * días, y recién entonces pasar a `enforce`.
  */
 class WPS_Rules_Engine {
+
+	/** Modo apagado: el motor no evalúa. */
+	const MODE_OFF = 'off';
+
+	/** Modo sombra: evalúa y registra, sin bloquear. */
+	const MODE_SHADOW = 'shadow';
+
+	/** Modo activo: evalúa y aplica la acción. */
+	const MODE_ENFORCE = 'enforce';
 
 	/** @var WPS_Rules_Engine|null */
 	private static $instance = null;
@@ -100,11 +120,68 @@ class WPS_Rules_Engine {
 		$this->blocker = WPS_Blocker::get_instance();
 	}
 
+	/**
+	 * @param WPS_Loader|null $loader Requerido en la primera llamada.
+	 */
 	public static function get_instance( WPS_Loader $loader = null ): self {
 		if ( null === self::$instance ) {
+			if ( null === $loader ) {
+				$loader = WPS_Loader::get_instance();
+			}
 			self::$instance = new self( $loader );
 		}
 		return self::$instance;
+	}
+
+	/*──────────────────────────────────────────────
+	 * Modo de operación
+	 *──────────────────────────────────────────────*/
+
+	/**
+	 * Modo configurado, normalizado.
+	 */
+	public function mode(): string {
+		$mode = (string) $this->loader->get_setting( 'risk_engine_mode', self::MODE_OFF );
+
+		$valid = array( self::MODE_OFF, self::MODE_SHADOW, self::MODE_ENFORCE );
+
+		return in_array( $mode, $valid, true ) ? $mode : self::MODE_OFF;
+	}
+
+	/**
+	 * ¿El motor evalúa peticiones?
+	 */
+	public function is_enabled(): bool {
+		return self::MODE_OFF !== $this->mode();
+	}
+
+	/**
+	 * ¿El motor aplica las acciones que decide?
+	 */
+	public function is_enforcing(): bool {
+		return self::MODE_ENFORCE === $this->mode();
+	}
+
+	/**
+	 * Acción que corresponde a un puntaje.
+	 *
+	 * @return string none|log|strict_rate|temp_block|hard_block
+	 */
+	public function action_for_score( int $score ): string {
+		if ( $score >= self::$thresholds['hard_block'] ) {
+			return 'hard_block';
+		}
+		if ( $score >= self::$thresholds['temp_block'] ) {
+			return 'temp_block';
+		}
+		if ( $score >= self::$thresholds['strict_rate'] ) {
+			return 'strict_rate';
+		}
+		if ( $score >= self::$thresholds['log'] ) {
+			return 'log';
+		}
+
+		return 'none';
 	}
 
 	/**
@@ -117,6 +194,21 @@ class WPS_Rules_Engine {
 	 * @return int Puntuación de riesgo.
 	 */
 	public function evaluate( WPS_Request $request, array $context = array() ): int {
+		return $this->assess( $request, $context )['score'];
+	}
+
+	/**
+	 * Evaluar una petición y devolver el detalle completo.
+	 *
+	 * Los factores se devuelven además del puntaje para poder registrarlos: sin
+	 * saber *qué* sumó, un puntaje suelto en el log no sirve para calibrar los
+	 * umbrales.
+	 *
+	 * @param WPS_Request $request Petición a evaluar.
+	 * @param array       $context Contexto adicional de otros detectores.
+	 * @return array{score:int, factors:string[], action:string}
+	 */
+	public function assess( WPS_Request $request, array $context = array() ): array {
 		$score   = 0;
 		$factors = array();
 
@@ -197,7 +289,7 @@ class WPS_Rules_Engine {
 		}
 
 		// 9. Tasa de peticiones elevada.
-		$rate_limiter = WPS_Rate_Limiter::get_instance();
+		$rate_limiter = WPS_Rate_Limiter::get_instance( $this->loader );
 		$page_count   = $rate_limiter->get_count( $ip, 'pages' );
 		$page_limit   = (int) $this->loader->get_setting( 'rate_pages_per_min', 60 );
 		if ( $page_limit > 0 && $page_count > ( $page_limit * 0.7 ) ) {
@@ -211,7 +303,11 @@ class WPS_Rules_Engine {
 			$factors[] = 'nonexistent_user';
 		}
 
-		return $score;
+		return array(
+			'score'   => $score,
+			'factors' => $factors,
+			'action'  => $this->action_for_score( $score ),
+		);
 	}
 
 	/**
@@ -221,77 +317,66 @@ class WPS_Rules_Engine {
 	 * @param array       $context Contexto adicional.
 	 */
 	public function evaluate_and_act( WPS_Request $request, array $context = array() ): void {
-		$ip    = $request->ip();
-		$score = $this->evaluate( $request, $context );
-
-		if ( $score < self::$thresholds['log'] ) {
+		if ( ! $this->is_enabled() ) {
 			return;
 		}
 
-		if ( $score >= self::$thresholds['hard_block'] ) {
-			// >100: Bloqueo inmediato.
-			$this->logger->event_immediate( WPS_Event_Types::RISK_HIGH, array(
-				'ip_address' => $ip,
-				'details'    => array(
-					'score'  => $score,
-					'action' => 'hard_block',
-				),
-			) );
+		$ip         = $request->ip();
+		$assessment = $this->assess( $request, $context );
+		$score      = $assessment['score'];
+		$action     = $assessment['action'];
 
-			$this->blocker->block_ip(
-				$ip,
-				'auto_rate',
-				sprintf( 'Puntuación de riesgo elevada: %d', $score ),
-				0 // Permanente (sin expiración).
-			);
-
-			$this->blocker->send_block_response( 'Acceso denegado' );
+		if ( 'none' === $action ) {
 			return;
 		}
 
-		if ( $score >= self::$thresholds['temp_block'] ) {
-			// 81-100: Bloqueo temporal.
-			$minutes = (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
+		$enforcing = $this->is_enforcing();
 
-			$this->logger->event_immediate( WPS_Event_Types::RISK_HIGH, array(
-				'ip_address' => $ip,
-				'details'    => array(
-					'score'  => $score,
-					'action' => 'temp_block',
-				),
-			) );
+		$details = array(
+			'score'    => $score,
+			'action'   => $action,
+			'factors'  => implode( ', ', $assessment['factors'] ),
+			'enforced' => $enforcing,
+		);
 
-			$this->blocker->block_ip(
-				$ip,
-				'auto_rate',
-				sprintf( 'Puntuación de riesgo elevada: %d', $score ),
-				$minutes
-			);
+		$event_type = 'log' === $action ? WPS_Event_Types::RISK_LOW
+			: ( 'strict_rate' === $action ? WPS_Event_Types::RISK_MEDIUM : WPS_Event_Types::RISK_HIGH );
 
-			$this->blocker->send_block_response( 'Acceso denegado temporalmente' );
+		$event_data = array(
+			'ip_address'  => $ip,
+			'request_uri' => $request->uri(),
+			'user_agent'  => $request->user_agent(),
+			'details'     => $details,
+		);
+
+		// En modo sombra se registra qué habría pasado y se corta acá.
+		if ( ! $enforcing ) {
+			$this->logger->event( $event_type, $event_data );
 			return;
 		}
 
-		if ( $score >= self::$thresholds['strict_rate'] ) {
-			// 51-80: Rate limiting estricto (reducir límites a la mitad).
-			$this->logger->event( WPS_Event_Types::RISK_MEDIUM, array(
-				'ip_address' => $ip,
-				'details'    => array(
-					'score'  => $score,
-					'action' => 'strict_rate',
-				),
-			) );
+		// Las acciones sin bloqueo no necesitan escritura inmediata.
+		if ( 'log' === $action || 'strict_rate' === $action ) {
+			$this->logger->event( $event_type, $event_data );
 			return;
 		}
 
-		// 31-50: Solo log como sospechoso.
-		$this->logger->event( WPS_Event_Types::RISK_LOW, array(
-			'ip_address' => $ip,
-			'details'    => array(
-				'score'  => $score,
-				'action' => 'log_only',
-			),
-		) );
+		$this->logger->event_immediate( $event_type, $event_data );
+
+		$minutes = 'hard_block' === $action
+			? null
+			: (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
+
+		$this->blocker->block_ip(
+			$ip,
+			'auto_risk',
+			sprintf( 'Puntuación de riesgo elevada: %d (%s)', $score, implode( ', ', $assessment['factors'] ) ),
+			$minutes
+		);
+
+		$this->blocker->send_block_response(
+			'hard_block' === $action ? 'Acceso denegado' : 'Acceso denegado temporalmente'
+		);
 	}
 
 	/**

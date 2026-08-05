@@ -76,6 +76,7 @@ class WPS_Activator {
             'login_escalate_hours' => 24,
             'login_permanent_after'=> 3,
             'login_block_unknown_user' => true,
+            'login_unknown_user_threshold' => 3,
             'login_whitelist_only' => false,
 
             // XML-RPC.
@@ -98,7 +99,10 @@ class WPS_Activator {
             'firewall_layer0_enabled' => false,
             'firewall_layer1_enabled' => true,
 
-            // Risk scoring — países de alto riesgo (lista vacía por defecto).
+            // Motor de riesgo. Arranca apagado: los puntajes por defecto nunca
+            // se calibraron contra tráfico real, así que se enciende primero en
+            // modo sombra y se pasa a 'enforce' con datos del propio sitio.
+            'risk_engine_mode'     => 'off',
             'risky_countries'      => '',
 
             // Respuesta de bloqueo.
@@ -265,12 +269,23 @@ class WPS_Activator {
      * Se llama periódicamente desde el cron de mantenimiento.
      */
     public static function sync_blocked_ips_file(): void {
+        $file = WPS_DATA_DIR . 'wps-blocked-ips.php';
+
+        // Con la Capa 0 desactivada no se mantiene el archivo de datos, y se
+        // elimina el que hubiera: dejarlo desactualizado haría que un prepend
+        // todavía configurado bloqueara con una lista vieja.
+        if ( ! WPS_Loader::get_instance()->is_layer_enabled( 0 ) ) {
+            if ( is_file( $file ) ) {
+                @unlink( $file ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+            }
+            return;
+        }
+
         if ( ! is_dir( WPS_DATA_DIR ) ) {
             wp_mkdir_p( WPS_DATA_DIR );
         }
 
-        $blocker = WPS_Blocker::get_instance();
-        $db      = WPS_Db::get_instance();
+        $db = WPS_Db::get_instance();
 
         // Obtener IPs bloqueadas activas.
         $table    = WPS_Db_Schema::table( 'blocked_ips' );
@@ -312,7 +327,6 @@ class WPS_Activator {
 
         $content = '<?php return ' . var_export( $data, true ) . ';' . "\n";
 
-        $file = WPS_DATA_DIR . 'wps-blocked-ips.php';
         file_put_contents( $file, $content, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions
     }
 }

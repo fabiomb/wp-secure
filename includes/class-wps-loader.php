@@ -81,6 +81,9 @@ class WPS_Loader {
         // Evaluar reglas personalizadas del usuario.
         $this->check_custom_rules();
 
+        // Motor de puntuación de riesgo (apagado salvo que se configure).
+        $this->init_risk_engine();
+
         // Registrar tráfico en cada petición (frontend + admin).
         $this->init_traffic_logging();
 
@@ -197,7 +200,38 @@ class WPS_Loader {
     }
 
     /**
+     * ¿Corresponde registrar esta petición en el log de tráfico?
+     *
+     * @param string $visitor_type Tipo de visita clasificado por WPS_Request.
+     */
+    public function should_log_traffic( string $visitor_type ): bool {
+        if ( 'static' === $visitor_type && $this->get_setting( 'exclude_static_from_log', true ) ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * ¿Está habilitada una capa del firewall?
+     *
+     * @param int $layer 0 (auto_prepend_file) o 1 (MU-Plugin).
+     */
+    public function is_layer_enabled( int $layer ): bool {
+        $defaults = array( 0 => false, 1 => true );
+
+        return (bool) $this->get_setting(
+            'firewall_layer' . $layer . '_enabled',
+            $defaults[ $layer ] ?? false
+        );
+    }
+
+    /**
      * Registrar cada petición en la tabla traffic_log.
+     *
+     * El registro se difiere al shutdown: en plugins_loaded todavía no existen
+     * ni el código de respuesta ni un tiempo de proceso con sentido, así que
+     * medirlos acá daba siempre http_status vacío y response_time_ms ≈ 0.
      */
     private function init_traffic_logging(): void {
         // No registrar cron.
@@ -206,12 +240,25 @@ class WPS_Loader {
         }
 
         $request = WPS_Request::get_instance();
-        $ip      = $request->ip();
 
-        // No registrar tráfico de IPs en whitelist (ej: admin).
-        if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+        if ( ! $this->should_log_traffic( $request->visitor_type() ) ) {
             return;
         }
+
+        // No registrar tráfico de IPs en whitelist (ej: admin).
+        if ( WPS_Whitelist::get_instance()->is_whitelisted( $request->ip() ) ) {
+            return;
+        }
+
+        add_action( 'shutdown', array( $this, 'log_current_request' ), 0 );
+    }
+
+    /**
+     * Volcar la petición actual al log de tráfico, al final del ciclo.
+     */
+    public function log_current_request(): void {
+        $request = WPS_Request::get_instance();
+        $ip      = $request->ip();
 
         // Geo data (si está disponible).
         $country = null;
@@ -225,6 +272,8 @@ class WPS_Loader {
             }
         }
 
+        $status = http_response_code();
+
         $logger = WPS_Logger::get_instance();
         $logger->traffic( array(
             'ip_address'     => $ip,
@@ -236,6 +285,7 @@ class WPS_Loader {
             'referer'        => $request->referer(),
             'visitor_type'   => $request->visitor_type(),
             'session_hash'   => $request->session_hash(),
+            'http_status'    => is_int( $status ) ? $status : null,
             'response_time_ms' => $request->elapsed_ms(),
         ) );
     }
@@ -336,6 +386,73 @@ class WPS_Loader {
     }
 
     /**
+     * Enganchar el motor de puntuación de riesgo.
+     *
+     * Corre después de los detectores individuales (prioridad 2) para que una
+     * petición que ya fue bloqueada por un patrón concreto no vuelva a
+     * evaluarse. Si el motor está apagado no se registra ningún hook.
+     */
+    private function init_risk_engine(): void {
+        if ( defined( 'DOING_CRON' ) && DOING_CRON ) {
+            return;
+        }
+
+        $engine = WPS_Rules_Engine::get_instance( $this );
+
+        if ( ! $engine->is_enabled() ) {
+            return;
+        }
+
+        add_action( 'init', function () use ( $engine ) {
+            if ( WPS_Request::is_trusted_user() ) {
+                return;
+            }
+
+            $request = WPS_Request::get_instance();
+
+            if ( WPS_Whitelist::get_instance()->is_whitelisted( $request->ip() ) ) {
+                return;
+            }
+
+            $engine->evaluate_and_act( $request, $this->build_risk_context( $request ) );
+        }, 3 );
+    }
+
+    /**
+     * Contexto adicional para la evaluación de riesgo.
+     */
+    private function build_risk_context( WPS_Request $request ): array {
+        $context = array();
+
+        $country = $this->resolve_country( $request->ip() );
+        if ( $country ) {
+            $context['country_code'] = $country;
+        }
+
+        return $context;
+    }
+
+    /**
+     * Resolver el país de una IP, si hay geolocalización disponible.
+     */
+    private function resolve_country( string $ip ): ?string {
+        $api_key  = $this->get_setting( 'ipinfo_api_key', '' );
+        $has_mmdb = WPS_Ipdb_Manager::get_instance()->is_local_available();
+
+        if ( empty( $api_key ) && ! $has_mmdb ) {
+            return null;
+        }
+
+        if ( WPS_Ip_Utils::is_private_ip( $ip ) ) {
+            return null;
+        }
+
+        $geo_data = WPS_Geo::get_instance()->lookup( $ip );
+
+        return ! empty( $geo_data['country'] ) ? $geo_data['country'] : null;
+    }
+
+    /**
      * Evaluar reglas personalizadas del usuario contra la petición actual.
      */
     private function check_custom_rules(): void {
@@ -356,16 +473,7 @@ class WPS_Loader {
         }
 
         // Construir contexto geo si está disponible.
-        $context = array();
-        $api_key  = $this->get_setting( 'ipinfo_api_key', '' );
-        $has_mmdb = WPS_Ipdb_Manager::get_instance()->is_local_available();
-
-        if ( ( ! empty( $api_key ) || $has_mmdb ) && ! WPS_Ip_Utils::is_private_ip( $ip ) ) {
-            $geo_data = WPS_Geo::get_instance()->lookup( $ip );
-            if ( ! empty( $geo_data['country'] ) ) {
-                $context['country_code'] = $geo_data['country'];
-            }
-        }
+        $context = $this->build_risk_context( $request );
 
         $custom_rules = WPS_Custom_Rules::get_instance();
         $custom_rules->evaluate_and_act( $request, $context );

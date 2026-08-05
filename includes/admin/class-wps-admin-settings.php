@@ -330,7 +330,16 @@ class WPS_Admin_Settings {
                         'label'          => __( 'Bloquear usuario inexistente', 'wp-secure' ),
                         'type'           => 'checkbox',
                         'default'        => true,
-                        'checkbox_label' => __( 'Bloquear IP inmediatamente si el usuario no existe', 'wp-secure' ),
+                        'checkbox_label' => __( 'Bloquear IP tras varios intentos con usuarios que no existen', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'         => 'login_unknown_user_threshold',
+                        'label'       => __( 'Intentos con usuario inexistente', 'wp-secure' ),
+                        'type'        => 'number',
+                        'default'     => 3,
+                        'min'         => 0,
+                        'max'         => 50,
+                        'description' => __( 'Intentos con usuarios inexistentes, en una hora, antes de bloquear la IP. 0 desactiva este bloqueo. Un umbral de 1 bloquea a quien simplemente se equivoca de usuario.', 'wp-secure' ),
                     ),
                     array(
                         'key'            => 'login_whitelist_only',
@@ -468,11 +477,23 @@ class WPS_Admin_Settings {
                         'description'    => __( 'Intercepta peticiones antes de plugins y temas con acceso a la BD.', 'wp-secure' ),
                     ),
                     array(
+                        'key'         => 'risk_engine_mode',
+                        'label'       => __( 'Motor de puntuación de riesgo', 'wp-secure' ),
+                        'type'        => 'select',
+                        'default'     => 'off',
+                        'options'     => array(
+                            'off'     => __( 'Desactivado', 'wp-secure' ),
+                            'shadow'  => __( 'Modo sombra (mide y registra, no bloquea)', 'wp-secure' ),
+                            'enforce' => __( 'Activo (bloquea según el puntaje)', 'wp-secure' ),
+                        ),
+                        'description' => __( 'Puntúa cada petición combinando varios factores (User-Agent, ruta, tasa de peticiones, país, detecciones). Activá primero el modo sombra: durante unos días vas a ver en Eventos qué puntaje saca tu tráfico real y con qué factores, sin que se bloquee a nadie. Cuando los números tengan sentido para tu sitio, pasalo a Activo.', 'wp-secure' ),
+                    ),
+                    array(
                         'key'         => 'risky_countries',
                         'label'       => __( 'Países de alto riesgo', 'wp-secure' ),
                         'type'        => 'text',
                         'default'     => '',
-                        'description' => __( 'Códigos de país separados por coma (ej: CN,RU,KP). Aumenta la puntuación de riesgo para IPs de estos países.', 'wp-secure' ),
+                        'description' => __( 'Códigos de país separados por coma (ej: CN,RU,KP). Aumenta la puntuación de riesgo para IPs de estos países. Requiere el motor de riesgo encendido.', 'wp-secure' ),
                     ),
                     array(
                         'key'            => 'crawler_rdns_enabled',
