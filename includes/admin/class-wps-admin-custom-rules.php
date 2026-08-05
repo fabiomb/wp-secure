@@ -67,7 +67,8 @@ class WPS_Admin_Custom_Rules {
 	 * Formulario para crear/editar regla.
 	 */
 	private function render_rule_form( ?array $edit_rule = null ): void {
-		$is_edit  = ! empty( $edit_rule );
+		// Una regla precargada desde un evento llega sin id: es alta, no edición.
+		$is_edit  = ! empty( $edit_rule['id'] );
 		$rule     = $edit_rule ?? array(
 			'id'              => 0,
 			'name'            => '',
@@ -457,6 +458,11 @@ class WPS_Admin_Custom_Rules {
 			return array( 'type' => 'error', 'text' => __( 'Regla no encontrada.', 'wp-secure' ) );
 		}
 
+		// Alta precargada desde un evento o un patrón observado.
+		if ( 'new_from_event' === $get_action ) {
+			return $this->prefilled_rule_from_request();
+		}
+
 		if ( 'toggle' === $get_action && $rule_id ) {
 			if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ?? '' ) ), 'wps_toggle_rule_' . $rule_id ) ) {
 				return array( 'type' => 'error', 'text' => __( 'Nonce inválido.', 'wp-secure' ) );
@@ -513,6 +519,53 @@ class WPS_Admin_Custom_Rules {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Armar una regla precargada a partir de un evento observado.
+	 *
+	 * No crea nada: deja el formulario abierto y completo para que el
+	 * administrador revise la condición y elija la acción antes de guardar. La
+	 * sugerencia automática puede ser demasiado amplia, así que la decisión
+	 * final sigue siendo de una persona.
+	 *
+	 * @return array Estado para render(): la regla precargada o un mensaje.
+	 */
+	private function prefilled_rule_from_request(): array {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ?? '' ) ), 'wps_new_rule_from_event' ) ) {
+			return array( 'type' => 'error', 'text' => __( 'Nonce inválido.', 'wp-secure' ) );
+		}
+
+		$field = sanitize_text_field( wp_unslash( $_GET['field'] ?? 'uri' ) );
+		$value = rawurldecode( sanitize_text_field( wp_unslash( $_GET['value'] ?? '' ) ) );
+
+		$condition = 'user_agent' === $field
+			? WPS_Custom_Rules::suggest_condition_from_user_agent( $value )
+			: WPS_Custom_Rules::suggest_condition_from_uri( $value );
+
+		if ( null === $condition ) {
+			return array(
+				'type' => 'error',
+				'text' => __( 'Ese valor es demasiado genérico para derivar una regla: bloquearía tráfico legítimo.', 'wp-secure' ),
+			);
+		}
+
+		return array(
+			'edit_rule' => array(
+				'id'              => 0,
+				'name'            => sprintf(
+					/* translators: %s: observed value the rule is derived from */
+					__( 'Bloquear %s', 'wp-secure' ),
+					mb_strimwidth( $condition['value'], 0, 60, '…' )
+				),
+				'description'     => __( 'Creada desde un patrón observado en los eventos.', 'wp-secure' ),
+				'conditions'      => array( $condition ),
+				'action_type'     => 'block_temporary',
+				'action_duration' => 60,
+				'is_active'       => true,
+				'priority'        => 10,
+			),
+		);
 	}
 
 	/**

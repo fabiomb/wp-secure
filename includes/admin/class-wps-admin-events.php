@@ -21,7 +21,8 @@ class WPS_Admin_Events {
         $severity = isset( $_GET['severity'] ) ? sanitize_text_field( wp_unslash( $_GET['severity'] ) ) : '';
         $etype    = isset( $_GET['event_type'] ) ? sanitize_text_field( wp_unslash( $_GET['event_type'] ) ) : '';
         $ip       = isset( $_GET['ip'] ) ? WPS_Ip_Utils::strip_port( sanitize_text_field( wp_unslash( $_GET['ip'] ) ) ) : '';
-        $result   = $this->get_events( $page, 30, $severity, $etype, $ip );
+        $uri      = isset( $_GET['uri'] ) ? sanitize_text_field( wp_unslash( $_GET['uri'] ) ) : '';
+        $result   = $this->get_events( $page, 30, $severity, $etype, $ip, $uri );
         $blocked_map = $this->get_blocked_status_map( $result['items'] );
         ?>
         <div class="wrap wps-wrap">
@@ -182,6 +183,18 @@ class WPS_Admin_Events {
                                             <span class="dashicons dashicons-shield" style="font-size:14px;width:14px;height:14px;line-height:1.8;"></span>
                                         </a>
                                     <?php endif; ?>
+
+                                    <?php
+                                    // Crear una regla desde este evento, para
+                                    // atacar el patrón y no la IP de turno.
+                                    if ( ! empty( $event['request_uri'] )
+                                        && null !== WPS_Custom_Rules::suggest_condition_from_uri( $event['request_uri'] ) ) :
+                                        ?>
+                                        <a href="<?php echo esc_url( WPS_Admin_Patterns::new_rule_url( $event['request_uri'] ) ); ?>"
+                                           class="button button-small" title="<?php esc_attr_e( 'Crear una regla a partir de esta ruta', 'wp-secure' ); ?>">
+                                            <span class="dashicons dashicons-filter" style="font-size:14px;width:14px;height:14px;line-height:1.8;"></span>
+                                        </a>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -189,19 +202,16 @@ class WPS_Admin_Events {
                     </tbody>
                 </table>
 
-                <?php $this->render_pagination( $result, $severity, $etype, $ip ); ?>
+                <?php $this->render_pagination( $result, $severity, $etype, $ip, $uri ); ?>
             </div>
         </div>
         <?php
-
-        // Procesar bloqueo rápido desde eventos.
-        $this->handle_block_from_events();
     }
 
     /**
      * Obtener eventos paginados con filtros.
      */
-    private function get_events( int $page, int $per_page, string $severity, string $etype, string $ip ): array {
+    private function get_events( int $page, int $per_page, string $severity, string $etype, string $ip, string $uri = '' ): array {
         $db     = WPS_Db::get_instance();
         $table  = WPS_Db_Schema::table( 'security_events' );
         $offset = ( $page - 1 ) * $per_page;
@@ -222,6 +232,13 @@ class WPS_Admin_Events {
         if ( $ip && WPS_Ip_Utils::is_valid_ip( $ip ) ) {
             $where[]  = 'ip_address = %s';
             $params[] = $ip;
+        }
+
+        if ( '' !== $uri ) {
+            // Coincidencia por prefijo: la ruta llega desde la vista de
+            // patrones, ya sin query string.
+            $where[]  = 'request_uri LIKE %s';
+            $params[] = $db->esc_like( $uri ) . '%';
         }
 
         $where_sql = implode( ' AND ', $where );
@@ -290,9 +307,21 @@ class WPS_Admin_Events {
 
     /**
      * Bloqueo rápido de IP desde la lista de eventos.
+     *
+     * Corre en admin_init, antes de que WordPress emita nada: al ejecutarse
+     * durante el render la redirección posterior fallaba con las cabeceras ya
+     * enviadas y la tabla quedaba mostrando el estado anterior al bloqueo.
      */
-    private function handle_block_from_events(): void {
+    public function handle_block_from_events(): void {
+        if ( ! isset( $_GET['page'] ) || 'wp-secure-events' !== $_GET['page'] ) {
+            return;
+        }
+
         if ( ! isset( $_GET['wps_action'] ) || 'block_ip' !== $_GET['wps_action'] ) {
+            return;
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
 
@@ -309,7 +338,7 @@ class WPS_Admin_Events {
         $blocker->block_ip( $block_ip, 'manual', __( 'Bloqueado desde visor de eventos', 'wp-secure' ) );
 
         $redirect_args = array( 'page' => 'wp-secure-events' );
-        foreach ( array( 'paged', 'severity', 'event_type', 'ip' ) as $param ) {
+        foreach ( array( 'paged', 'severity', 'event_type', 'ip', 'uri' ) as $param ) {
             if ( ! empty( $_GET[ $param ] ) ) {
                 $redirect_args[ $param ] = sanitize_text_field( wp_unslash( $_GET[ $param ] ) );
             }
@@ -320,28 +349,37 @@ class WPS_Admin_Events {
 
     /**
      * Lista de tipos de evento para el filtro.
+     *
+     * Se deriva de los tipos que el plugin realmente registra, para que no
+     * queden detecciones (scanner, SQLi, XSS, reglas personalizadas) sin
+     * posibilidad de filtrar.
      */
     private function get_event_types(): array {
-        return array(
-            WPS_Event_Types::LOGIN_FAILED       => WPS_Event_Types::label( WPS_Event_Types::LOGIN_FAILED ),
-            WPS_Event_Types::LOGIN_BLOCKED       => WPS_Event_Types::label( WPS_Event_Types::LOGIN_BLOCKED ),
-            WPS_Event_Types::LOGIN_SUCCESS       => WPS_Event_Types::label( WPS_Event_Types::LOGIN_SUCCESS ),
-            WPS_Event_Types::XMLRPC_BLOCKED      => WPS_Event_Types::label( WPS_Event_Types::XMLRPC_BLOCKED ),
-            WPS_Event_Types::IP_BLOCKED          => WPS_Event_Types::label( WPS_Event_Types::IP_BLOCKED ),
-            WPS_Event_Types::MANUAL_BLOCK        => WPS_Event_Types::label( WPS_Event_Types::MANUAL_BLOCK ),
-            WPS_Event_Types::MANUAL_UNBLOCK      => WPS_Event_Types::label( WPS_Event_Types::MANUAL_UNBLOCK ),
-            WPS_Event_Types::SETTINGS_CHANGED    => WPS_Event_Types::label( WPS_Event_Types::SETTINGS_CHANGED ),
-        );
+        $types = array();
+
+        foreach ( WPS_Event_Types::all() as $type ) {
+            $types[ $type ] = WPS_Event_Types::label( $type );
+        }
+
+        asort( $types );
+
+        return $types;
     }
 
     /**
      * Paginación con filtros mantenidos.
+     *
+     * Muestra una ventana alrededor de la página actual: con decenas de miles
+     * de eventos, imprimir un botón por página generaba listas de cientos de
+     * enlaces.
      */
-    private function render_pagination( array $result, string $severity, string $etype, string $ip ): void {
-        if ( $result['pages'] <= 1 ) {
+    private function render_pagination( array $result, string $severity, string $etype, string $ip, string $uri = '' ): void {
+        $total_pages = (int) $result['pages'];
+        if ( $total_pages <= 1 ) {
             return;
         }
 
+        $current  = (int) $result['page'];
         $base_url = admin_url( 'admin.php?page=wp-secure-events' );
         $args     = array();
         if ( $severity ) {
@@ -353,18 +391,52 @@ class WPS_Admin_Events {
         if ( $ip ) {
             $args['ip'] = $ip;
         }
+        if ( $uri ) {
+            $args['uri'] = $uri;
+        }
+
+        $link = function ( int $page, string $label, bool $is_current = false ) use ( $args, $base_url ): void {
+            $args['paged'] = $page;
+            printf(
+                '<a href="%s" class="%s">%s</a> ',
+                esc_url( add_query_arg( $args, $base_url ) ),
+                esc_attr( $is_current ? 'button button-primary' : 'button' ),
+                esc_html( $label )
+            );
+        };
+
+        $window = 2;
+        $from   = max( 1, $current - $window );
+        $to     = min( $total_pages, $current + $window );
 
         echo '<div class="wps-pagination">';
-        for ( $i = 1; $i <= $result['pages']; $i++ ) {
-            $args['paged'] = $i;
-            $class = ( $i === $result['page'] ) ? 'button button-primary' : 'button';
-            printf(
-                '<a href="%s" class="%s">%d</a> ',
-                esc_url( add_query_arg( $args, $base_url ) ),
-                esc_attr( $class ),
-                $i
-            );
+
+        if ( $current > 1 ) {
+            $link( $current - 1, __( '« Anterior', 'wp-secure' ) );
         }
+
+        if ( $from > 1 ) {
+            $link( 1, '1' );
+            if ( $from > 2 ) {
+                echo '<span class="wps-pagination-gap">…</span> ';
+            }
+        }
+
+        for ( $i = $from; $i <= $to; $i++ ) {
+            $link( $i, (string) $i, $i === $current );
+        }
+
+        if ( $to < $total_pages ) {
+            if ( $to < $total_pages - 1 ) {
+                echo '<span class="wps-pagination-gap">…</span> ';
+            }
+            $link( $total_pages, (string) $total_pages );
+        }
+
+        if ( $current < $total_pages ) {
+            $link( $current + 1, __( 'Siguiente »', 'wp-secure' ) );
+        }
+
         echo '</div>';
     }
 }

@@ -49,6 +49,35 @@ class WPS_Event_Types {
     const SEVERITY_CRITICAL = 'critical';
 
     /**
+     * Todos los tipos de evento que el plugin puede registrar.
+     *
+     * Se deriva por reflexión de las constantes de la clase para que agregar un
+     * tipo nuevo no requiera acordarse de sumarlo también a los filtros del
+     * visor de eventos.
+     *
+     * @return string[]
+     */
+    public static function all(): array {
+        static $types = null;
+
+        if ( null !== $types ) {
+            return $types;
+        }
+
+        $constants = ( new ReflectionClass( __CLASS__ ) )->getConstants();
+
+        $types = array();
+        foreach ( $constants as $name => $value ) {
+            if ( 0 === strpos( $name, 'SEVERITY_' ) ) {
+                continue;
+            }
+            $types[] = $value;
+        }
+
+        return $types;
+    }
+
+    /**
      * Severidad predefinida para cada tipo de evento.
      */
     public static function default_severity( string $event_type ): string {

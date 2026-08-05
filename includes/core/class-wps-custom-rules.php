@@ -461,6 +461,122 @@ class WPS_Custom_Rules {
 	}
 
 	/*──────────────────────────────────────────────
+	 * Sugerencias a partir de un evento observado
+	 *──────────────────────────────────────────────*/
+
+	/** Largo mínimo de una ruta para que una regla derivada sea específica. */
+	const MIN_SUGGESTION_LENGTH = 3;
+
+	/** Largo máximo del valor de una condición sugerida. */
+	const MAX_SUGGESTION_LENGTH = 255;
+
+	/**
+	 * Proponer una condición a partir de la URI de un evento.
+	 *
+	 * Devuelve null cuando la ruta es tan genérica que la regla resultante
+	 * coincidiría con casi todo el tráfico: bloquear por "uri contiene /"
+	 * deja el sitio fuera de servicio.
+	 *
+	 * @return array{field:string, operator:string, value:string}|null
+	 */
+	public static function suggest_condition_from_uri( string $uri ): ?array {
+		$path = trim( $uri );
+
+		// El query string cambia en cada intento; la regla apunta a la ruta.
+		$query_position = strpos( $path, '?' );
+		if ( false !== $query_position ) {
+			$path = substr( $path, 0, $query_position );
+		}
+
+		$path = trim( $path );
+
+		if ( strlen( $path ) > self::MAX_SUGGESTION_LENGTH ) {
+			$path = substr( $path, 0, self::MAX_SUGGESTION_LENGTH );
+		}
+
+		// Una ruta que es sólo barras, o demasiado corta, no discrimina nada.
+		if ( strlen( $path ) < self::MIN_SUGGESTION_LENGTH || '' === trim( $path, '/' ) ) {
+			return null;
+		}
+
+		return array(
+			'field'    => 'uri',
+			'operator' => 'contains',
+			'value'    => $path,
+			'logic'    => 'AND',
+		);
+	}
+
+	/**
+	 * Proponer una condición a partir del User-Agent de un evento.
+	 *
+	 * @return array{field:string, operator:string, value:string}|null
+	 */
+	public static function suggest_condition_from_user_agent( string $user_agent ): ?array {
+		$value = trim( $user_agent );
+
+		if ( '' === $value ) {
+			return null;
+		}
+
+		if ( strlen( $value ) > self::MAX_SUGGESTION_LENGTH ) {
+			$value = substr( $value, 0, self::MAX_SUGGESTION_LENGTH );
+		}
+
+		return array(
+			'field'    => 'user_agent',
+			'operator' => 'contains',
+			'value'    => $value,
+			'logic'    => 'AND',
+		);
+	}
+
+	/**
+	 * ¿Alguna regla existente ya actúa sobre esta ruta?
+	 *
+	 * Permite marcar en la vista de patrones cuáles ya están atendidos, para no
+	 * volver a revisar lo mismo en cada pasada por el log.
+	 *
+	 * @param string $path  Ruta observada.
+	 * @param array  $rules Reglas con sus condiciones ya decodificadas.
+	 */
+	public static function path_is_covered( string $path, array $rules ): bool {
+		foreach ( $rules as $rule ) {
+			// Una exención no bloquea nada, así que no cubre el patrón.
+			if ( 'exempt' === ( $rule['action_type'] ?? '' ) || 'log_only' === ( $rule['action_type'] ?? '' ) ) {
+				continue;
+			}
+
+			foreach ( (array) ( $rule['conditions'] ?? array() ) as $condition ) {
+				if ( 'uri' !== ( $condition['field'] ?? '' ) ) {
+					continue;
+				}
+
+				$value = (string) ( $condition['value'] ?? '' );
+				if ( '' === $value ) {
+					continue;
+				}
+
+				$operator = $condition['operator'] ?? 'contains';
+
+				if ( 'contains' === $operator && false !== stripos( $path, $value ) ) {
+					return true;
+				}
+
+				if ( 'equals' === $operator && 0 === strcasecmp( $path, $value ) ) {
+					return true;
+				}
+
+				if ( 'starts_with' === $operator && 0 === stripos( $path, $value ) ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/*──────────────────────────────────────────────
 	 * Evaluación de condiciones
 	 *──────────────────────────────────────────────*/
 

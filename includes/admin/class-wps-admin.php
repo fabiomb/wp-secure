@@ -36,6 +36,10 @@ class WPS_Admin {
         add_action( 'admin_init', array( $this, 'handle_settings_save' ) );
         add_action( 'admin_init', array( $this, 'handle_export' ) );
 
+        // Acciones del visor de eventos. Deben resolverse antes de imprimir
+        // nada para que la redirección posterior funcione.
+        add_action( 'admin_init', array( new WPS_Admin_Events( $this->loader ), 'handle_block_from_events' ) );
+
         // Aviso global cuando el Modo Inseguro está activo.
         add_action( 'admin_notices', array( $this, 'maybe_show_unsafe_mode_notice' ) );
 
@@ -157,6 +161,16 @@ class WPS_Admin {
             $this->capability,
             $this->menu_slug . '-events',
             array( $this, 'render_events' )
+        );
+
+        // Patrones recurrentes.
+        $this->page_hooks[] = add_submenu_page(
+            $this->menu_slug,
+            __( 'Patrones', 'wp-secure' ),
+            __( 'Patrones', 'wp-secure' ),
+            $this->capability,
+            $this->menu_slug . '-patterns',
+            array( $this, 'render_patterns' )
         );
 
         // Base de Datos IP.
@@ -433,6 +447,17 @@ class WPS_Admin {
         }
         $events = new WPS_Admin_Events( $this->loader );
         $events->render();
+    }
+
+    /**
+     * Patrones recurrentes.
+     */
+    public function render_patterns(): void {
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        $patterns = new WPS_Admin_Patterns( $this->loader );
+        $patterns->render();
     }
 
     /**
