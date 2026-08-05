@@ -38,6 +38,51 @@ class WPS_Login_Detector {
     }
 
     /**
+     * Mensaje único de rechazo de login.
+     *
+     * Todas las rutas de rechazo devuelven el mismo texto. Un mensaje
+     * específico para "el usuario no existe" convierte al formulario de login
+     * en un oráculo: permite enumerar cuentas válidas probando nombres y
+     * mirando cuál responde distinto.
+     */
+    public static function denied_message(): string {
+        return __( 'No se pudo completar el inicio de sesión. Verificá los datos o intentá más tarde.', 'wp-secure' );
+    }
+
+    /**
+     * ¿Corresponde bloquear la IP por intentos con usuarios inexistentes?
+     *
+     * @param int $recent_attempts Intentos recientes con usuario inexistente desde esa IP.
+     */
+    public function should_block_unknown_user( int $recent_attempts ): bool {
+        $threshold = (int) $this->loader->get_setting( 'login_unknown_user_threshold', 3 );
+
+        // 0 deshabilita este bloqueo.
+        if ( $threshold <= 0 ) {
+            return false;
+        }
+
+        return $recent_attempts >= $threshold;
+    }
+
+    /**
+     * Contar intentos recientes con usuario inexistente desde una IP.
+     */
+    private function count_recent_unknown_user_attempts( string $ip ): int {
+        $table = WPS_Db_Schema::table( 'login_attempts' );
+
+        return (int) $this->db->get_var(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "SELECT COUNT(*) FROM {$table}
+             WHERE ip_address = %s
+             AND user_exists = 0
+             AND success = 0
+             AND attempted_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
+            $ip
+        );
+    }
+
+    /**
      * Verificar antes de autenticar: bloquear IP si es necesario.
      *
      * @param WP_User|WP_Error|null $user
@@ -72,20 +117,14 @@ class WPS_Login_Detector {
                 'details'     => array( 'reason' => 'login_whitelist_only', 'username' => $username ),
             ) );
 
-            return new \WP_Error(
-                'wps_blocked',
-                __( 'Acceso denegado. Tu IP no está autorizada para iniciar sesión.', 'wp-secure' )
-            );
+            return new \WP_Error( 'wps_blocked', self::denied_message() );
         }
 
         // Verificar si la IP ya está bloqueada.
         $block = $this->blocker->is_blocked( $ip );
         if ( $block ) {
             $this->blocker->increment_hits( (int) $block['id'] );
-            return new \WP_Error(
-                'wps_blocked',
-                __( 'Tu IP ha sido bloqueada temporalmente por múltiples intentos fallidos. Intenta más tarde.', 'wp-secure' )
-            );
+            return new \WP_Error( 'wps_blocked', self::denied_message() );
         }
 
         // Evaluar reglas personalizadas con condición login_username.
@@ -102,18 +141,21 @@ class WPS_Login_Detector {
             }
         }
 
-        // Bloquear IP inmediatamente si el usuario no existe en WordPress.
+        // Bloquear la IP tras varios intentos con usuarios inexistentes.
         if ( $this->loader->get_setting( 'login_block_unknown_user', true ) ) {
             $user_exists = ( get_user_by( 'login', $username ) || get_user_by( 'email', $username ) );
 
             if ( ! $user_exists ) {
                 $this->record_attempt( $ip, $username, false, false );
-                $this->block_for_unknown_user( $ip, $username );
 
-                return new \WP_Error(
-                    'wps_blocked',
-                    __( 'Tu IP ha sido bloqueada por intentar acceder con un usuario inexistente.', 'wp-secure' )
-                );
+                if ( $this->should_block_unknown_user( $this->count_recent_unknown_user_attempts( $ip ) ) ) {
+                    $this->block_for_unknown_user( $ip, $username );
+
+                    return new \WP_Error( 'wps_blocked', self::denied_message() );
+                }
+
+                // Por debajo del umbral se deja seguir el flujo normal de
+                // WordPress, que responde igual que con una contraseña mala.
             }
         }
 
