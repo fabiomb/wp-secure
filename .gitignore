@@ -5,3 +5,4 @@ composer.json
 composer.lock
 vendor/*
 .phpunit.result.cache
+.atl/

@@ -51,6 +51,76 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	if ( ! function_exists( 'wp_unslash' ) ) {
 		function wp_unslash( $value ) { return is_string( $value ) ? stripslashes( $value ) : $value; }
 	}
+	if ( ! function_exists( 'current_user_can' ) ) {
+		function current_user_can( $capability ) {
+			return ! empty( $GLOBALS['wps_test_caps'][ $capability ] );
+		}
+	}
+	if ( ! function_exists( 'is_user_logged_in' ) ) {
+		function is_user_logged_in() { return ! empty( $GLOBALS['wps_test_caps'] ); }
+	}
+	if ( ! function_exists( 'wp_parse_url' ) ) {
+		function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
+	}
+	if ( ! function_exists( 'get_transient' ) ) {
+		function get_transient( $key ) { return $GLOBALS['wps_test_transients'][ $key ] ?? false; }
+	}
+	if ( ! function_exists( 'set_transient' ) ) {
+		function set_transient( $key, $value, $ttl = 0 ) {
+			$GLOBALS['wps_test_transients'][ $key ] = $value;
+			return true;
+		}
+	}
+	if ( ! function_exists( 'delete_transient' ) ) {
+		function delete_transient( $key ) {
+			unset( $GLOBALS['wps_test_transients'][ $key ] );
+			return true;
+		}
+	}
+	if ( ! defined( 'DAY_IN_SECONDS' ) ) {
+		define( 'DAY_IN_SECONDS', 86400 );
+	}
+	if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+		define( 'HOUR_IN_SECONDS', 3600 );
+	}
+	if ( ! defined( 'ARRAY_A' ) ) {
+		define( 'ARRAY_A', 'ARRAY_A' );
+	}
+	if ( ! defined( 'OBJECT' ) ) {
+		define( 'OBJECT', 'OBJECT' );
+	}
+
+	/**
+	 * Doble mínimo de $wpdb.
+	 *
+	 * Devuelve resultados vacíos en vez de fallar, para que el código que
+	 * consulta la base de datos tome sus valores por defecto durante los
+	 * tests unitarios.
+	 */
+	class WPS_Test_Wpdb {
+		public $prefix     = 'wp_';
+		public $last_error = '';
+		public $insert_id  = 0;
+
+		/** @var string[] Queries ejecutadas, para verificar costo de acceso a BD. */
+		public $queries = array();
+
+		public function reset_queries() { $this->queries = array(); }
+
+		public function prepare( $query, ...$args ) { return $query; }
+		public function get_var( $query = null ) { $this->queries[] = $query; return null; }
+		public function get_row( $query = null, $output = null ) { $this->queries[] = $query; return null; }
+		public function get_results( $query = null, $output = null ) { $this->queries[] = $query; return array(); }
+		public function get_col( $query = null, $column = 0 ) { $this->queries[] = $query; return array(); }
+		public function query( $query ) { $this->queries[] = $query; return 0; }
+		public function insert( $table, $data, $format = null ) { return false; }
+		public function update( $table, $data, $where, $format = null, $where_format = null ) { return false; }
+		public function delete( $table, $where, $where_format = null ) { return false; }
+		public function esc_like( $text ) { return $text; }
+		public function get_charset_collate() { return ''; }
+	}
+
+	$GLOBALS['wpdb'] = new WPS_Test_Wpdb();
 
 	// Autoloader.
 	spl_autoload_register( function ( $class ) {
