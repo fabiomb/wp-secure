@@ -110,7 +110,10 @@ class WPS_Rate_Limiter {
 	/**
 	 * Incrementar el contador de peticiones.
 	 *
-	 * Usa INSERT ... ON DUPLICATE KEY UPDATE para atomicidad.
+	 * Usa INSERT ... ON DUPLICATE KEY UPDATE para atomicidad, y recupera el
+	 * nuevo valor en la misma consulta con LAST_INSERT_ID(expr): esto corre dos
+	 * veces por visita (total y pages), así que ahorrar el SELECT de vuelta
+	 * elimina dos consultas por petición.
 	 *
 	 * @return int El nuevo conteo.
 	 */
@@ -118,25 +121,25 @@ class WPS_Rate_Limiter {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$wpdb->query( $wpdb->prepare(
+		$affected = $wpdb->query( $wpdb->prepare(
 			"INSERT INTO {$this->table} (ip_address, limit_type, window_start, request_count)
 			VALUES (%s, %s, %s, 1)
-			ON DUPLICATE KEY UPDATE request_count = request_count + 1",
+			ON DUPLICATE KEY UPDATE request_count = LAST_INSERT_ID(request_count + 1)",
 			$ip,
 			$type,
 			$window_start
 		) );
 
-		// Leer el valor actual.
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$count = $wpdb->get_var( $wpdb->prepare(
-			"SELECT request_count FROM {$this->table} WHERE ip_address = %s AND limit_type = %s AND window_start = %s",
-			$ip,
-			$type,
-			$window_start
-		) );
+		// MySQL devuelve 1 cuando insertó una fila nueva y 2 cuando actualizó
+		// una existente. En el primer caso el contador arranca en 1; en el
+		// segundo, LAST_INSERT_ID() trae el valor ya incrementado.
+		if ( 1 === (int) $affected ) {
+			return 1;
+		}
 
-		return $count ? (int) $count : 1;
+		$count = (int) $wpdb->insert_id;
+
+		return $count > 0 ? $count : 1;
 	}
 
 	/**

@@ -28,38 +28,58 @@ class WPS_Whitelist {
 
     /**
      * Verificar si una IP está en la whitelist (global o tipo específico).
+     *
+     * Cada petición consulta esto una decena de veces (loader, detectores,
+     * hardener, rate limiter). La tabla es chica y estable, así que se carga
+     * entera una sola vez y las coincidencias se resuelven en memoria.
      */
     public function is_whitelisted( string $ip, string $type = 'global' ): bool {
-        $table = WPS_Db_Schema::table( 'whitelist' );
+        return self::matches_entries( $ip, $type, $this->get_entries() );
+    }
 
-        // Buscar por IP exacta.
-        $found = $this->db->get_var(
-            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            "SELECT COUNT(*) FROM {$table}
-             WHERE ip_address = %s AND (whitelist_type = %s OR whitelist_type = 'global')",
-            $ip,
-            $type
-        );
+    /**
+     * Resolver una coincidencia contra un conjunto de entradas ya cargadas.
+     *
+     * @param string $ip      IP del visitante.
+     * @param string $type    Tipo consultado (global, login, …).
+     * @param array  $entries Filas con ip_address, cidr y whitelist_type.
+     */
+    public static function matches_entries( string $ip, string $type, array $entries ): bool {
+        foreach ( $entries as $entry ) {
+            $entry_type = $entry['whitelist_type'] ?? 'global';
 
-        if ( (int) $found > 0 ) {
-            return true;
-        }
+            // Las entradas globales aplican a todo; las tipadas sólo a su tipo.
+            if ( 'global' !== $entry_type && $type !== $entry_type ) {
+                continue;
+            }
 
-        // Buscar por CIDR en la whitelist.
-        $cidrs = $this->db->get_results(
-            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            "SELECT cidr FROM {$table}
-             WHERE cidr IS NOT NULL AND (whitelist_type = %s OR whitelist_type = 'global')",
-            $type
-        );
+            if ( ! empty( $entry['ip_address'] ) && $entry['ip_address'] === $ip ) {
+                return true;
+            }
 
-        foreach ( $cidrs as $row ) {
-            if ( WPS_Ip_Utils::ip_in_cidr( $ip, $row['cidr'] ) ) {
+            if ( ! empty( $entry['cidr'] ) && WPS_Ip_Utils::ip_in_cidr( $ip, $entry['cidr'] ) ) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Cargar la whitelist completa, una sola vez por petición.
+     */
+    private function get_entries(): array {
+        if ( null !== $this->cache ) {
+            return $this->cache;
+        }
+
+        $table = WPS_Db_Schema::table( 'whitelist' );
+
+        $this->cache = $this->db->get_results(
+            "SELECT ip_address, cidr, whitelist_type FROM {$table}"
+        );
+
+        return $this->cache;
     }
 
     /**

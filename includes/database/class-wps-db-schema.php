@@ -9,12 +9,44 @@ defined( 'ABSPATH' ) || exit;
  */
 class WPS_Db_Schema {
 
+    /** @var bool|null Resultado memorizado de tables_exist() para la petición actual. */
+    private static $tables_exist_cache = null;
+
     /**
      * Devuelve el nombre completo de una tabla del plugin.
      */
     public static function table( string $name ): string {
         global $wpdb;
         return $wpdb->prefix . 'wps_' . $name;
+    }
+
+    /**
+     * Lista canónica de tablas del plugin.
+     *
+     * @return string[]
+     */
+    public static function table_names(): array {
+        return array(
+            'settings',
+            'blocked_ips',
+            'blocked_countries',
+            'blocked_asns',
+            'whitelist',
+            'traffic_log',
+            'security_events',
+            'login_attempts',
+            'rate_limits',
+            'custom_rules',
+        );
+    }
+
+    /**
+     * Olvidar el resultado memorizado de tables_exist().
+     *
+     * Se usa después de crear o eliminar tablas.
+     */
+    public static function flush_table_cache(): void {
+        self::$tables_exist_cache = null;
     }
 
     /**
@@ -186,6 +218,8 @@ class WPS_Db_Schema {
         foreach ( $sql as $query ) {
             dbDelta( $query );
         }
+
+        self::flush_table_cache();
     }
 
     /**
@@ -194,54 +228,45 @@ class WPS_Db_Schema {
     public static function drop_tables(): void {
         global $wpdb;
 
-        $tables = array(
-            'settings',
-            'blocked_ips',
-            'blocked_countries',
-            'blocked_asns',
-            'whitelist',
-            'traffic_log',
-            'security_events',
-            'login_attempts',
-            'rate_limits',
-            'custom_rules',
-        );
-
-        foreach ( $tables as $name ) {
+        foreach ( self::table_names() as $name ) {
             $table = self::table( $name );
             // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             $wpdb->query( "DROP TABLE IF EXISTS {$table}" );
         }
+
+        self::flush_table_cache();
     }
 
     /**
      * Verifica que todas las tablas existan.
+     *
+     * Se resuelve con una única consulta y se memoriza: esto corre en cada
+     * petición desde WPS_Loader, así que preguntar tabla por tabla costaba
+     * diez consultas por visita.
      */
     public static function tables_exist(): bool {
+        if ( null !== self::$tables_exist_cache ) {
+            return self::$tables_exist_cache;
+        }
+
         global $wpdb;
 
-        $tables = array(
-            'settings',
-            'blocked_ips',
-            'blocked_countries',
-            'blocked_asns',
-            'whitelist',
-            'traffic_log',
-            'security_events',
-            'login_attempts',
-            'rate_limits',
-            'custom_rules',
-        );
+        $prefix  = $wpdb->prefix . 'wps_';
+        $pattern = $wpdb->esc_like( $prefix ) . '%';
 
-        foreach ( $tables as $name ) {
-            $table = self::table( $name );
-            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            $result = $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" );
-            if ( $result !== $table ) {
-                return false;
+        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $found = $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $pattern ) );
+        $found = array_map( 'strtolower', (array) $found );
+
+        self::$tables_exist_cache = true;
+
+        foreach ( self::table_names() as $name ) {
+            if ( ! in_array( strtolower( $prefix . $name ), $found, true ) ) {
+                self::$tables_exist_cache = false;
+                break;
             }
         }
 
-        return true;
+        return self::$tables_exist_cache;
     }
 }
