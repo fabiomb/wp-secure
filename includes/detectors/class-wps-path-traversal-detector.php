@@ -38,13 +38,27 @@ class WPS_Path_Traversal_Detector {
 	);
 
 	/**
-	 * Archivos sensibles que nunca deben ser accedidos vía web.
+	 * Archivos del sistema operativo. Son inequívocos en cualquier campo: nadie
+	 * escribe "/proc/self/environ" en un comentario por accidente.
+	 *
+	 * @var array
+	 */
+	private static $system_files = array(
+		'/\/etc\/(?:passwd|shadow|hosts|group)\b/i',
+		'/\/proc\/self\/environ\b/i',
+	);
+
+	/**
+	 * Archivos sensibles del sitio que nunca deben servirse vía web.
+	 *
+	 * Sólo se buscan en la ruta pedida, no en el query string ni en el cuerpo:
+	 * en texto libre son menciones legítimas ("cómo editar el .htaccess",
+	 * "mi wp-config.php no carga") y un buscador o un comentario en un blog
+	 * técnico bastaba para bloquear al visitante.
 	 *
 	 * @var array
 	 */
 	private static $sensitive_files = array(
-		'/\/etc\/(?:passwd|shadow|hosts|group)\b/i',
-		'/\/proc\/self\/environ\b/i',
 		'/wp-config\.php/i',
 		'/\.htaccess\b/i',
 		'/\.htpasswd\b/i',
@@ -59,8 +73,8 @@ class WPS_Path_Traversal_Detector {
 		'/package\.json\b/i',
 		'/phpinfo\.php\b/i',
 		'/adminer\.php\b/i',
-		'/\.sql(?:\.gz|\.zip)?\b/i',
-		'/(?:backup|dump|database).*\.(?:sql|tar|gz|zip)\b/i',
+		'/\.sql(?:\.gz|\.zip)?$/i',
+		'/(?:backup|dump|database)[^\/]*\.(?:sql|tar|gz|zip)$/i',
 	);
 
 	public function __construct( WPS_Loader $loader ) {
@@ -117,42 +131,29 @@ class WPS_Path_Traversal_Detector {
 	private function scan_request( WPS_Request $request ): ?string {
 		$uri          = $request->uri();
 		$query_string = $request->query_string();
-		$decoded_uri  = rawurldecode( rawurldecode( $uri ) );
-		$decoded_qs   = rawurldecode( rawurldecode( $query_string ) );
 
 		// Omitir análisis de URI si es una ruta de contenido WP
 		// (tags, categorías, etc.) para evitar falsos positivos.
-		$is_content_path = $request->is_wp_content_path();
-
-		if ( ! $is_content_path ) {
-			// Traversal en URI.
-			foreach ( self::$traversal_patterns as $pattern ) {
-				if ( preg_match( $pattern, $uri ) || preg_match( $pattern, $decoded_uri ) ) {
-					return 'traversal:' . $pattern;
-				}
+		if ( ! $request->is_wp_content_path() ) {
+			// Traversal sobre la URI completa (cruda y decodificada).
+			$match = self::match_traversal( $uri );
+			if ( $match ) {
+				return $match;
 			}
 
-			// Archivos sensibles en URI.
-			foreach ( self::$sensitive_files as $pattern ) {
-				if ( preg_match( $pattern, $decoded_uri ) ) {
-					return 'sensitive_file:' . $pattern;
-				}
+			// Archivos sensibles sólo sobre la ruta pedida.
+			$path  = (string) wp_parse_url( $uri, PHP_URL_PATH );
+			$match = self::detect_in_path( $path );
+			if ( $match ) {
+				return $match;
 			}
 		}
 
-		// Traversal y archivos sensibles en query string (siempre analizar).
+		// Query string: traversal y archivos del sistema (siempre analizar).
 		if ( $query_string ) {
-			foreach ( self::$traversal_patterns as $pattern ) {
-				if ( preg_match( $pattern, $query_string ) || preg_match( $pattern, $decoded_qs ) ) {
-					return 'traversal:' . $pattern;
-				}
-			}
-			if ( $decoded_qs ) {
-				foreach ( self::$sensitive_files as $pattern ) {
-					if ( preg_match( $pattern, $decoded_qs ) ) {
-						return 'sensitive_file:' . $pattern;
-					}
-				}
+			$match = self::detect_in_value( $query_string );
+			if ( $match ) {
+				return $match;
 			}
 		}
 
@@ -164,6 +165,71 @@ class WPS_Path_Traversal_Detector {
 				if ( $match ) {
 					return $match;
 				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Analizar la ruta pedida: traversal, archivos del sistema y archivos
+	 * sensibles del sitio.
+	 *
+	 * @param string $path Ruta de la URL, sin query string.
+	 * @return string|null Descripción del patrón que coincidió.
+	 */
+	public static function detect_in_path( string $path ): ?string {
+		$match = self::match_traversal( $path );
+		if ( $match ) {
+			return $match;
+		}
+
+		$decoded = rawurldecode( rawurldecode( $path ) );
+
+		foreach ( array_merge( self::$system_files, self::$sensitive_files ) as $pattern ) {
+			if ( preg_match( $pattern, $decoded ) ) {
+				return 'sensitive_file:' . $pattern;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Analizar un valor de texto libre (query string o campo de formulario).
+	 *
+	 * Sólo cuentan el recorrido de directorios y los archivos del sistema; la
+	 * mención de un archivo del sitio en un texto no es un ataque.
+	 *
+	 * @param string $value Valor crudo tal como llegó en la petición.
+	 * @return string|null Descripción del patrón que coincidió.
+	 */
+	public static function detect_in_value( string $value ): ?string {
+		$match = self::match_traversal( $value );
+		if ( $match ) {
+			return $match;
+		}
+
+		$decoded = rawurldecode( rawurldecode( $value ) );
+
+		foreach ( self::$system_files as $pattern ) {
+			if ( preg_match( $pattern, $decoded ) ) {
+				return 'sensitive_file:' . $pattern;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Buscar secuencias de recorrido de directorios, crudas y decodificadas.
+	 */
+	private static function match_traversal( string $value ): ?string {
+		$decoded = rawurldecode( rawurldecode( $value ) );
+
+		foreach ( self::$traversal_patterns as $pattern ) {
+			if ( preg_match( $pattern, $value ) || preg_match( $pattern, $decoded ) ) {
+				return 'traversal:' . $pattern;
 			}
 		}
 
@@ -191,21 +257,7 @@ class WPS_Path_Traversal_Detector {
 			return null;
 		}
 
-		$decoded = rawurldecode( rawurldecode( $value ) );
-
-		foreach ( self::$traversal_patterns as $pattern ) {
-			if ( preg_match( $pattern, $decoded ) ) {
-				return 'traversal:' . $pattern;
-			}
-		}
-
-		foreach ( self::$sensitive_files as $pattern ) {
-			if ( preg_match( $pattern, $decoded ) ) {
-				return 'sensitive_file:' . $pattern;
-			}
-		}
-
-		return null;
+		return self::detect_in_value( $value );
 	}
 
 	/**

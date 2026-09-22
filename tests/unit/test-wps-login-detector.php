@@ -67,4 +67,61 @@ class Test_WPS_Login_Detector extends \PHPUnit\Framework\TestCase {
 	public function test_denied_message_is_not_empty(): void {
 		$this->assertNotEmpty( WPS_Login_Detector::denied_message() );
 	}
+
+	/*──────────────────────────────────────────────
+	 * Un intento, una fila
+	 *──────────────────────────────────────────────*/
+
+	public function test_unknown_user_attempt_is_recorded_once(): void {
+		$GLOBALS['wps_test_users'] = array();
+		$GLOBALS['wpdb']->reset_queries();
+		$detector = $this->detector_with();
+
+		// WordPress llama a authenticate y, al fallar, dispara wp_login_failed.
+		$detector->check_before_auth( null, 'usuario-inexistente', 'x' );
+		$detector->on_login_failed( 'usuario-inexistente' );
+
+		$this->assertCount(
+			1,
+			$this->login_attempt_inserts(),
+			'Cada intento contado dos veces bloquea la IP con la mitad de los errores configurados.'
+		);
+	}
+
+	public function test_each_attempt_counts_separately(): void {
+		$GLOBALS['wps_test_users'] = array();
+		$GLOBALS['wpdb']->reset_queries();
+		$detector = $this->detector_with();
+
+		for ( $i = 0; $i < 2; $i++ ) {
+			$detector->check_before_auth( null, 'usuario-inexistente', 'x' );
+			$detector->on_login_failed( 'usuario-inexistente' );
+		}
+
+		$this->assertCount( 2, $this->login_attempt_inserts() );
+	}
+
+	public function test_failed_login_of_existing_user_is_recorded(): void {
+		$GLOBALS['wps_test_users'] = array( 'admin' => (object) array( 'ID' => 1 ) );
+		$GLOBALS['wpdb']->reset_queries();
+		$detector = $this->detector_with();
+
+		$detector->check_before_auth( null, 'admin', 'mala' );
+		$detector->on_login_failed( 'admin' );
+
+		$inserts = $this->login_attempt_inserts();
+		$this->assertCount( 1, $inserts );
+		$this->assertSame( 1, $inserts[0]['user_exists'] );
+		$GLOBALS['wps_test_users'] = array();
+	}
+
+	private function login_attempt_inserts(): array {
+		$rows = array();
+		foreach ( $GLOBALS['wpdb']->inserts as $insert ) {
+			if ( 'wp_wps_login_attempts' === $insert[0] ) {
+				$rows[] = $insert[1];
+			}
+		}
+		return $rows;
+	}
 }

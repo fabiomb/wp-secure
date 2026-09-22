@@ -1,5 +1,79 @@
 # Registro de Cambios
 
+## [0.3.0] — 2026-09-22
+
+Versión centrada en eliminar bloqueos a visitantes legítimos y en una vulnerabilidad XSS del panel. Varios cambios afectan cuánto duran los bloqueos y cuándo se aplican, así que después de actualizar conviene revisar **WP Seguro → Bloqueos** y **Eventos** durante unos días.
+
+### Seguridad: XSS almacenado en Tráfico en Vivo
+
+Un visitante anónimo podía ejecutar JavaScript en la sesión de un administrador. La URI de cada petición se guarda decodificada en el log de tráfico, y la vista en vivo la insertaba dentro de un atributo `title="…"`. La función de escape del panel convertía `<`, `>` y `&`, pero no las comillas, así que una petición a una URI con `%22 onmouseover=…` cerraba el atributo e inyectaba un manejador de eventos. Ningún detector lo frenaba: el patrón de manejadores `on*=` exige una etiqueta `<` previa.
+
+- **`WPS.esc()`** (`assets/js/wps-admin.js`): escapa ahora también `"` y `'`, de modo que es seguro tanto en texto como dentro de atributos. Ya no depende de `innerHTML`, y convierte a texto valores no string (antes un `http_status` de `0` se mostraba vacío).
+- **Tráfico en Vivo**: el enlace a la ficha de la IP también pasa por `esc()` al insertarse en `href`.
+
+### Corrección: La duración de los bloqueos dependía de la zona horaria de MySQL
+
+Todas las fechas del plugin se guardan en UTC, pero se comparaban contra `NOW()`, que devuelve la hora en la zona horaria de la sesión MySQL. WordPress no fija esa zona, así que en la práctica rige la del servidor de base de datos.
+
+- **Con MySQL en UTC-3** (lo habitual en hostings argentinos), un bloqueo de 15 minutos duraba 3 h 15 min, la ventana de «intentos de login en la última hora» abarcaba 4 horas y la escalada a bloqueo permanente se alcanzaba mucho antes de lo configurado.
+- **Con MySQL en UTC+1 o UTC+2**, los bloqueos temporales vencían en el momento de crearse y el conteo de intentos fallidos de login daba siempre cero: la protección contra fuerza bruta quedaba anulada.
+- **Todas las consultas** (`WPS_Blocker`, `WPS_Login_Detector`, `WPS_Db_Maintenance`, `WPS_Activator::sync_blocked_ips_file()`, dashboard, notificador, eventos, tráfico y patrones) usan ahora `UTC_TIMESTAMP()`. Los bloqueos existentes no necesitan migración: ya estaban guardados en UTC y a partir de esta versión se interpretan bien.
+- **Nuevo test** que recorre `includes/` y falla si alguna consulta vuelve a usar `NOW()`, `CURDATE()`, `CURTIME()` o `SYSDATE()`.
+
+### Corrección: El rate limit contaba cada visita dos veces y podía bloquear al propio servidor
+
+El MU-plugin (Capa 1) registraba los hits `total` y `pages` en `muplugins_loaded`, y el loader (Capa 2) volvía a registrarlos en `init`. Cada visita anónima sumaba dos, así que el límite de 60 páginas por minuto era en la práctica de 30. Detrás de un NAT de oficina o del CGNAT de una operadora móvil, donde muchos usuarios comparten IP, eso alcanzaba para bloquearlos a todos.
+
+Además, nada eximía al propio servidor. wp-cron, los loopbacks de Site Health y los precargadores de caché (WP Rocket, LiteSpeed Cache) salen de la IP del servidor, y un precargador supera el límite en segundos. Con la IP del servidor bloqueada, el sitio se queda sin tareas programadas.
+
+- **`WPS_Rate_Limiter::record_hit()`**: cuenta cada tipo una sola vez por petición, aunque lo invoquen ambas capas. Las dos siguen registrando, para cubrir a visitantes anónimos (Capa 1) y a usuarios logueados sin `manage_options` (Capa 2).
+- **`WPS_Ip_Utils::is_server_ip()`** (nuevo): reconoce loopback (`127.0.0.0/8`, `::1`) y la IP con la que el servidor atiende la petición (`SERVER_ADDR`, o `LOCAL_ADDR` en IIS).
+- **El propio servidor ya no se limita ni se bloquea automáticamente**: `record_hit()` lo ignora, `WPS_Blocker::block_ip()` rechaza bloquearlo salvo que el bloqueo sea manual, y tanto el MU-plugin como `WPS_Loader::check_current_ip()` lo dejan pasar aunque una versión anterior lo haya dejado en la lista de bloqueos.
+- **MU-plugin**: no aplica rate limit a las peticiones de wp-cron (`DOING_CRON`), igual que ya hacía la Capa 2.
+- **`WPS_Ip_Utils::ip_in_cidr()`**: una IP y un CIDR de familias distintas (IPv4/IPv6) ya no coinciden nunca. Antes, una IPv6 contra un rango IPv4 se comparaba con una máscara sin el prefijo de 96 bits y podía coincidir por los ceros iniciales (`::1` coincidía con `127.0.0.0/8`).
+
+Si el sitio está detrás de un CDN, los loopbacks pueden llegar con la IP pública del servidor en `CF-Connecting-IP` en lugar de `SERVER_ADDR`. En ese caso conviene agregar esa IP a la whitelist.
+
+### Corrección: Visitantes bloqueados por abrir un post, buscar o comentar
+
+Los detectores bloquean la IP ante la primera coincidencia, y varios patrones coincidían con tráfico completamente normal. Lo más grave estaba en las rutas: una URL de post la repite cada visitante que llega a ella, así que un solo slug desafortunado bloqueaba a todo el tráfico de esa página.
+
+- **`WPS_Scanner_Detector::$scanner_paths`**: los nombres de directorio (`phpmyadmin`, `pma`, `mysql`, `myadmin`, `administrator`, `manager`) exigen ahora un segmento completo de la ruta. `\b` también corta en un guion, así que `/2024/05/mysql-vs-postgresql/` o `/blog/manager-de-contenidos/` se tomaban por sondas. `admin.php` sólo cuenta fuera de `/wp-admin/`: antes, un usuario con la sesión vencida que volvía a `/wp-admin/admin.php` quedaba bloqueado.
+- **`WPS_Scanner_Detector::match_scanner_path()`** (nuevo): las rutas de scanner se evalúan sobre el path, sin el query string.
+- **`WPS_Path_Traversal_Detector`**: los archivos sensibles del sitio (`wp-config.php`, `.htaccess`, `.env`, `composer.json`, `debug.log`, volcados `.sql`, etc.) sólo cuentan cuando son la ruta pedida. En el query string y en los formularios son menciones legítimas: buscar «cómo editar el .htaccess» o comentar «mi wp-config.php no carga» bastaba para quedar bloqueado. En cualquier campo se siguen detectando el recorrido de directorios (`../../`, en todas sus codificaciones) y los archivos del sistema (`/etc/passwd`, `/proc/self/environ`).
+- **`WPS_Path_Traversal_Detector`**: el patrón de copias de seguridad (`backup|dump|database … .zip`) cruzaba todo el valor con `.*`; ahora exige que sea el nombre del archivo pedido. Los volcados `.sql` también.
+- **`WPS_Path_Traversal_Detector::detect_in_path()`** y **`detect_in_value()`** (nuevos): exponen el análisis de cada contexto, lo que permite cubrirlo con tests.
+- **`WPS_Sqli_Detector::$patterns`**: eliminado `' OR '` suelto, que coincidía con «¿elijo 'sí' or 'no'?»; la forma de ataque real (`' OR '1'='1`) la sigue cubriendo el patrón de tautologías. El patrón de comentarios SQL ya no considera el guion doble, habitual en prosa («I tried it -- and it worked»); se mantienen `/**/` y `/*!…*/`, que sí se usan para partir palabras clave.
+- **`WPS_Xss_Detector::$patterns`**: `expression(` sólo cuenta como valor de una propiedad CSS (`: expression(`). Antes coincidía con «una regular expression (regex)».
+- **Nuevos tests** de rutas legítimas y sondas reales para scanner y path traversal, y casos nuevos en los de SQLi y XSS.
+
+### Corrección: Googlebot real se bloqueaba como crawler falsificado
+
+La verificación de crawlers (PTR + resolución directa) tenía dos fallos que terminaban bloqueando a buscadores reales, con impacto directo en el posicionamiento.
+
+- **IPv6**: la resolución directa usaba `gethostbyname()`, que sólo devuelve IPv4. Googlebot rastrea por IPv6 cuando el sitio tiene registro AAAA (o está detrás de Cloudflare), y en ese caso la IP resuelta nunca coincidía con la del visitante.
+- **Fallas de DNS**: `gethostbyaddr()` no distingue «esta IP no tiene PTR» de «el DNS no respondió». Un timeout se trataba como falsificación, se bloqueaba la IP y el veredicto quedaba en cache 24 horas.
+
+Cambios:
+
+- **`WPS_Crawler_Verifier::verify_rdns()`**: usa `dns_get_record()`, que devuelve una lista vacía ante NXDOMAIN y `false` ante un error del servidor. La resolución directa consulta A y AAAA, y las IPs se comparan en binario (`inet_pton`), así que la notación abreviada o expandida de IPv6 da igual. Se revisan todos los nombres PTR, no sólo el primero.
+- **`WPS_Crawler_Verifier::RESULT_UNVERIFIED`** (nuevo): resultado para cuando el DNS no respondió o no hay datos de ASN. No aplica el bloqueo por spoofing (la petición sigue el análisis normal) y se cachea 10 minutos en lugar de 24 horas.
+- **`WPS_Crawler_Verifier::verify_asn()`**: sin base local ni API de geolocalización devuelve `unverified` en lugar de `spoofed`. Antes, el rastreador de Facebook que llegaba por IPv6 se bloqueaba en cualquier sitio sin datos de ASN.
+- **Crawler de Facebook**: se agrega `.fbsv.net` a sus dominios de rDNS, que es el que usan sus IPs IPv6.
+- **Cache**: la clave incluye el crawler además de la IP, para que el veredicto de un UA no se reutilice con otro.
+- **`WPS_Crawler_Verifier::set_resolver()`** y **`arpa_name()`** (nuevos): permiten testear la verificación con un resolver falso. Los tests ya no dependen de la red.
+
+### Corrección: Cada intento de login con usuario inexistente contaba doble
+
+Con un usuario inexistente, `check_before_auth()` grababa el intento antes de autenticar, para poder contarlo y bloquear en el acto. Después WordPress disparaba `wp_login_failed` por ese mismo intento y `on_login_failed()` lo grababa otra vez. Con el umbral por defecto de 3, bastaban **dos** errores de tipeo en el usuario o el email para bloquear la IP, y el máximo de 5 intentos fallidos se alcanzaba en el tercero.
+
+- **`WPS_Login_Detector`**: si `check_before_auth()` ya grabó el intento, `on_login_failed()` no lo vuelve a grabar. Se sigue registrando el evento y evaluando el bloqueo.
+- **Tests**: el doble de `$wpdb` registra ahora los inserts, y se agregan stubs de `get_user_by()`, `wp_json_encode()` y `current_time()`. Esto permite verificar el flujo completo `authenticate` → `wp_login_failed`.
+
+### Versión
+
+- Versión actualizada a `0.3.0` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin. Al cambiar la cabecera del MU-plugin, `WPS_Loader::maybe_sync_muplugin()` reinstala automáticamente la copia de `wp-content/mu-plugins/`, que incluye los cambios de la Capa 1 de esta versión.
+
 ## [0.2.11] — 2026-08-05
 
 Revisión completa del código. Los cambios de seguridad de esta versión afectan cómo se determina la IP del visitante, así que conviene verificar en **WP Seguro → Tráfico en Vivo** que se registran IPs de visitantes reales y variadas antes de dar por buena la actualización en un sitio en producción.

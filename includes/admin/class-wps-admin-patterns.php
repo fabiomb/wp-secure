@@ -196,7 +196,7 @@ class WPS_Admin_Patterns {
                 COUNT(DISTINCT ip_address) AS unique_ips,
                 MAX(created_at) AS last_seen
              FROM {$table}
-             WHERE created_at >= DATE_SUB(NOW(), INTERVAL %d DAY)
+             WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
                AND request_uri IS NOT NULL
                AND request_uri <> ''
              GROUP BY path

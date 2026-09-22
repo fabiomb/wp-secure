@@ -200,4 +200,42 @@ class Test_WPS_Ip_Utils extends \PHPUnit\Framework\TestCase {
 		$this->assertNotNull( $network );
 		$this->assertStringContainsString( '/48', $network );
 	}
+
+	/*──────────────────────────────────────────────
+	 * Familias de IP
+	 *──────────────────────────────────────────────*/
+
+	public function test_ipv6_never_matches_an_ipv4_cidr(): void {
+		$this->assertFalse( WPS_Ip_Utils::ip_in_cidr( '::1', '127.0.0.0/8' ) );
+		$this->assertFalse( WPS_Ip_Utils::ip_in_cidr( '::5', '0.0.0.0/8' ) );
+	}
+
+	public function test_ipv4_never_matches_an_ipv6_cidr(): void {
+		$this->assertFalse( WPS_Ip_Utils::ip_in_cidr( '10.0.0.1', '::/8' ) );
+	}
+
+	/*──────────────────────────────────────────────
+	 * IP del propio servidor
+	 *──────────────────────────────────────────────*/
+
+	public function test_loopback_is_the_server(): void {
+		$this->assertTrue( WPS_Ip_Utils::is_server_ip( '127.0.0.1' ) );
+		$this->assertTrue( WPS_Ip_Utils::is_server_ip( '127.0.1.1' ) );
+		$this->assertTrue( WPS_Ip_Utils::is_server_ip( '::1' ) );
+	}
+
+	public function test_server_addr_is_the_server(): void {
+		$_SERVER['SERVER_ADDR'] = '203.0.113.10';
+		try {
+			$this->assertTrue( WPS_Ip_Utils::is_server_ip( '203.0.113.10' ) );
+			$this->assertFalse( WPS_Ip_Utils::is_server_ip( '203.0.113.11' ) );
+		} finally {
+			unset( $_SERVER['SERVER_ADDR'] );
+		}
+	}
+
+	public function test_visitor_ip_is_not_the_server(): void {
+		$this->assertFalse( WPS_Ip_Utils::is_server_ip( '45.33.32.156' ) );
+		$this->assertFalse( WPS_Ip_Utils::is_server_ip( 'not-an-ip' ) );
+	}
 }

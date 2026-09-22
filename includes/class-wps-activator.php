@@ -290,7 +290,7 @@ class WPS_Activator {
         // Obtener IPs bloqueadas activas.
         $table    = WPS_Db_Schema::table( 'blocked_ips' );
         $blocked  = $db->get_results(
-            "SELECT ip_address, cidr FROM {$table} WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())"
+            "SELECT ip_address, cidr FROM {$table} WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())"
         );
 
         $ips   = array();

@@ -39,6 +39,34 @@ class WPS_Ip_Utils {
     }
 
     /**
+     * ¿La IP es el propio servidor?
+     *
+     * Cubre loopback (127.0.0.0/8, ::1) y la dirección con la que el servidor
+     * atiende la petición (SERVER_ADDR, o LOCAL_ADDR en IIS). Son el origen de
+     * wp-cron, los loopbacks de Site Health y los precargadores de caché;
+     * bloquearlas o limitarlas deja al sitio sin tareas programadas.
+     */
+    public static function is_server_ip( string $ip ): bool {
+        if ( ! self::is_valid_ip( $ip ) ) {
+            return false;
+        }
+
+        if ( '::1' === $ip || self::ip_in_cidr( $ip, '127.0.0.0/8' ) ) {
+            return true;
+        }
+
+        foreach ( array( 'SERVER_ADDR', 'LOCAL_ADDR' ) as $key ) {
+            $server_ip = self::strip_port( (string) ( $_SERVER[ $key ] ?? '' ) );
+            if ( '' !== $server_ip && self::is_valid_ip( $server_ip )
+                && inet_pton( $server_ip ) === inet_pton( $ip ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Convertir IP a representación binaria (16 bytes para v4 y v6).
      *
      * IPv4 se mapea a IPv6 (::ffff:x.x.x.x) para comparación uniforme.
@@ -91,8 +119,15 @@ class WPS_Ip_Utils {
             return false;
         }
 
+        // Familias distintas nunca coinciden. Sin esto, una IPv6 contra un
+        // CIDR IPv4 se comparaba con la máscara sin el prefijo de 96 bits y
+        // podía coincidir por los ceros iniciales (p. ej. ::1 con 127.0.0.0/8).
+        if ( self::is_ipv4( $ip ) !== self::is_ipv4( $subnet ) ) {
+            return false;
+        }
+
         // Ajustar bits de máscara para IPv4-mapped (añadir 96 bits del prefijo).
-        if ( self::is_ipv4( $ip ) && self::is_ipv4( $subnet ) ) {
+        if ( self::is_ipv4( $ip ) ) {
             $mask_bits += 96;
         }
 

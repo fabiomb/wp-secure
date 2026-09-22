@@ -20,6 +20,19 @@ class WPS_Login_Detector {
     /** @var WPS_Blocker */
     private $blocker;
 
+    /**
+     * Intento ya registrado en esta petición por check_before_auth().
+     *
+     * Con usuario inexistente el intento se graba antes de autenticar, para
+     * poder contarlo y bloquear en el acto; después WordPress dispara
+     * `wp_login_failed` por el mismo intento. Sin esta marca cada intento
+     * sumaba dos filas: dos errores de tipeo bloqueaban la IP y el máximo de
+     * intentos fallidos se alcanzaba con la mitad.
+     *
+     * @var bool
+     */
+    private $attempt_recorded = false;
+
     public function __construct( WPS_Loader $loader ) {
         $this->loader  = $loader;
         $this->db      = WPS_Db::get_instance();
@@ -77,7 +90,7 @@ class WPS_Login_Detector {
              WHERE ip_address = %s
              AND user_exists = 0
              AND success = 0
-             AND attempted_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
+             AND attempted_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 HOUR)",
             $ip
         );
     }
@@ -147,6 +160,7 @@ class WPS_Login_Detector {
 
             if ( ! $user_exists ) {
                 $this->record_attempt( $ip, $username, false, false );
+                $this->attempt_recorded = true;
 
                 if ( $this->should_block_unknown_user( $this->count_recent_unknown_user_attempts( $ip ) ) ) {
                     $this->block_for_unknown_user( $ip, $username );
@@ -199,7 +213,13 @@ class WPS_Login_Detector {
         }
 
         $user_exists = ( get_user_by( 'login', $username ) || get_user_by( 'email', $username ) );
-        $this->record_attempt( $ip, $username, $user_exists, false );
+
+        // Si check_before_auth() ya lo grabó, no contarlo dos veces.
+        if ( $this->attempt_recorded ) {
+            $this->attempt_recorded = false;
+        } else {
+            $this->record_attempt( $ip, $username, $user_exists, false );
+        }
 
         $this->logger->event( WPS_Event_Types::LOGIN_FAILED, array(
             'ip_address'  => $ip,
@@ -265,7 +285,7 @@ class WPS_Login_Detector {
             "SELECT COUNT(*) FROM {$table}
              WHERE ip_address = %s
              AND success = 0
-             AND attempted_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
+             AND attempted_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 HOUR)",
             $ip
         );
 

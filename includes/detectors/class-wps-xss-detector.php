@@ -36,8 +36,9 @@ class WPS_Xss_Detector {
 		'/vbscript:(?!\s|$)/i',
 		// Data URI con HTML embebido.
 		'/data\s*:\s*text\/html/i',
-		// Expression (IE legacy).
-		'/expression\s*\(/i',
+		// expression() de CSS (IE legacy), sólo como valor de una propiedad:
+		// "una regular expression (regex)" es prosa.
+		'/:\s*expression\s*\(/i',
 		// Acceso a la cookie de sesión: el objetivo real de la exfiltración.
 		'/\bdocument\s*\.\s*cookie\b/i',
 		// Etiquetas que ejecutan o embeben contenido remoto. form, input,

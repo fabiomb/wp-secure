@@ -55,12 +55,19 @@ class WPS_Scanner_Detector {
 	/**
 	 * Rutas de escaneo comunes que indican enumeración de vulnerabilidades.
 	 *
+	 * Se evalúan sólo sobre la ruta, sin query string. Los nombres de
+	 * directorio exigen un segmento completo: `\b` también corta en un guion,
+	 * así que "/mysql-vs-postgresql/" o "/manager-de-contenidos/" coincidían y
+	 * cualquiera que abriera ese post quedaba bloqueado.
+	 *
 	 * @var array
 	 */
 	private static $scanner_paths = array(
 		// Paneles de administración comunes (no WordPress).
-		'/\/(?:phpmyadmin|pma|mysql|myadmin|phpMyAdmin)\b/i',
-		'/\/(?:administrator|admin\.php|manager)\b/i',
+		'#/(?:phpmyadmin|pma|mysql|myadmin)(?:/|$)#i',
+		'#/(?:administrator|manager)(?:/|$)#i',
+		// admin.php suelto; el de WordPress vive en /wp-admin/.
+		'#(?<!/wp-admin)/admin\.php$#i',
 		// Shells / backdoors.
 		'/\/(?:c99|r57|wso|shell|b374k|alfa|mini)\.(php|txt)\b/i',
 		// Config / env files.
@@ -144,6 +151,9 @@ class WPS_Scanner_Detector {
 					);
 					$this->blocker->send_block_response( 'Acceso denegado' );
 				}
+
+				// RESULT_UNVERIFIED: el DNS no respondió. No es evidencia de
+				// falsificación; la petición sigue el análisis normal.
 			}
 		}
 
@@ -182,14 +192,13 @@ class WPS_Scanner_Detector {
 
 		// 2. Verificar rutas de escaneo (solo si no es una URL de contenido WP).
 		if ( ! $is_content_path ) {
-			foreach ( self::$scanner_paths as $pattern ) {
-				if ( preg_match( $pattern, $uri ) ) {
-					return array(
-						'type'    => 'scanner_path',
-						'pattern' => $pattern,
-						'value'   => $uri,
-					);
-				}
+			$pattern = self::match_scanner_path( (string) wp_parse_url( $uri, PHP_URL_PATH ) );
+			if ( $pattern ) {
+				return array(
+					'type'    => 'scanner_path',
+					'pattern' => $pattern,
+					'value'   => $uri,
+				);
 			}
 		}
 
@@ -216,6 +225,22 @@ class WPS_Scanner_Detector {
 					'pattern' => $theme_slug,
 					'value'   => $uri,
 				);
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * ¿La ruta corresponde a una sonda típica de scanner?
+	 *
+	 * @param string $path Ruta de la URL, sin query string.
+	 * @return string|null Patrón que coincidió.
+	 */
+	public static function match_scanner_path( string $path ): ?string {
+		foreach ( self::$scanner_paths as $pattern ) {
+			if ( preg_match( $pattern, $path ) ) {
+				return $pattern;
 			}
 		}
 

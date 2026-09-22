@@ -274,7 +274,7 @@
                     }
                     var tr = '<tr class="wps-traffic-new">' +
                         '<td>' + self.esc(r.created_at) + '</td>' +
-                        '<td><a href="' + ipUrl + '"><code>' + self.esc(r.ip_address) + '</code></a></td>' +
+                        '<td><a href="' + self.esc(ipUrl) + '"><code>' + self.esc(r.ip_address) + '</code></a></td>' +
                         '<td>' + self.esc(r.country_code) + '</td>' +
                         '<td><span class="wps-badge wps-badge-info">' + self.esc(r.visitor_type) + '</span></td>' +
                         '<td><code>' + self.esc(r.request_method) + '</code></td>' +
@@ -282,7 +282,7 @@
                         '<td>' + self.esc(r.http_status) + '</td>' +
                         '<td class="wps-ua-cell">' + uaHtml + '</td>' +
                         '<td>' +
-                            '<a href="' + ipUrl + '" class="button button-small" title="Ver detalle"><span class="dashicons dashicons-visibility" style="font-size:14px;line-height:1.8;"></span></a> ' +
+                            '<a href="' + self.esc(ipUrl) + '" class="button button-small" title="Ver detalle"><span class="dashicons dashicons-visibility" style="font-size:14px;line-height:1.8;"></span></a> ' +
                             '<button type="button" class="button button-small wps-ajax-action" data-action="wps_block_ip" data-ip="' + self.esc(r.ip_address) + '" data-reason="Bloqueo manual desde tráfico en vivo" data-wps-confirm="¿Bloquear ' + self.esc(r.ip_address) + '?" title="Bloquear IP"><span class="dashicons dashicons-dismiss" style="font-size:14px;line-height:1.8;color:#d63638;"></span></button>' +
                         '</td>' +
                         '</tr>';
@@ -533,13 +533,18 @@
         },
 
         /**
-         * Escapar HTML básico.
+         * Escapar un valor para insertarlo en HTML, tanto en texto como en
+         * atributos. Las comillas se escapan siempre: los datos del log vienen
+         * del visitante y se interpolan dentro de title="…" y data-*="…".
          */
         esc: function (str) {
-            if (!str) return '';
-            var div = document.createElement('div');
-            div.appendChild(document.createTextNode(str));
-            return div.innerHTML;
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         },
 
         /**

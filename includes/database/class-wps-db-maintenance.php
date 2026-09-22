@@ -46,19 +46,19 @@ class WPS_Db_Maintenance {
 
         // Purgar logs de tráfico.
         $db->query(
-            "DELETE FROM {$traffic_table} WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
+            "DELETE FROM {$traffic_table} WHERE created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
             $traffic_days
         );
 
         // Purgar eventos de seguridad.
         $db->query(
-            "DELETE FROM {$events_table} WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
+            "DELETE FROM {$events_table} WHERE created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
             $events_days
         );
 
         // Purgar intentos de login.
         $db->query(
-            "DELETE FROM {$login_table} WHERE attempted_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
+            "DELETE FROM {$login_table} WHERE attempted_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
             $login_days
         );
 
@@ -67,7 +67,7 @@ class WPS_Db_Maintenance {
             "DELETE FROM {$blocked_table}
              WHERE is_active = 0
              AND expires_at IS NOT NULL
-             AND expires_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
+             AND expires_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
             $blocks_days
         );
     }
@@ -81,13 +81,13 @@ class WPS_Db_Maintenance {
         // Purgar rate limits expirados (ventanas de más de 2 horas).
         $rate_table = WPS_Db_Schema::table( 'rate_limits' );
         $db->query(
-            "DELETE FROM {$rate_table} WHERE window_start < DATE_SUB(NOW(), INTERVAL 2 HOUR)"
+            "DELETE FROM {$rate_table} WHERE window_start < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 HOUR)"
         );
 
         // Desactivar bloqueos temporales expirados.
         $blocked_table = WPS_Db_Schema::table( 'blocked_ips' );
         $db->query(
-            "UPDATE {$blocked_table} SET is_active = 0 WHERE expires_at IS NOT NULL AND expires_at < NOW() AND is_active = 1"
+            "UPDATE {$blocked_table} SET is_active = 0 WHERE expires_at IS NOT NULL AND expires_at < UTC_TIMESTAMP() AND is_active = 1"
         );
 
         // Sincronizar el archivo de IPs bloqueadas para Capa 0.

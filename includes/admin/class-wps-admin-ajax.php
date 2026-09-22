@@ -162,9 +162,9 @@ class WPS_Admin_Ajax {
         $blocked_table  = WPS_Db_Schema::table( 'blocked_ips' );
 
         wp_send_json_success( array(
-            'total_requests'   => (int) $db->get_var( "SELECT COUNT(*) FROM {$traffic_table} WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)" ),
-            'unique_ips'       => (int) $db->get_var( "SELECT COUNT(DISTINCT ip_address) FROM {$traffic_table} WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)" ),
-            'blocked_requests' => (int) $db->get_var( "SELECT COUNT(*) FROM {$events_table} WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) AND severity IN ('warning','critical')" ),
+            'total_requests'   => (int) $db->get_var( "SELECT COUNT(*) FROM {$traffic_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)" ),
+            'unique_ips'       => (int) $db->get_var( "SELECT COUNT(DISTINCT ip_address) FROM {$traffic_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)" ),
+            'blocked_requests' => (int) $db->get_var( "SELECT COUNT(*) FROM {$events_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR) AND severity IN ('warning','critical')" ),
             'active_blocks'    => (int) $db->get_var( "SELECT COUNT(*) FROM {$blocked_table} WHERE is_active = 1" ),
         ) );
     }

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Seguro — Firewall (Capa 1)
  * Description: MU-Plugin del firewall WP Seguro. Se ejecuta antes de plugins y temas.
- * Version: 0.2.11
+ * Version: 0.3.0
  * Author: WP Seguro
  *
  * Este archivo se instala automáticamente en wp-content/mu-plugins/.
@@ -112,6 +112,12 @@ final class WPS_Firewall_MuPlugin {
 			return;
 		}
 
+		// El propio servidor (wp-cron, loopbacks) nunca se bloquea, aunque una
+		// versión anterior lo haya dejado en la lista de bloqueos.
+		if ( WPS_Ip_Utils::is_server_ip( $ip ) ) {
+			return;
+		}
+
 		// Verificar si ya está bloqueada.
 		$blocker = WPS_Blocker::get_instance();
 		if ( $blocker->is_blocked( $ip ) ) {
@@ -129,8 +135,13 @@ final class WPS_Firewall_MuPlugin {
 			}
 		}
 
+		// wp-cron no se limita: lo dispara el propio sitio, no un visitante.
+		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
+
 		// Rate limiting para la petición actual (si el rate limiter está cargado y no hay sesión activa).
-		if ( ! $has_wp_session && class_exists( 'WPS_Rate_Limiter', false ) ) {
+		// El loader vuelve a registrar estos hits en `init`; WPS_Rate_Limiter
+		// cuenta cada tipo una sola vez por petición.
+		if ( ! $has_wp_session && ! $doing_cron && class_exists( 'WPS_Rate_Limiter', false ) ) {
 			$rate_limiter = WPS_Rate_Limiter::get_instance( $loader );
 			$visitor_type = $request->visitor_type();
 
@@ -161,7 +172,7 @@ final class WPS_Firewall_MuPlugin {
 			define( 'WPS_DATA_DIR', dirname( self::$plugin_dir, 2 ) . '/wps-data/' );
 		}
 		if ( ! defined( 'WPS_VERSION' ) ) {
-			define( 'WPS_VERSION', '0.2.11' );
+			define( 'WPS_VERSION', '0.3.0' );
 		}
 
 		// Cargar clases en el orden necesario (sin autoloader para minimizar carga).

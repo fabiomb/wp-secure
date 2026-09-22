@@ -77,6 +77,17 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 			return true;
 		}
 	}
+	if ( ! function_exists( 'wp_json_encode' ) ) {
+		function wp_json_encode( $data, $options = 0, $depth = 512 ) { return json_encode( $data, $options, $depth ); }
+	}
+	if ( ! function_exists( 'get_user_by' ) ) {
+		function get_user_by( $field, $value ) { return $GLOBALS['wps_test_users'][ $value ] ?? false; }
+	}
+	if ( ! function_exists( 'current_time' ) ) {
+		function current_time( $type, $gmt = 0 ) {
+			return 'mysql' === $type ? gmdate( 'Y-m-d H:i:s' ) : time();
+		}
+	}
 	if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 		define( 'DAY_IN_SECONDS', 86400 );
 	}
@@ -105,7 +116,13 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 		/** @var string[] Queries ejecutadas, para verificar costo de acceso a BD. */
 		public $queries = array();
 
-		public function reset_queries() { $this->queries = array(); }
+		/** @var array[] Inserts ejecutados: array( tabla, datos ). */
+		public $inserts = array();
+
+		public function reset_queries() {
+			$this->queries = array();
+			$this->inserts = array();
+		}
 
 		public function prepare( $query, ...$args ) { return $query; }
 		public function get_var( $query = null ) { $this->queries[] = $query; return null; }
@@ -113,7 +130,10 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 		public function get_results( $query = null, $output = null ) { $this->queries[] = $query; return array(); }
 		public function get_col( $query = null, $column = 0 ) { $this->queries[] = $query; return array(); }
 		public function query( $query ) { $this->queries[] = $query; return 0; }
-		public function insert( $table, $data, $format = null ) { return false; }
+		public function insert( $table, $data, $format = null ) {
+			$this->inserts[] = array( $table, $data );
+			return false;
+		}
 		public function update( $table, $data, $where, $format = null, $where_format = null ) { return false; }
 		public function delete( $table, $where, $where_format = null ) { return false; }
 		public function esc_like( $text ) { return $text; }

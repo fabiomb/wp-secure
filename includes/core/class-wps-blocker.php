@@ -41,7 +41,7 @@ class WPS_Blocker {
             "SELECT * FROM {$table}
              WHERE ip_address = %s
              AND is_active = 1
-             AND (expires_at IS NULL OR expires_at > NOW())
+             AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())
              LIMIT 1",
             $ip
         );
@@ -61,7 +61,7 @@ class WPS_Blocker {
                  AND ip_range_start <= %s
                  AND ip_range_end >= %s
                  AND is_active = 1
-                 AND (expires_at IS NULL OR expires_at > NOW())
+                 AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())
                  LIMIT 1",
                 $ip_bin,
                 $ip_bin
@@ -86,6 +86,13 @@ class WPS_Blocker {
      */
     public function block_ip( string $ip, string $block_type, string $reason, ?int $minutes = null ) {
         if ( ! WPS_Ip_Utils::is_valid_ip( $ip ) ) {
+            return false;
+        }
+
+        // Un detector nunca bloquea al propio servidor: de ahí salen wp-cron,
+        // los loopbacks y los precargadores de caché. Sólo un bloqueo manual,
+        // explícito, puede alcanzarlo.
+        if ( 'manual' !== $block_type && WPS_Ip_Utils::is_server_ip( $ip ) ) {
             return false;
         }
 
@@ -268,7 +275,7 @@ class WPS_Blocker {
         $table = WPS_Db_Schema::table( 'blocked_ips' );
         return (int) $this->db->query(
             // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            "UPDATE {$table} SET is_active = 0 WHERE is_active = 1 AND expires_at IS NOT NULL AND expires_at <= NOW()"
+            "UPDATE {$table} SET is_active = 0 WHERE is_active = 1 AND expires_at IS NOT NULL AND expires_at <= UTC_TIMESTAMP()"
         );
     }
 
@@ -324,7 +331,7 @@ class WPS_Blocker {
             "SELECT COUNT(*) FROM {$table}
              WHERE ip_address = %s
              AND block_type = %s
-             AND blocked_at > DATE_SUB(NOW(), INTERVAL %d HOUR)",
+             AND blocked_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d HOUR)",
             $ip,
             $block_type,
             $hours

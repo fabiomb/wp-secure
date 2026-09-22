@@ -31,6 +31,9 @@ class WPS_Rate_Limiter {
 	/** @var string Tabla de rate limits. */
 	private $table;
 
+	/** @var array<string, bool> Hits ya contados en esta petición, por "ip|tipo". */
+	private $recorded = array();
+
 	/**
 	 * Defaults de los límites.
 	 *
@@ -65,8 +68,26 @@ class WPS_Rate_Limiter {
 	/**
 	 * Registrar un hit para un tipo determinado.
 	 * Retorna true si la IP sigue dentro de los límites, false si fue bloqueada.
+	 *
+	 * Cada tipo se cuenta una sola vez por petición. El MU-plugin (Capa 1) y
+	 * el loader (Capa 2) registran los mismos hits en fases distintas, para
+	 * cubrir tanto a visitantes anónimos como a usuarios logueados; sin esta
+	 * guarda cada visita sumaba dos y los límites efectivos eran la mitad de
+	 * los configurados.
 	 */
 	public function record_hit( string $ip, string $type ): bool {
+		$key = $ip . '|' . $type;
+		if ( isset( $this->recorded[ $key ] ) ) {
+			return true;
+		}
+		$this->recorded[ $key ] = true;
+
+		// El propio servidor (cron, loopbacks, precargadores de caché) no se
+		// limita: bloquearlo deja al sitio sin tareas programadas.
+		if ( WPS_Ip_Utils::is_server_ip( $ip ) ) {
+			return true;
+		}
+
 		$limit = $this->get_limit( $type );
 
 		// 0 = deshabilitado.

@@ -307,6 +307,11 @@ class WPS_Loader {
             return;
         }
 
+        // El propio servidor (wp-cron, loopbacks) nunca se bloquea.
+        if ( WPS_Ip_Utils::is_server_ip( $ip ) ) {
+            return;
+        }
+
         $blocker = WPS_Blocker::get_instance();
         $logger  = WPS_Logger::get_instance();
 

@@ -30,8 +30,9 @@ class WPS_Sqli_Detector {
 		'/\bUNION\s+(?:ALL\s+)?SELECT\b/i',
 		// Boolean-based blind. Se exige un delimitador de cierre antes de la
 		// tautología: "1' OR 1=1" es inyección, "llevás 1 y 1 = 2" es prosa.
+		// "' OR '" suelto no se usa: coincide con "'sí' or 'no'". La forma
+		// real "' OR '1'='1" ya la cubre este patrón.
 		'/[\'")]\s*(?:OR|AND)\s+[\d\'"]+\s*=\s*[\d\'"]+/i',
-		'/\'\s*OR\s+\'/i',
 		// Stacked queries. Las sentencias destructivas sólo cuentan cuando
 		// aparecen después de cerrar el valor original; un texto que menciona
 		// "DELETE FROM" o "drop table" no es un ataque.
@@ -44,8 +45,11 @@ class WPS_Sqli_Detector {
 		// Metadata. Se exige la referencia a la tabla, no la palabra suelta.
 		'/\bINFORMATION_SCHEMA\s*\./i',
 		'/\bSYS(?:OBJECTS|COLUMNS|TABLES)\b/i',
-		// SQL comments used for injection (standalone, not inside words).
-		'/(?:--|\/\*!|\/\*\*\/)\s*(?:UNION|SELECT|DROP|INSERT|UPDATE|DELETE|OR|AND)\b/i',
+		// Comentarios SQL usados para partir palabras clave (/**/UNION,
+		// /*!SELECT*/). El guion doble no cuenta: en prosa es un separador
+		// habitual ("I tried it -- and it worked"), y el comentario final de
+		// una inyección real ya lo cubren las tautologías y stacked queries.
+		'/(?:\/\*!|\/\*\*\/)\s*(?:UNION|SELECT|DROP|INSERT|UPDATE|DELETE|OR|AND)\b/i',
 		// Hex-encoded injection – must appear in a SQL context to avoid false
 		// positives on legitimate hex values (e.g. WooCommerce cart hashes,
 		// session tokens). Matches only when a SQL keyword or operator

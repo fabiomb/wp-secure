@@ -220,22 +220,22 @@ class WPS_Admin_Dashboard {
 		$blocked_table = WPS_Db_Schema::table( 'blocked_ips' );
 
 		$total_requests = (int) $db->get_var(
-			"SELECT COUNT(*) FROM {$traffic_table} WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+			"SELECT COUNT(*) FROM {$traffic_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)"
 		);
 
 		$unique_ips = (int) $db->get_var(
-			"SELECT COUNT(DISTINCT ip_address) FROM {$traffic_table} WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+			"SELECT COUNT(DISTINCT ip_address) FROM {$traffic_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)"
 		);
 
 		$blocked_requests = (int) $db->get_var(
 			"SELECT COUNT(*) FROM {$events_table}
-			 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+			 WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)
 			 AND event_type IN ('login_blocked','xmlrpc_blocked','sqli_detected','xss_detected','traversal_detected','rate_limited','scanner_detected','country_blocked','asn_blocked','ip_blocked')"
 		);
 
 		$critical_events = (int) $db->get_var(
 			"SELECT COUNT(*) FROM {$events_table}
-			 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) AND severity = 'critical'"
+			 WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR) AND severity = 'critical'"
 		);
 
 		$total_blocks = WPS_Blocker::get_instance()->count_total_blocks();
@@ -261,7 +261,7 @@ class WPS_Admin_Dashboard {
 		$requests_raw = $db->get_results(
 			"SELECT DATE_FORMAT(created_at, '%Y-%m-%d %H:00') AS hour_slot, COUNT(*) AS cnt
 			 FROM {$traffic_table}
-			 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+			 WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)
 			 GROUP BY hour_slot ORDER BY hour_slot ASC"
 		);
 
@@ -269,7 +269,7 @@ class WPS_Admin_Dashboard {
 		$blocks_raw = $db->get_results(
 			"SELECT DATE_FORMAT(created_at, '%Y-%m-%d %H:00') AS hour_slot, COUNT(*) AS cnt
 			 FROM {$events_table}
-			 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+			 WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)
 			 AND severity IN ('warning','critical')
 			 GROUP BY hour_slot ORDER BY hour_slot ASC"
 		);
@@ -321,7 +321,7 @@ class WPS_Admin_Dashboard {
 
 		$raw = $db->get_results(
 			"SELECT country_code, COUNT(*) AS cnt FROM {$table}
-			 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+			 WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)
 			 AND country_code IS NOT NULL AND country_code != ''
 			 GROUP BY country_code ORDER BY cnt DESC LIMIT 10"
 		);

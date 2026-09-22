@@ -22,6 +22,16 @@ class WPS_Crawler_Verifier {
 	const RESULT_UNKNOWN = 'unknown';
 
 	/**
+	 * Resultado: el UA es de un crawler pero no se pudo verificar (DNS caído,
+	 * timeout, sin datos de ASN). No es evidencia de falsificación: la petición
+	 * sigue el análisis normal, sin el bloqueo por spoofing.
+	 */
+	const RESULT_UNVERIFIED = 'unverified';
+
+	/** Segundos que se recuerda un resultado no verificable antes de reintentar. */
+	const UNVERIFIED_TTL = 600;
+
+	/**
 	 * Definición de crawlers verificables.
 	 * Cada entrada contiene: regex para UA y dominios válidos para rDNS.
 	 *
@@ -54,7 +64,7 @@ class WPS_Crawler_Verifier {
 		),
 		'facebookbot' => array(
 			'ua'      => '/facebookexternalhit|Facebot/i',
-			'domains' => array( '.facebook.com', '.fbcdn.net', '.fb.com', '.tfbnw.net', '.meta.com' ),
+			'domains' => array( '.facebook.com', '.fbcdn.net', '.fb.com', '.tfbnw.net', '.meta.com', '.fbsv.net' ),
 			'asns'    => array( 32934 ),
 		),
 		'linkedinbot' => array(
@@ -65,6 +75,24 @@ class WPS_Crawler_Verifier {
 
 	/** @var string Prefijo del transient para cache rDNS. */
 	private static $cache_prefix = 'wps_rdns_';
+
+	/**
+	 * Resolver DNS alternativo (tests). Objeto con métodos
+	 * `ptr( string $ip ): ?array` y `forward( string $host ): ?array`, que
+	 * devuelven la lista de nombres/IPs o null si la consulta falló.
+	 *
+	 * @var object|null
+	 */
+	private $resolver = null;
+
+	/**
+	 * Reemplazar el resolver DNS. Null restaura el del sistema.
+	 *
+	 * @param object|null $resolver
+	 */
+	public function set_resolver( $resolver ): void {
+		$this->resolver = $resolver;
+	}
 
 	private function __construct() {}
 
@@ -80,7 +108,7 @@ class WPS_Crawler_Verifier {
 	 *
 	 * @param string $ip         Dirección IP.
 	 * @param string $user_agent User-Agent de la petición.
-	 * @return string RESULT_LEGITIMATE | RESULT_SPOOFED | RESULT_UNKNOWN
+	 * @return string RESULT_LEGITIMATE | RESULT_SPOOFED | RESULT_UNVERIFIED | RESULT_UNKNOWN
 	 */
 	public function verify( string $ip, string $user_agent ): string {
 		$crawler_id = $this->identify_crawler_ua( $user_agent );
@@ -90,7 +118,8 @@ class WPS_Crawler_Verifier {
 		}
 
 		// Verificar cache.
-		$cached = $this->get_cache( $ip );
+		$cache_id = $crawler_id . '|' . $ip;
+		$cached   = $this->get_cache( $cache_id );
 		if ( null !== $cached ) {
 			return $cached;
 		}
@@ -98,13 +127,23 @@ class WPS_Crawler_Verifier {
 		// Verificar rDNS.
 		$result = $this->verify_rdns( $ip, self::$crawlers[ $crawler_id ]['domains'] );
 
-		// Fallback: verificar por ASN si rDNS falla y el crawler tiene ASNs definidos.
-		if ( self::RESULT_SPOOFED === $result && ! empty( self::$crawlers[ $crawler_id ]['asns'] ) ) {
-			$result = $this->verify_asn( $ip, self::$crawlers[ $crawler_id ]['asns'] );
+		// Fallback: verificar por ASN si rDNS no confirma y el crawler tiene ASNs definidos.
+		if ( self::RESULT_LEGITIMATE !== $result && ! empty( self::$crawlers[ $crawler_id ]['asns'] ) ) {
+			$by_asn = $this->verify_asn( $ip, self::$crawlers[ $crawler_id ]['asns'] );
+
+			if ( self::RESULT_LEGITIMATE === $by_asn ) {
+				$result = self::RESULT_LEGITIMATE;
+			} elseif ( self::RESULT_UNVERIFIED === $by_asn ) {
+				// Sin datos de ASN no se puede condenar lo que el DNS no confirmó.
+				$result = self::RESULT_UNVERIFIED;
+			}
+			// ASN ajeno: se mantiene el veredicto del DNS (spoofed o unverified).
 		}
 
-		// Cachear resultado por 24 horas.
-		$this->set_cache( $ip, $result );
+		// Un resultado firme se recuerda 24 horas; uno no verificable, unos
+		// minutos, para reintentar sin consultar el DNS en cada petición.
+		$ttl = ( self::RESULT_UNVERIFIED === $result ) ? self::UNVERIFIED_TTL : DAY_IN_SECONDS;
+		$this->set_cache( $cache_id, $result, $ttl );
 
 		return $result;
 	}
@@ -162,64 +201,160 @@ class WPS_Crawler_Verifier {
 	 * Verificar IP mediante reverse DNS (PTR) + forward DNS.
 	 *
 	 * Algoritmo:
-	 * 1. gethostbyaddr($ip) → obtener hostname PTR
-	 * 2. Verificar que el hostname termina en un dominio esperado
-	 * 3. gethostbyname($hostname) → resolver hostname a IP
-	 * 4. Verificar que la IP resuelta coincide con la original
+	 * 1. PTR de la IP → nombres de host.
+	 * 2. Alguno debe terminar en un dominio esperado del crawler.
+	 * 3. Ese nombre se resuelve (A y AAAA) y debe incluir la IP original.
+	 *
+	 * Distingue "el DNS dice que no" (spoofed) de "el DNS no respondió"
+	 * (unverified). Tratar un timeout como falsificación bloqueaba a Googlebot
+	 * real y cacheaba el veredicto 24 horas. La resolución directa consulta
+	 * también AAAA: Googlebot rastrea por IPv6 y `gethostbyname()` sólo
+	 * devolvía IPv4, así que nunca coincidía.
 	 *
 	 * @param string $ip      IP a verificar.
 	 * @param array  $domains Dominios esperados (con punto inicial).
-	 * @return string RESULT_LEGITIMATE | RESULT_SPOOFED
+	 * @return string RESULT_LEGITIMATE | RESULT_SPOOFED | RESULT_UNVERIFIED
 	 */
 	private function verify_rdns( string $ip, array $domains ): string {
-		// Paso 1: Reverse DNS.
-		$hostname = gethostbyaddr( $ip );
-		if ( $hostname === $ip || empty( $hostname ) ) {
+		$ip_bin = @inet_pton( $ip ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		if ( false === $ip_bin ) {
 			return self::RESULT_SPOOFED;
 		}
 
-		// Paso 2: Verificar dominio.
-		$domain_match = false;
-		foreach ( $domains as $domain ) {
-			if ( substr( $hostname, -strlen( $domain ) ) === $domain ) {
-				$domain_match = true;
-				break;
+		// Paso 1: Reverse DNS.
+		$hostnames = $this->lookup_ptr( $ip );
+		if ( null === $hostnames ) {
+			return self::RESULT_UNVERIFIED;
+		}
+
+		$saw_failure = false;
+
+		foreach ( $hostnames as $hostname ) {
+			$hostname = strtolower( rtrim( $hostname, '.' ) );
+
+			// Paso 2: Verificar dominio.
+			if ( ! self::hostname_in_domains( $hostname, $domains ) ) {
+				continue;
+			}
+
+			// Paso 3: Forward DNS y comparar.
+			$resolved = $this->lookup_forward( $hostname );
+			if ( null === $resolved ) {
+				$saw_failure = true;
+				continue;
+			}
+
+			foreach ( $resolved as $resolved_ip ) {
+				if ( @inet_pton( $resolved_ip ) === $ip_bin ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors
+					return self::RESULT_LEGITIMATE;
+				}
 			}
 		}
 
-		if ( ! $domain_match ) {
-			return self::RESULT_SPOOFED;
+		return $saw_failure ? self::RESULT_UNVERIFIED : self::RESULT_SPOOFED;
+	}
+
+	/**
+	 * ¿El host pertenece a alguno de los dominios (".dominio.tld")?
+	 */
+	private static function hostname_in_domains( string $hostname, array $domains ): bool {
+		foreach ( $domains as $domain ) {
+			if ( substr( $hostname, -strlen( $domain ) ) === $domain ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Nombres PTR de una IP. Lista vacía si no tiene PTR; null si el DNS falló.
+	 *
+	 * @return string[]|null
+	 */
+	private function lookup_ptr( string $ip ): ?array {
+		if ( $this->resolver ) {
+			return $this->resolver->ptr( $ip );
 		}
 
-		// Paso 3-4: Forward DNS y comparar.
-		$resolved_ip = gethostbyname( $hostname );
-		if ( $resolved_ip === $hostname ) {
-			// gethostbyname devuelve el hostname si no puede resolver.
-			return self::RESULT_SPOOFED;
+		$arpa = self::arpa_name( $ip );
+		if ( null === $arpa || ! function_exists( 'dns_get_record' ) ) {
+			return null;
 		}
 
-		if ( $resolved_ip !== $ip ) {
-			return self::RESULT_SPOOFED;
+		// dns_get_record() devuelve array vacío ante NXDOMAIN o sin datos, y
+		// false (con warning) ante un error del servidor o un timeout.
+		$records = @dns_get_record( $arpa, DNS_PTR ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		if ( false === $records ) {
+			return null;
 		}
 
-		return self::RESULT_LEGITIMATE;
+		return array_values( array_filter( array_column( $records, 'target' ) ) );
+	}
+
+	/**
+	 * IPs (A y AAAA) de un nombre de host. Lista vacía si no resuelve; null si
+	 * el DNS falló.
+	 *
+	 * @return string[]|null
+	 */
+	private function lookup_forward( string $hostname ): ?array {
+		if ( $this->resolver ) {
+			return $this->resolver->forward( $hostname );
+		}
+
+		if ( ! function_exists( 'dns_get_record' ) ) {
+			return null;
+		}
+
+		$records = @dns_get_record( $hostname, DNS_A | DNS_AAAA ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		if ( false === $records ) {
+			return null;
+		}
+
+		$ips = array();
+		foreach ( $records as $record ) {
+			if ( ! empty( $record['ip'] ) ) {
+				$ips[] = $record['ip'];
+			} elseif ( ! empty( $record['ipv6'] ) ) {
+				$ips[] = $record['ipv6'];
+			}
+		}
+
+		return $ips;
+	}
+
+	/**
+	 * Nombre de la zona inversa para una IP (in-addr.arpa / ip6.arpa).
+	 */
+	public static function arpa_name( string $ip ): ?string {
+		$packed = @inet_pton( $ip ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		if ( false === $packed ) {
+			return null;
+		}
+
+		if ( 4 === strlen( $packed ) ) {
+			return implode( '.', array_reverse( explode( '.', $ip ) ) ) . '.in-addr.arpa';
+		}
+
+		$nibbles = str_split( bin2hex( $packed ) );
+		return implode( '.', array_reverse( $nibbles ) ) . '.ip6.arpa';
 	}
 
 	/**
 	 * Obtener resultado cacheado.
 	 */
-	private function get_cache( string $ip ): ?string {
-		$key   = self::$cache_prefix . md5( $ip );
+	private function get_cache( string $cache_id ): ?string {
+		$key   = self::$cache_prefix . md5( $cache_id );
 		$value = get_transient( $key );
 		return false === $value ? null : $value;
 	}
 
 	/**
-	 * Guardar resultado en cache (24 horas).
+	 * Guardar resultado en cache.
 	 */
-	private function set_cache( string $ip, string $result ): void {
-		$key = self::$cache_prefix . md5( $ip );
-		set_transient( $key, $result, DAY_IN_SECONDS );
+	private function set_cache( string $cache_id, string $result, int $ttl ): void {
+		$key = self::$cache_prefix . md5( $cache_id );
+		set_transient( $key, $result, $ttl );
 	}
 
 	/**
@@ -230,17 +365,21 @@ class WPS_Crawler_Verifier {
 	 *
 	 * @param string $ip   IP a verificar.
 	 * @param array  $asns ASNs esperados del crawler.
-	 * @return string RESULT_LEGITIMATE | RESULT_SPOOFED
+	 * @return string RESULT_LEGITIMATE | RESULT_SPOOFED | RESULT_UNVERIFIED
 	 */
 	private function verify_asn( string $ip, array $asns ): string {
 		if ( ! class_exists( 'WPS_Geo' ) ) {
-			return self::RESULT_SPOOFED;
+			return self::RESULT_UNVERIFIED;
 		}
 
-		$geo = WPS_Geo::get_instance();
-		$info = $geo->lookup( $ip );
+		$info = WPS_Geo::get_instance()->lookup( $ip );
 
-		if ( ! empty( $info['asn'] ) && in_array( (int) $info['asn'], $asns, true ) ) {
+		// Sin base local ni API configurada no hay dato de ASN.
+		if ( empty( $info['asn'] ) ) {
+			return self::RESULT_UNVERIFIED;
+		}
+
+		if ( in_array( (int) $info['asn'], $asns, true ) ) {
 			return self::RESULT_LEGITIMATE;
 		}
 

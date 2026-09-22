@@ -71,4 +71,33 @@ class Test_WPS_Rate_Limiter extends \PHPUnit\Framework\TestCase {
 		$this->assertEquals( 60, $method->invoke( $limiter, 'pages' ) );
 		$this->assertEquals( 60, $method->invoke( $limiter, '404' ) );
 	}
+
+	/*──────────────────────────────────────────────
+	 * Un solo conteo por petición
+	 *──────────────────────────────────────────────*/
+
+	public function test_each_type_is_counted_once_per_request(): void {
+		$limiter = $this->limiter_with( array( 'rate_pages_per_min' => 60, 'rate_total_per_min' => 240 ) );
+		$GLOBALS['wpdb']->reset_queries();
+
+		// Capa 1 (MU-plugin) y Capa 2 (loader) registran la misma visita.
+		$limiter->record_hit( '45.33.32.156', 'total' );
+		$limiter->record_hit( '45.33.32.156', 'pages' );
+		$limiter->record_hit( '45.33.32.156', 'total' );
+		$limiter->record_hit( '45.33.32.156', 'pages' );
+
+		$this->assertCount(
+			2,
+			$GLOBALS['wpdb']->queries,
+			'Una visita contada dos veces reduce a la mitad los límites configurados.'
+		);
+	}
+
+	public function test_server_ip_is_never_rate_limited(): void {
+		$limiter = $this->limiter_with( array( 'rate_total_per_min' => 240 ) );
+		$GLOBALS['wpdb']->reset_queries();
+
+		$this->assertTrue( $limiter->record_hit( '127.0.0.1', 'total' ) );
+		$this->assertCount( 0, $GLOBALS['wpdb']->queries );
+	}
 }

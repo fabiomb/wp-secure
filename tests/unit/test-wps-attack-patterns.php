@@ -34,6 +34,8 @@ class Test_WPS_Attack_Patterns extends \PHPUnit\Framework\TestCase {
 			'hash de carrito woocommerce' => array( 'wc_cart_hash_0x9f8a7b6c5d4e3f21' ),
 			'busqueda comun'              => array( 'zapatillas running talle 42' ),
 			'direccion de email'          => array( 'cliente.nombre+etiqueta@dominio.com.ar' ),
+			'guion doble en prosa'        => array( 'I tried it -- and it worked fine' ),
+			'opciones entre comillas'     => array( "Should I pick 'yes' or 'no'?" ),
 		);
 	}
 
@@ -65,6 +67,8 @@ class Test_WPS_Attack_Patterns extends \PHPUnit\Framework\TestCase {
 			'outfile'                 => array( "1 UNION SELECT 1 INTO OUTFILE '/var/www/s.php'" ),
 			'extractvalue'            => array( "1 AND EXTRACTVALUE(1,CONCAT(0x5c,VERSION()))" ),
 			'tautologia numerica'     => array( "1' OR 1=1-- -" ),
+			'comentario parte union'  => array( "-1/**/UNION/**/SELECT user_pass FROM wp_users" ),
+			'comentario versionado'   => array( "1 /*!UNION*/ /*!SELECT*/ 1,2" ),
 		);
 	}
 
@@ -94,6 +98,7 @@ class Test_WPS_Attack_Patterns extends \PHPUnit\Framework\TestCase {
 			'menciona innerhtml'    => array( 'Reemplacé el innerHTML = por textContent' ),
 			'menciona onchange'     => array( 'El evento onchange = no se dispara en Safari' ),
 			'busqueda comun'        => array( 'ofertas de verano 2026' ),
+			'regular expression'    => array( 'Usá una regular expression (regex) para validar' ),
 		);
 	}
 
@@ -125,6 +130,7 @@ class Test_WPS_Attack_Patterns extends \PHPUnit\Framework\TestCase {
 			'objeto embebido'   => array( '<object data="//evil.tld/x.swf"></object>' ),
 			'encodeado en url'  => array( '%3Cscript%3Ealert(1)%3C/script%3E' ),
 			'entidades html'    => array( '&lt;script&gt;alert(1)&lt;/script&gt;' ),
+			'css expression'    => array( '<div style="width: expression(alert(1))">' ),
 		);
 	}
 }

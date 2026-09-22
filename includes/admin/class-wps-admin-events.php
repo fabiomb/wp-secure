@@ -293,7 +293,7 @@ class WPS_Admin_Events {
             "SELECT ip_address, expires_at FROM {$table}
              WHERE ip_address IN ({$placeholders})
              AND is_active = 1
-             AND (expires_at IS NULL OR expires_at > NOW())",
+             AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())",
             ...$unique_ips
         );
 

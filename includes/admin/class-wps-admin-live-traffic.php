@@ -139,7 +139,7 @@ class WPS_Admin_Live_Traffic {
 			$ip
 		);
 		$hits_24h = (int) $db->get_var(
-			"SELECT COUNT(*) FROM {$traffic_tbl} WHERE ip_address = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)",
+			"SELECT COUNT(*) FROM {$traffic_tbl} WHERE ip_address = %s AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)",
 			$ip
 		);
 		$event_count = (int) $db->get_var(
