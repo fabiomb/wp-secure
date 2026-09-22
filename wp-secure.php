@@ -5,7 +5,7 @@
  * Description: Sistema de protección contra bots, spiders e intrusiones. Orientado a rendimiento y claridad.
  * Version:     0.2.11
  * Author:      Fabio Baccaglioni
- * Author URI:  https://github.com/fabiomb
+ * Author URI:  https://wpsecure.fabio.com.ar
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: wp-secure
