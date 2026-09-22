@@ -466,7 +466,11 @@ class WPS_Admin_Settings {
                         'type'           => 'checkbox',
                         'default'        => false,
                         'checkbox_label' => __( 'Habilitar firewall PHP pre-WordPress (requiere configuración manual de .htaccess o .user.ini)', 'wp-secure' ),
-                        'description'    => __( 'Bloquea IPs antes de que PHP cargue WordPress. Máximo rendimiento.', 'wp-secure' ),
+                        'description'    => sprintf(
+                            /* translators: %s: ruta absoluta del cargador de la Capa 0. */
+                            __( 'Bloquea IPs antes de que PHP cargue WordPress. Máximo rendimiento. La directiva auto_prepend_file debe apuntar a: %s', 'wp-secure' ),
+                            WPS_Activator::prepend_loader_path()
+                        ),
                     ),
                     array(
                         'key'            => 'firewall_layer1_enabled',

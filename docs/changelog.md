@@ -1,5 +1,91 @@
 # Registro de Cambios
 
+## [0.3.1] — 2026-09-22
+
+Continuación de la revisión de la 0.3.0: Capa 0, resiliencia ante fallas externas y documentación.
+
+### Corrección: La Capa 0 aplicaba bloqueos vencidos y no se enteraba de los desbloqueos
+
+La Capa 0 corre antes de WordPress y no consulta la base de datos: sólo conoce lo que dice su archivo de datos, y ese archivo se regeneraba únicamente con el cron horario.
+
+- **Desbloquear una IP desde el panel no tenía efecto en la Capa 0** hasta la siguiente pasada del cron. Lo mismo al agregar una IP a la whitelist, incluso la propia.
+- **Los bloqueos temporales no vencían en la Capa 0**: el archivo no guardaba el vencimiento, así que un bloqueo de 15 minutos seguía vigente hasta una hora más, o indefinidamente si el cron no corría.
+- **La whitelist por rango CIDR se ignoraba** en la Capa 0.
+- **El archivo se escribía en el mismo lugar desde donde se lee**. Una petición que lo incluía a mitad de la escritura recibía un *ParseError*, que el operador `@` no suprime, y fallaba con error fatal.
+
+Cambios:
+
+- **Formato del archivo**: cada IP y cada CIDR bloqueado lleva su vencimiento como timestamp (`0` = permanente), y se agrega `whitelist_cidrs`. `WPS_Firewall_Prepend` descarta los bloqueos vencidos por su cuenta y sigue leyendo el formato anterior (valor `1`, lista plana de CIDRs) como permanente, así que no hay corte durante la actualización.
+- **`WPS_Blocker::schedule_layer0_sync()`** (nuevo): bloquear, desbloquear, hacer permanente un bloqueo o modificar la whitelist regenera el archivo al final de la petición, una sola vez aunque haya varios cambios. También funciona cuando el bloqueo ocurre en la Capa 1 y termina con `exit`.
+- **Guardar la configuración** regenera el archivo, o lo elimina si se apagó la Capa 0.
+- **`WPS_Activator::build_blocked_ips_data()`** (nuevo): arma el contenido del archivo, separado de la escritura para poder testearlo. Si una IP tiene varios bloqueos activos, gana el más largo.
+- **Escritura atómica**: el archivo se escribe en un temporal y se renombra, y después se invalida OPcache. Con `opcache.validate_timestamps` desactivado, antes se seguía sirviendo la versión vieja.
+- **Whitelist de la Capa 0**: sólo toma las entradas de tipo `global`. Las de tipo `login` eximen del detector de login, no de un bloqueo de IP.
+
+### Corrección: Una actualización del plugin podía dejar todo el sitio en error fatal
+
+La documentación indicaba apuntar `auto_prepend_file` a `plugins/wp-secure/includes/firewall/wps-firewall-prepend.php`. Durante una actualización WordPress borra y vuelve a copiar la carpeta del plugin; mientras el archivo no está, PHP no puede cargar el prepend y **cada** petición del sitio termina en error fatal, incluido wp-admin. Lo mismo al eliminar el plugin o al renombrar su carpeta, que era justamente el procedimiento de recuperación que proponía la guía de solución de problemas.
+
+- **Cargador estable de la Capa 0** (nuevo): el plugin genera `wp-content/wps-data/wps-firewall-loader.php`, fuera de su carpeta, y lo mantiene al activarse, actualizarse o cambiar de versión. El cargador incluye el firewall sólo si existe; si el plugin no está, no hace nada. Corre dentro de una función anónima para no dejar variables en el ámbito global de cada petición.
+- **`WPS_Activator::install_prepend_loader()`**, **`build_prepend_loader()`**, **`prepend_loader_path()`** y **`prepend_points_into_plugin()`** (nuevos).
+- **Aviso en el panel**: si `auto_prepend_file` apunta todavía al archivo dentro del plugin, se muestra una advertencia con la ruta del cargador. La descripción del ajuste de Capa 0 muestra la ruta exacta a configurar.
+- **Desinstalación**: el cargador se conserva a propósito, porque borrarlo con la directiva todavía activa tumbaría el sitio.
+
+### Nuevo: Suspender el bloqueo desde wp-config.php
+
+Hasta ahora, recuperar el acceso tras bloquearse a uno mismo requería borrar el MU-plugin y renombrar la carpeta del plugin. Además de ser riesgoso con la Capa 0 configurada, no alcanzaba: al reactivar, el bloqueo seguía en la base de datos.
+
+- **Constante `WPS_DISABLE_BLOCKING`**: definida en `wp-config.php`, el firewall sigue detectando y registrando pero no bloquea, igual que el Modo Inseguro. El panel muestra un aviso mientras esté activa.
+- **`WPS_Blocker::blocking_disabled()`** (nuevo): reúne el Modo Inseguro y la constante.
+- **Login con el bloqueo suspendido**: `WPS_Login_Detector::check_before_auth()` rechazaba el login de una IP bloqueada aunque el Modo Inseguro estuviera activo, porque no pasaba por `send_block_response()`. Ahora respeta ambos mecanismos, así que el administrador bloqueado puede entrar a desbloquearse.
+
+### Corrección: Con la API de geolocalización caída, cada visita esperaba 5 segundos
+
+En modo API, la primera petición de cada IP consulta ipinfo.io dentro de la propia petición del visitante, con un timeout de 5 segundos. Sólo se cacheaban las respuestas exitosas. Si el servicio estaba caído, lento o con la cuota agotada (429), cada IP nueva esperaba el timeout completo, y cada petición siguiente de esa misma IP volvía a intentarlo.
+
+- **Pausa ante fallas del servicio**: un timeout, un error de conexión, un 429 o un 5xx suspenden las consultas a la API durante 10 minutos (`WPS_Ipdb_Manager::API_BACKOFF_TTL`). Mientras tanto se usa la base local si existe, o la petición sigue sin datos de país.
+- **Cache de fallos por IP**: una IP que no pudo resolverse (respuesta inválida o error propio de esa IP) no se vuelve a consultar durante 15 minutos.
+- **Timeout** reducido de 5 a 2 segundos.
+
+### Seguridad: Una regla personalizada podía permitir que cualquiera se agregara a la whitelist
+
+La acción **Agregar a whitelist** aceptaba cualquier condición, y la propia documentación proponía como ejemplo `User-Agent contiene "UptimeRobot"`. Cualquiera que enviara ese User-Agent quedaba en la whitelist global de forma permanente, excluido de todo el firewall. Lo mismo con condiciones sobre headers, la URI, el país (alcanzable con una VPN) o con operadores negativos («IP distinta de X» coincide con el resto de Internet).
+
+- **`WPS_Custom_Rules::whitelist_conditions_allowed()`** (nuevo): la acción `whitelist` sólo admite condiciones sobre el campo `ip` con `equals` o `cidr`. Al guardar una regla que no cumple, el panel explica el motivo.
+- **Reglas existentes**: las guardadas con versiones anteriores que no cumplen siguen registrando el evento, pero ya no agregan la IP a la whitelist. Las IPs que ya se hubieran agregado por esa vía siguen en la whitelist y conviene revisarlas: se reconocen por la etiqueta «Auto: regla …».
+- **Documentación**: el ejemplo del servicio de monitoreo usa ahora el rango de IPs publicado por el servicio, y explica cuándo conviene la acción *Eximir*.
+
+### Corrección: Acceder a XML-RPC bloqueaba la IP en todo el sitio
+
+Con XML-RPC desactivado (el valor por defecto), cualquier petición a `xmlrpc.php` bloqueaba la IP durante 15 minutos para todo el sitio. Eso dejaba fuera a los servidores de Jetpack, a la app móvil de WordPress y a cualquiera que compartiera IP con ellos. Además, la detección buscaba `xmlrpc.php` en toda la URI, así que bastaba con buscar «xmlrpc.php» en el buscador del sitio.
+
+- **`WPS_Xmlrpc_Detector`**: la petición se sigue rechazando con 403, pero ya no se bloquea la IP. Con XML-RPC desactivado el intento no tiene efecto; el abuso sostenido lo cubre el límite `rate_xmlrpc_per_hour`, que ahora sí recibe los hits de XML-RPC.
+- **`WPS_Xmlrpc_Detector::is_xmlrpc_path()`** (nuevo): sólo cuenta la ruta pedida, no el query string. También se reconoce la constante `XMLRPC_REQUEST` que define WordPress.
+- **Documentación**: la «excepción para Jetpack» que describía `configuration.md` no existía. Se explica cómo lograrlo con una regla *Eximir* por IP o rango.
+
+### Corrección: Security headers duplicados y filtro XSS heredado
+
+- **`WPS_Security_Hardener::headers_to_send()`** (nuevo): no se envía un header que otro plugin, el tema o el servidor ya definieron. Un `X-Frame-Options` duplicado con valores distintos hace que el navegador lo descarte, y un sitio configurado para embeberse en un dominio propio quedaba roto.
+- **`X-XSS-Protection`** pasa de `1; mode=block` a `0`. El filtro fue retirado de los navegadores y, en los que lo conservan, permite ataques de filtrado selectivo. La recomendación actual es desactivarlo.
+
+### Documentación
+
+- **Recuperación de acceso** (`troubleshooting.md`, `faq.md`, `cdn-proxy-setup.md`): se reemplaza «borrar el MU-plugin y renombrar la carpeta» por la constante `WPS_DISABLE_BLOCKING` o, con WP-CLI, el Modo Inseguro. Se advierte no renombrar la carpeta con la Capa 0 apuntando dentro de ella.
+- **Nombre del MU-plugin**: la documentación decía `wps-firewall.php` y `wps-muplugin.php`; los archivos reales son `wps-firewall-muplugin.php` en ambos lados.
+- **Instalación de la Capa 0**: apunta al cargador y distingue Apache con mod_php (`.htaccess`) de PHP-FPM (`.user.ini`).
+- **Desinstalación**: describía que se eliminaban las directivas de `auto_prepend_file`, cosa que el plugin no hace ni puede hacer con seguridad. Ahora explica qué se borra y qué no.
+- **Ajustes inexistentes**: se eliminan las menciones a un «Nivel de protección» Bajo/Medio/Alto y a un «Modo de operación», que no existen. El asistente se describe con sus cuatro pasos reales.
+
+### Corrección: La desinstalación dejaba datos atrás
+
+`uninstall.php` borraba la ubicación de datos anterior (dentro de la carpeta del plugin) en lugar de `wp-content/wps-data/`, y no eliminaba la opción `wps_unsafe_mode` ni los transients de geolocalización y verificación de crawlers (uno por IP, potencialmente miles de filas en `wp_options`).
+
+- Se eliminan `wp-content/wps-data/` (salvo el cargador de la Capa 0), `wps_unsafe_mode`, los transients `wps_*` y el MU-plugin, por si el plugin se eliminó sin desactivarse.
+
+### Versión
+
+- Versión actualizada a `0.3.1` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin.
+
 ## [0.3.0] — 2026-09-22
 
 Versión centrada en eliminar bloqueos a visitantes legítimos y en una vulnerabilidad XSS del panel. Varios cambios afectan cuánto duran los bloqueos y cuándo se aplican, así que después de actualizar conviene revisar **WP Seguro → Bloqueos** y **Eventos** durante unos días.

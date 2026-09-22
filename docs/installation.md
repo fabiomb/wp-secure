@@ -37,11 +37,10 @@
 
 Al activar el plugin por primera vez, se mostrará un **asistente de configuración** que te guiará por los ajustes básicos:
 
-1. **Nivel de protección** — Elige entre Bajo, Medio o Alto.
-2. **Whitelist de IP** — Tu IP actual se añade automáticamente.
-3. **Notificaciones** — Configura el email para alertas de seguridad.
-4. **REST API** — Decide si bloquear el acceso público a la API REST.
-5. **CDN/Proxy** — Selecciona tu proveedor si usas uno (Cloudflare, Sucuri, etc.).
+1. **API y geolocalización** — Token de ipinfo.io y base de datos local de países/ASN.
+2. **Login y XML-RPC** — Intentos máximos, duración de bloqueos y bloqueo de XML-RPC.
+3. **Rate limiting** — Límites de peticiones por minuto.
+4. **Whitelist** — Ofrece agregar tu IP actual (marcado por defecto).
 
 ## Activación de Capas
 
@@ -54,22 +53,26 @@ Se activa automáticamente al instalar el plugin. No requiere configuración adi
 WP Seguro puede instalar un micro-plugin en `wp-content/mu-plugins/` para interceptar tráfico antes de que se carguen los demás plugins. El asistente de configuración lo ofrece automáticamente.
 
 Para instalación manual:
-1. Copia `wp-secure/includes/firewall/wps-muplugin.php` a `wp-content/mu-plugins/wps-firewall.php`.
+1. Copia `wp-secure/includes/firewall/wps-firewall-muplugin.php` a `wp-content/mu-plugins/wps-firewall-muplugin.php`.
 2. Verifica que los permisos del archivo sean correctos (644).
 
 ### Capa 0 (Firewall PHP)
 
-Para máximo rendimiento, WP Seguro puede interceptar peticiones antes de que WordPress se cargue. Requiere acceso a la configuración de PHP:
+Para máximo rendimiento, WP Seguro puede interceptar peticiones antes de que WordPress se cargue. Requiere acceso a la configuración de PHP y activar **Configuración → Firewall Avanzado → Capa 0**.
 
-**Apache (.htaccess):**
+La directiva debe apuntar al **cargador** que el plugin genera en `wp-content/wps-data/`, nunca a un archivo dentro de la carpeta del plugin. Durante una actualización WordPress borra y vuelve a copiar esa carpeta; si la directiva apunta ahí, cada petición del sitio termina en error fatal mientras tanto, y también si el plugin se elimina o se renombra. El cargador no hace nada si el plugin no está. La ruta exacta se muestra en la descripción del ajuste.
+
+**Apache con mod_php (.htaccess):**
 ```
-php_value auto_prepend_file "/ruta/a/wp-content/plugins/wp-secure/includes/firewall/wps-firewall-prepend.php"
+php_value auto_prepend_file "/ruta/a/wp-content/wps-data/wps-firewall-loader.php"
 ```
 
-**Nginx (php.ini o pool config):**
+**PHP-FPM / Nginx (.user.ini, php.ini o pool config):**
 ```ini
-auto_prepend_file = /ruta/a/wp-content/plugins/wp-secure/includes/firewall/wps-firewall-prepend.php
+auto_prepend_file = /ruta/a/wp-content/wps-data/wps-firewall-loader.php
 ```
+
+Si actualizás desde una versión anterior a 0.3.1 con la directiva apuntando a `plugins/wp-secure/includes/firewall/wps-firewall-prepend.php`, el panel muestra un aviso con la ruta nueva.
 
 **Nota:** En hosting compartido, esta opción puede no estar disponible. La Capa 1 proporciona protección suficiente para la mayoría de sitios.
 
@@ -79,7 +82,7 @@ Al desactivar el plugin, las tablas de datos se conservan por seguridad. Al **de
 
 1. Se eliminan todas las tablas de la base de datos (`wps_*`).
 2. Se elimina el MU-Plugin si fue instalado.
-3. Se eliminan las directivas de auto_prepend_file si fueron añadidas.
-4. Se eliminan los transients del cache.
+3. Se eliminan las opciones y los transients del plugin (cache de geolocalización y de verificación de crawlers).
+4. Se eliminan los datos de `wp-content/wps-data/`, **salvo el cargador de la Capa 0**. La directiva `auto_prepend_file` no se toca: la agregaste a mano y el plugin no puede modificarla con seguridad. Quitala primero y después borrá `wp-content/wps-data/wps-firewall-loader.php`. Si la dejás, el cargador no hace nada.
 
 Para conservar los datos antes de desinstalar, usa la función de **Exportación CSV** en el dashboard.

@@ -492,6 +492,7 @@ class WPS_Loader {
         if ( version_compare( $stored_version, WPS_VERSION, '<' ) ) {
             WPS_Db_Migrations::run();
             WPS_Activator::install_muplugin();
+            WPS_Activator::install_prepend_loader();
             update_option( 'wps_version', WPS_VERSION );
         }
     }

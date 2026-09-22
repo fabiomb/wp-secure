@@ -22,7 +22,7 @@ Petición HTTP entrante
               ▼
 ┌─────────────────────────────┐
 │  Capa 1: MU-Plugin          │  ← Antes de plugins (< 5ms)
-│  mu-plugins/wps-firewall.php │
+│  wps-firewall-muplugin.php   │
 ├─────────────────────────────┤
 │  Análisis de petición        │
 │  Detección de patrones       │

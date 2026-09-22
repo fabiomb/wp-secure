@@ -162,7 +162,6 @@ Esto suele indicar un proxy interno (Docker, Kubernetes, load balancer). Configu
 
 Si el proxy no está configurado y bloqueas la IP del CDN, **todos** los visitantes serán bloqueados. Solución:
 
-1. Accede al servidor por SSH o FTP.
-2. Elimina el archivo `wp-content/mu-plugins/wps-firewall.php` si existe.
-3. Desactiva el plugin renombrando la carpeta `wp-secure/`.
-4. Reactiva y configura correctamente el modo de proxy.
+1. Agregá `define( 'WPS_DISABLE_BLOCKING', true );` en `wp-config.php` (vía SSH o FTP). El firewall deja de bloquear sin desactivar el plugin.
+2. Configurá correctamente el modo de proxy y desbloqueá las IPs del CDN en **WP Seguro → Bloqueos**.
+3. Quitá la constante de `wp-config.php`.

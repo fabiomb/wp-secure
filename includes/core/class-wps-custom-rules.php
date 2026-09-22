@@ -331,6 +331,11 @@ class WPS_Custom_Rules {
 					break;
 
 				case 'whitelist':
+					// Reglas guardadas antes de 0.3.1 pueden tener condiciones
+					// que el visitante controla; esas no agregan a la whitelist.
+					if ( ! self::whitelist_conditions_allowed( $rule['conditions'] ?? array() ) ) {
+						break;
+					}
 					$whitelist = WPS_Whitelist::get_instance();
 					$whitelist->add_ip(
 						$ip,
@@ -398,6 +403,9 @@ class WPS_Custom_Rules {
 				break;
 
 			case 'whitelist':
+				if ( ! self::whitelist_conditions_allowed( $rule['conditions'] ?? array() ) ) {
+					break;
+				}
 				$whitelist = WPS_Whitelist::get_instance();
 				$whitelist->add_ip(
 					$ip,
@@ -411,6 +419,33 @@ class WPS_Custom_Rules {
 				// Solo el evento ya fue registrado arriba.
 				break;
 		}
+	}
+
+	/**
+	 * ¿Estas condiciones pueden disparar la acción `whitelist`?
+	 *
+	 * Agregar a la whitelist es permanente y exime de todo el firewall, así
+	 * que sólo se admite con condiciones sobre la IP que el visitante no
+	 * controla: `ip` con `equals` o `cidr`. Una regla sobre el User-Agent, un
+	 * header, la URI o el país (alcanzable con una VPN) permitiría a cualquiera
+	 * auto-incluirse. Tampoco se admiten operadores negativos: «IP distinta de
+	 * X» coincide con todo el resto de Internet.
+	 *
+	 * @param array $conditions Condiciones de la regla.
+	 */
+	public static function whitelist_conditions_allowed( array $conditions ): bool {
+		if ( empty( $conditions ) ) {
+			return false;
+		}
+
+		foreach ( $conditions as $condition ) {
+			if ( 'ip' !== ( $condition['field'] ?? '' )
+				|| ! in_array( $condition['operator'] ?? '', array( 'equals', 'cidr' ), true ) ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -845,6 +880,10 @@ class WPS_Custom_Rules {
 
 		$action_type = $data['action_type'] ?? '';
 		if ( ! in_array( $action_type, $valid_actions, true ) ) {
+			return false;
+		}
+
+		if ( 'whitelist' === $action_type && ! self::whitelist_conditions_allowed( $sanitized_conditions ) ) {
 			return false;
 		}
 

@@ -73,15 +73,13 @@ class WPS_Xmlrpc_Detector {
             ),
         ) );
 
-        // Bloquear la IP automáticamente.
-        $this->blocker->block_ip(
-            $ip,
-            'auto_xmlrpc',
-            'Intento de acceso a XML-RPC',
-            (int) $this->loader->get_setting( 'login_block_minutes', 15 )
-        );
+        // Se rechaza la petición, pero no se bloquea la IP: con XML-RPC
+        // desactivado el intento ya no tiene efecto, y bloquear la IP dejaba
+        // fuera del sitio entero a los servidores de Jetpack, a la app móvil
+        // de WordPress y a cualquiera que compartiera IP con ellos. El abuso
+        // sostenido lo cubre el límite `rate_xmlrpc_per_hour`.
+        WPS_Rate_Limiter::get_instance( $this->loader )->record_hit( $ip, 'xmlrpc' );
 
-        // Emitir respuesta.
         $this->blocker->send_block_response( 'XML-RPC bloqueado' );
     }
 
@@ -89,13 +87,26 @@ class WPS_Xmlrpc_Detector {
      * ¿Es una petición a xmlrpc.php?
      */
     private function is_xmlrpc_request(): bool {
+        if ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) {
+            return true;
+        }
+
         $script = $_SERVER['SCRIPT_FILENAME'] ?? '';
         if ( basename( $script ) === 'xmlrpc.php' ) {
             return true;
         }
 
-        $uri = $_SERVER['REQUEST_URI'] ?? '';
-        return false !== strpos( $uri, 'xmlrpc.php' );
+        return self::is_xmlrpc_path( (string) ( $_SERVER['REQUEST_URI'] ?? '' ) );
+    }
+
+    /**
+     * ¿La URI pide xmlrpc.php? Sólo cuenta la ruta: "/?s=xmlrpc.php" es una
+     * búsqueda, no un acceso a XML-RPC.
+     */
+    public static function is_xmlrpc_path( string $uri ): bool {
+        $path = (string) wp_parse_url( $uri, PHP_URL_PATH );
+
+        return 'xmlrpc.php' === strtolower( basename( rawurldecode( $path ) ) );
     }
 
     /**

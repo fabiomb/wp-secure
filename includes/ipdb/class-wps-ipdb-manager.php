@@ -25,6 +25,18 @@ class WPS_Ipdb_Manager {
 	/** @var bool Whether the reader failed to load (avoid repeated attempts). */
 	private $reader_failed = false;
 
+	/** Timeout de la consulta a ipinfo.io, en segundos. Corre dentro de la petición del visitante. */
+	const API_TIMEOUT = 2;
+
+	/** Segundos que se recuerda que una IP no pudo resolverse. */
+	const API_FAILURE_TTL = 900;
+
+	/** Segundos sin consultar la API después de un error del servicio. */
+	const API_BACKOFF_TTL = 600;
+
+	/** Transient que suspende la API mientras el servicio falla. */
+	const API_BACKOFF_KEY = 'wps_geo_api_backoff';
+
 	private function __construct() {
 		$this->loader = WPS_Loader::get_instance();
 	}
@@ -136,7 +148,8 @@ class WPS_Ipdb_Manager {
 			return $default;
 		}
 
-		// Check transient cache first (2 hours).
+		// Check transient cache first (2 hours). Incluye los fallos recientes,
+		// guardados con los campos en null.
 		$cache_key = 'wps_geo_' . md5( $ip );
 		$cached    = get_transient( $cache_key );
 		if ( false !== $cached && is_array( $cached ) ) {
@@ -144,27 +157,44 @@ class WPS_Ipdb_Manager {
 			return $cached;
 		}
 
+		// La consulta corre dentro de la petición del visitante. Si el servicio
+		// está caído o agotó la cuota, cada IP nueva pagaría el timeout completo:
+		// tras un error se deja de consultar por unos minutos.
+		if ( get_transient( self::API_BACKOFF_KEY ) ) {
+			return $default;
+		}
+
 		// API request.
 		$url = sprintf( 'https://ipinfo.io/%s?token=%s', rawurlencode( $ip ), rawurlencode( $api_key ) );
 
 		$response = wp_remote_get( $url, array(
-			'timeout'   => 5,
+			'timeout'   => self::API_TIMEOUT,
 			'sslverify' => true,
 			'headers'   => array( 'Accept' => 'application/json' ),
 		) );
 
 		if ( is_wp_error( $response ) ) {
+			// Timeout, DNS o conexión: problema del servicio, no de la IP.
+			set_transient( self::API_BACKOFF_KEY, 1, self::API_BACKOFF_TTL );
 			return $default;
 		}
 
-		$code = wp_remote_retrieve_response_code( $response );
+		$code = (int) wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
+			if ( 429 === $code || $code >= 500 ) {
+				// Cuota agotada o servicio caído.
+				set_transient( self::API_BACKOFF_KEY, 1, self::API_BACKOFF_TTL );
+			} else {
+				// Error propio de esta IP: no volver a preguntar enseguida.
+				$this->remember_api_failure( $cache_key );
+			}
 			return $default;
 		}
 
 		$body = wp_remote_retrieve_body( $response );
 		$data = json_decode( $body, true );
 		if ( ! is_array( $data ) ) {
+			$this->remember_api_failure( $cache_key );
 			return $default;
 		}
 
@@ -182,6 +212,22 @@ class WPS_Ipdb_Manager {
 		set_transient( $cache_key, $to_cache, 2 * HOUR_IN_SECONDS );
 
 		return $result;
+	}
+
+	/**
+	 * Recordar que una IP no pudo resolverse, para no consultarla en cada petición.
+	 */
+	private function remember_api_failure( string $cache_key ): void {
+		set_transient(
+			$cache_key,
+			array(
+				'country'      => null,
+				'country_name' => null,
+				'asn'          => null,
+				'asn_name'     => null,
+			),
+			self::API_FAILURE_TTL
+		);
 	}
 
 	/**

@@ -83,6 +83,26 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	if ( ! function_exists( 'get_user_by' ) ) {
 		function get_user_by( $field, $value ) { return $GLOBALS['wps_test_users'][ $value ] ?? false; }
 	}
+	// HTTP: la respuesta la fija cada test en $GLOBALS['wps_test_http_response']
+	// (array con 'code' y 'body', o un WP_Error simulado con 'error').
+	if ( ! function_exists( 'wp_remote_get' ) ) {
+		function wp_remote_get( $url, $args = array() ) {
+			$GLOBALS['wps_test_http_calls'] = ( $GLOBALS['wps_test_http_calls'] ?? 0 ) + 1;
+			return $GLOBALS['wps_test_http_response'] ?? array( 'code' => 200, 'body' => '{}' );
+		}
+	}
+	if ( ! function_exists( 'is_wp_error' ) ) {
+		function is_wp_error( $thing ) { return is_array( $thing ) && isset( $thing['error'] ); }
+	}
+	if ( ! function_exists( 'wp_remote_retrieve_response_code' ) ) {
+		function wp_remote_retrieve_response_code( $response ) { return $response['code'] ?? ''; }
+	}
+	if ( ! function_exists( 'wp_remote_retrieve_body' ) ) {
+		function wp_remote_retrieve_body( $response ) { return $response['body'] ?? ''; }
+	}
+	if ( ! function_exists( 'wp_normalize_path' ) ) {
+		function wp_normalize_path( $path ) { return str_replace( '\\', '/', $path ); }
+	}
 	if ( ! function_exists( 'current_time' ) ) {
 		function current_time( $type, $gmt = 0 ) {
 			return 'mysql' === $type ? gmdate( 'Y-m-d H:i:s' ) : time();

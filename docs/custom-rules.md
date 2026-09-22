@@ -57,7 +57,7 @@ Cada condición evalúa un campo de la petición HTTP:
 |--------|-------------|
 | **Bloqueo permanente** | Bloquea la IP del visitante de forma permanente. La IP se agrega a la lista de IPs bloqueadas sin fecha de expiración. |
 | **Bloqueo temporal** | Bloquea la IP del visitante por un período configurable (en minutos). Tras expirar, la IP puede volver a acceder. |
-| **Agregar a whitelist** | Agrega la IP del visitante a la whitelist global. Las peticiones futuras de esta IP se excluyen de todas las reglas. |
+| **Agregar a whitelist** | Agrega la IP del visitante a la whitelist global. Las peticiones futuras de esta IP se excluyen de todas las reglas. Sólo admite condiciones sobre la **IP** (*igual a* o *rango CIDR*): con cualquier otro campo, un visitante podría incluirse a sí mismo. |
 | **Solo registrar (log)** | Registra un evento de seguridad sin bloquear ni modificar nada. Útil para monitoreo. |
 
 ---
@@ -94,12 +94,14 @@ THEN Bloqueo temporal (30 minutos)
 
 ### Permitir un servicio de monitoreo
 
-Agregar automáticamente a la whitelist un servicio conocido:
+Agregar a la whitelist el rango de IPs publicado por el servicio:
 
 ```
-IF   User-Agent contiene "UptimeRobot"
+IF   IP en rango CIDR "216.144.250.0/24"
 THEN Agregar a whitelist
 ```
+
+No uses el User-Agent para esto: cualquiera puede enviar `UptimeRobot` en su User-Agent y quedar excluido del firewall para siempre. Si el servicio no publica sus IPs, usá la acción **Eximir** con los detectores que lo afectan: exime sólo esa petición, no agrega nada a la whitelist.
 
 ### Monitorear tráfico de un país sin bloquear
 

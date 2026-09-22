@@ -20,12 +20,15 @@ WP Seguro está diseñado para añadir **menos de 5ms** al tiempo de carga de un
 
 ### ¿Qué pasa si me bloqueo a mí mismo?
 
-Tu IP se añade automáticamente a la whitelist durante la configuración inicial. Si aun así te bloqueas:
+El asistente de configuración ofrece agregar tu IP a la whitelist. Si aun así te bloqueas:
 
-1. Accede al servidor por FTP/SSH.
-2. Elimina `wp-content/mu-plugins/wps-firewall.php`.
-3. Renombra la carpeta del plugin.
-4. Accede al panel y reconfigura.
+1. **Suspendé el bloqueo desde `wp-config.php`** (vía FTP/SSH o el administrador de archivos del hosting). Agregá, antes de la línea `/* That's all, stop editing! */`:
+   ```php
+   define( 'WPS_DISABLE_BLOCKING', true );
+   ```
+   El firewall sigue detectando y registrando, pero no bloquea ni rechaza logins. Con WP-CLI se logra lo mismo activando el Modo Inseguro: `wp option update wps_unsafe_mode 1`.
+2. Entrá al panel y agregá tu IP en **WP Seguro → Whitelist**. Si estaba bloqueada, desbloqueala en **Bloqueos**.
+3. Quitá la constante de `wp-config.php` (o desactivá el Modo Inseguro desde el dashboard).
 
 Consulta [Solución de Problemas](troubleshooting.md) para más detalles.
 
@@ -51,7 +54,9 @@ Son cabeceras HTTP que WP Seguro envía en cada respuesta para mejorar la seguri
 | `X-Frame-Options: SAMEORIGIN` | Previene clickjacking |
 | `Referrer-Policy: strict-origin-when-cross-origin` | Controla información de referrer |
 | `Permissions-Policy` | Restringe APIs del navegador (geolocation, camera, etc.) |
-| `X-XSS-Protection: 1; mode=block` | Activa filtro XSS del navegador |
+| `X-XSS-Protection: 0` | Desactiva el filtro XSS heredado de los navegadores, que fue retirado y en los que lo conservan habilita ataques de filtrado selectivo |
+
+Si otro plugin, el tema o el servidor ya definen alguno de estos headers, WP Seguro no lo pisa.
 
 ### ¿Cómo funciona la puntuación de riesgo?
 

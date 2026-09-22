@@ -8,8 +8,7 @@ Todos los ajustes de WP Seguro se gestionan desde **WP Seguro → Configuración
 
 | Opción | Descripción | Valor por defecto |
 |--------|-------------|-------------------|
-| Nivel de protección | Bajo / Medio / Alto. Ajusta umbrales de detección. | Medio |
-| Modo de operación | **Bloquear** (deniega acceso) o **Solo log** (registra sin bloquear). | Bloquear |
+| Modo Inseguro | Desde el dashboard. El firewall detecta y registra, pero no bloquea. Equivale a definir `WPS_DISABLE_BLOCKING` en `wp-config.php`. | Desactivado |
 | Email de notificaciones | Dirección para alertas de seguridad. | Email del administrador |
 
 ---
@@ -29,8 +28,9 @@ Todos los ajustes de WP Seguro se gestionan desde **WP Seguro → Configuración
 
 | Opción | Descripción | Valor por defecto |
 |--------|-------------|-------------------|
-| Desactivar XML-RPC | Bloquear todas las peticiones a `xmlrpc.php`. | Activado |
-| Excepciones | Permitir Jetpack u otros servicios que requieran XML-RPC. | Jetpack |
+| Desactivar XML-RPC | Rechaza con 403 las peticiones a `xmlrpc.php` y desactiva pingbacks. No bloquea la IP: el abuso sostenido lo limita **Rate limit de XML-RPC** (`rate_xmlrpc_per_hour`). | Activado |
+
+Para permitir un servicio que necesita XML-RPC (Jetpack, la app móvil), creá una regla personalizada con acción **Eximir** del detector *XML-RPC* y condición sobre la **IP** o el **rango CIDR** del servicio.
 
 ---
 

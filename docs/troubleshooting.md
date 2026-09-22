@@ -8,12 +8,19 @@
 
 **Solución:**
 
-1. **Vía FTP/SSH:** Elimina el archivo `wp-content/mu-plugins/wps-firewall.php` para desactivar la Capa 1.
-2. **Vía FTP/SSH:** Renombra la carpeta `wp-content/plugins/wp-secure/` a `wp-secure-disabled/` para desactivar la Capa 2.
-3. Accede al panel de WordPress y reactiva el plugin.
-4. Añade tu IP a la whitelist antes de reactivar las capas.
+1. **Suspendé el bloqueo desde `wp-config.php`** (vía FTP/SSH o el administrador de archivos del hosting). Agregá, antes de la línea `/* That's all, stop editing! */`:
+   ```php
+   define( 'WPS_DISABLE_BLOCKING', true );
+   ```
+   El firewall sigue detectando y registrando, pero no bloquea ni rechaza logins. Con WP-CLI se logra lo mismo activando el Modo Inseguro: `wp option update wps_unsafe_mode 1`.
+2. Entrá al panel y agregá tu IP en **WP Seguro → Whitelist**. Si estaba bloqueada, desbloqueala en **Bloqueos**.
+3. Quitá la constante de `wp-config.php` (o desactivá el Modo Inseguro desde el dashboard).
 
-**Prevención:** Tu IP se añade automáticamente a la whitelist durante la configuración inicial. No la elimines.
+La Capa 0 corre antes de `wp-config.php` y no ve la constante. Si también la configuraste, comentá temporalmente la directiva `auto_prepend_file` o esperá a que venza el bloqueo: la Capa 0 respeta los vencimientos.
+
+**No renombres ni borres la carpeta del plugin** si configuraste la Capa 0 apuntando dentro de ella (instalaciones anteriores a 0.3.1): cada petición del sitio terminaría en error fatal. Apuntá la directiva al cargador `wp-content/wps-data/wps-firewall-loader.php`, que sigue funcionando aunque el plugin no esté.
+
+**Prevención:** el asistente de configuración ofrece agregar tu IP a la whitelist. No la elimines.
 
 ---
 
@@ -25,7 +32,7 @@
 
 1. Revisa los **Eventos** en el dashboard para identificar qué regla se activó.
 2. Si la IP es legítima, añádela a la **Whitelist**.
-3. Considera bajar el **Nivel de protección** de Alto a Medio.
+3. Si el falso positivo viene de un detector concreto (SQLi, XSS, Path Traversal, Scanner), creá una **regla personalizada** con acción *Eximir* para esa ruta, o desactivá el detector en **Configuración**.
 4. Si el problema persiste con un User-Agent específico, desactiva la regla correspondiente.
 
 ---
@@ -73,7 +80,7 @@
 
 1. Crea el directorio manualmente si no existe: `mkdir wp-content/mu-plugins/`
 2. Establece permisos: `chmod 755 wp-content/mu-plugins/`
-3. Copia manualmente el archivo: `cp wp-content/plugins/wp-secure/includes/firewall/wps-muplugin.php wp-content/mu-plugins/wps-firewall.php`
+3. Copia manualmente el archivo: `cp wp-content/plugins/wp-secure/includes/firewall/wps-firewall-muplugin.php wp-content/mu-plugins/wps-firewall-muplugin.php`
 4. Reintenta la activación desde el panel.
 
 ---

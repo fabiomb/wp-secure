@@ -46,20 +46,49 @@ class WPS_Security_Hardener {
 	 * Enviar security headers en cada respuesta.
 	 */
 	public function add_security_headers(): void {
-		// No sobrescribir si ya están definidos por el servidor/otro plugin.
+		if ( headers_sent() ) {
+			return;
+		}
+
+		foreach ( self::headers_to_send( headers_list() ) as $name => $value ) {
+			header( "{$name}: {$value}" );
+		}
+	}
+
+	/**
+	 * Headers de seguridad que faltan en la respuesta.
+	 *
+	 * No se pisan los que ya definió otro plugin o el tema: un
+	 * `X-Frame-Options` duplicado con valores distintos hace que el navegador
+	 * lo ignore, y un sitio que permite embeberse en un dominio propio quedaba
+	 * roto. `X-XSS-Protection` va en `0`: el filtro que activaba `1` fue
+	 * retirado de los navegadores y en los que lo conservan permite ataques de
+	 * filtrado selectivo; la recomendación actual es desactivarlo.
+	 *
+	 * @param string[] $already_sent Líneas de headers ya definidas (headers_list()).
+	 * @return array<string, string>
+	 */
+	public static function headers_to_send( array $already_sent ): array {
 		$headers = array(
-			'X-Content-Type-Options'  => 'nosniff',
-			'X-Frame-Options'         => 'SAMEORIGIN',
-			'Referrer-Policy'         => 'strict-origin-when-cross-origin',
-			'Permissions-Policy'      => 'geolocation=(), camera=(), microphone=()',
-			'X-XSS-Protection'       => '1; mode=block',
+			'X-Content-Type-Options' => 'nosniff',
+			'X-Frame-Options'        => 'SAMEORIGIN',
+			'Referrer-Policy'        => 'strict-origin-when-cross-origin',
+			'Permissions-Policy'     => 'geolocation=(), camera=(), microphone=()',
+			'X-XSS-Protection'       => '0',
 		);
 
-		foreach ( $headers as $name => $value ) {
-			if ( ! headers_sent() ) {
-				header( "{$name}: {$value}" );
+		$present = array();
+		foreach ( $already_sent as $line ) {
+			$present[ strtolower( trim( strstr( $line, ':', true ) ?: $line ) ) ] = true;
+		}
+
+		foreach ( array_keys( $headers ) as $name ) {
+			if ( isset( $present[ strtolower( $name ) ] ) ) {
+				unset( $headers[ $name ] );
 			}
 		}
+
+		return $headers;
 	}
 
 	/**

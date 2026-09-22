@@ -532,7 +532,7 @@ class WPS_Admin_Custom_Rules {
 			if ( $result ) {
 				return array( 'type' => 'success', 'text' => __( 'Regla creada correctamente.', 'wp-secure' ) );
 			}
-			return array( 'type' => 'error', 'text' => __( 'No se pudo crear la regla. Verifica que los datos sean válidos.', 'wp-secure' ) );
+			return array( 'type' => 'error', 'text' => $this->save_error_message( $rule_data, __( 'No se pudo crear la regla. Verifica que los datos sean válidos.', 'wp-secure' ) ) );
 		}
 
 		if ( 'edit_rule' === $post_action ) {
@@ -540,10 +540,22 @@ class WPS_Admin_Custom_Rules {
 			if ( $edit_id && $engine->update( $edit_id, $rule_data ) ) {
 				return array( 'type' => 'success', 'text' => __( 'Regla actualizada correctamente.', 'wp-secure' ) );
 			}
-			return array( 'type' => 'error', 'text' => __( 'No se pudo actualizar la regla.', 'wp-secure' ) );
+			return array( 'type' => 'error', 'text' => $this->save_error_message( $rule_data, __( 'No se pudo actualizar la regla.', 'wp-secure' ) ) );
 		}
 
 		return null;
+	}
+
+	/**
+	 * Mensaje de error al guardar, con el motivo cuando se conoce.
+	 */
+	private function save_error_message( array $rule_data, string $fallback ): string {
+		if ( 'whitelist' === ( $rule_data['action_type'] ?? '' )
+			&& ! WPS_Custom_Rules::whitelist_conditions_allowed( (array) ( $rule_data['conditions'] ?? array() ) ) ) {
+			return __( 'La acción «Agregar a whitelist» sólo admite condiciones sobre la IP (igual a, o rango CIDR). Con cualquier otro campo, un visitante podría incluirse a sí mismo en la whitelist.', 'wp-secure' );
+		}
+
+		return $fallback;
 	}
 
 	/**

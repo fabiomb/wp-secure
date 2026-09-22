@@ -17,6 +17,7 @@ class WPS_Activator {
         self::protect_data_dir();
         self::schedule_maintenance();
         self::install_muplugin();
+        self::install_prepend_loader();
         self::create_blocked_ips_file();
 
         // Marcar como recién activado para mostrar wizard.
@@ -173,6 +174,78 @@ class WPS_Activator {
     }
 
     /**
+     * Ruta del cargador de la Capa 0, que es a donde debe apuntar
+     * `auto_prepend_file`.
+     */
+    public static function prepend_loader_path(): string {
+        return WPS_DATA_DIR . 'wps-firewall-loader.php';
+    }
+
+    /**
+     * Instalar el cargador estable de la Capa 0.
+     *
+     * `auto_prepend_file` no debe apuntar dentro de la carpeta del plugin:
+     * durante una actualización WordPress la borra y la vuelve a copiar, y si
+     * el plugin se elimina o se renombra (el procedimiento habitual para
+     * recuperar el acceso), PHP no encuentra el archivo y *cada* petición del
+     * sitio termina en error fatal, incluido wp-admin. El cargador vive en
+     * wp-content/wps-data/, que sobrevive a las actualizaciones, e incluye el
+     * firewall sólo si existe.
+     */
+    public static function install_prepend_loader(): bool {
+        if ( ! is_dir( WPS_DATA_DIR ) ) {
+            wp_mkdir_p( WPS_DATA_DIR );
+        }
+
+        $content = self::build_prepend_loader( WPS_INCLUDES_DIR . 'firewall/wps-firewall-prepend.php' );
+        $file    = self::prepend_loader_path();
+
+        if ( is_file( $file ) && file_get_contents( $file ) === $content ) { // phpcs:ignore WordPress.WP.AlternativeFunctions
+            return true;
+        }
+
+        return self::write_file_atomically( $file, $content );
+    }
+
+    /**
+     * Contenido del cargador de la Capa 0.
+     *
+     * @param string $prepend_path Ruta absoluta al firewall del plugin.
+     */
+    public static function build_prepend_loader( string $prepend_path ): string {
+        $lines = array(
+            '<?php',
+            '/**',
+            ' * WP Seguro — cargador de la Capa 0. Archivo generado; no editar.',
+            ' *',
+            ' * Apuntar auto_prepend_file a este archivo, no al del plugin. Si el plugin',
+            ' * se está actualizando o ya no está, no hace nada en lugar de provocar un',
+            ' * error fatal en todo el sitio.',
+            ' */',
+            '( static function () {',
+            "\t" . '$prepend = ' . var_export( $prepend_path, true ) . ';',
+            "\t" . 'if ( is_file( $prepend ) ) {',
+            "\t\t" . 'include_once $prepend;',
+            "\t" . '}',
+            '} )();',
+        );
+
+        return implode( "\n", $lines ) . "\n";
+    }
+
+    /**
+     * ¿`auto_prepend_file` apunta directamente al firewall dentro del plugin?
+     */
+    public static function prepend_points_into_plugin(): bool {
+        $current = (string) ini_get( 'auto_prepend_file' );
+        if ( '' === $current ) {
+            return false;
+        }
+
+        return false !== strpos( wp_normalize_path( $current ), 'firewall/wps-firewall-prepend.php' );
+    }
+
+    /**
      * Eliminar el MU-Plugin (Capa 1).
      */
     public static function remove_muplugin(): void {
@@ -223,6 +296,7 @@ class WPS_Activator {
             self::protect_data_dir();
             self::sync_blocked_ips_file();
             self::install_muplugin();
+            self::install_prepend_loader();
         }
     }
 
@@ -290,43 +364,106 @@ class WPS_Activator {
         // Obtener IPs bloqueadas activas.
         $table    = WPS_Db_Schema::table( 'blocked_ips' );
         $blocked  = $db->get_results(
-            "SELECT ip_address, cidr FROM {$table} WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())"
+            "SELECT ip_address, cidr, expires_at FROM {$table} WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())"
         );
 
+        // Sólo la whitelist global: las entradas de tipo login eximen del
+        // detector de login, no de un bloqueo de IP.
+        $wl_table       = WPS_Db_Schema::table( 'whitelist' );
+        $whitelist_rows = $db->get_results(
+            "SELECT ip_address, cidr FROM {$wl_table} WHERE whitelist_type = 'global'"
+        );
+
+        $data    = self::build_blocked_ips_data( $blocked, $whitelist_rows, time() );
+        $content = '<?php return ' . var_export( $data, true ) . ';' . "\n";
+
+        self::write_file_atomically( $file, $content );
+    }
+
+    /**
+     * Armar el contenido del archivo de la Capa 0.
+     *
+     * Cada IP o CIDR bloqueado lleva su vencimiento como timestamp (0 si es
+     * permanente): la Capa 0 no tiene base de datos y, sin ese dato, un
+     * bloqueo de 15 minutos seguía vigente hasta la siguiente regeneración.
+     *
+     * @param array $blocked   Filas con ip_address, cidr y expires_at (UTC).
+     * @param array $whitelist Filas con ip_address y cidr.
+     * @param int   $now       Timestamp de generación.
+     */
+    public static function build_blocked_ips_data( array $blocked, array $whitelist, int $now ): array {
         $ips   = array();
         $cidrs = array();
 
         foreach ( $blocked as $row ) {
+            $expires = empty( $row['expires_at'] ) ? 0 : (int) strtotime( $row['expires_at'] . ' UTC' );
+
             if ( ! empty( $row['ip_address'] ) ) {
-                $ips[ $row['ip_address'] ] = 1;
+                $ips[ $row['ip_address'] ] = self::merge_expiry( $ips[ $row['ip_address'] ] ?? null, $expires );
             }
             if ( ! empty( $row['cidr'] ) ) {
-                $cidrs[] = $row['cidr'];
+                $cidrs[ $row['cidr'] ] = self::merge_expiry( $cidrs[ $row['cidr'] ] ?? null, $expires );
             }
         }
 
-        // Obtener whitelist.
-        $wl_table  = WPS_Db_Schema::table( 'whitelist' );
-        $whitelist_rows = $db->get_results(
-            "SELECT ip_address FROM {$wl_table} WHERE ip_address IS NOT NULL"
-        );
+        $whitelist_ips   = array();
+        $whitelist_cidrs = array();
 
-        $whitelist = array();
-        foreach ( $whitelist_rows as $row ) {
+        foreach ( $whitelist as $row ) {
             if ( ! empty( $row['ip_address'] ) ) {
-                $whitelist[ $row['ip_address'] ] = 1;
+                $whitelist_ips[ $row['ip_address'] ] = 1;
+            }
+            if ( ! empty( $row['cidr'] ) ) {
+                $whitelist_cidrs[] = $row['cidr'];
             }
         }
 
-        $data = array(
-            'ips'       => $ips,
-            'cidrs'     => array_values( $cidrs ),
-            'whitelist' => $whitelist,
-            'updated'   => time(),
+        return array(
+            'ips'             => $ips,
+            'cidrs'           => $cidrs,
+            'whitelist'       => $whitelist_ips,
+            'whitelist_cidrs' => array_values( array_unique( $whitelist_cidrs ) ),
+            'updated'         => $now,
         );
+    }
 
-        $content = '<?php return ' . var_export( $data, true ) . ';' . "\n";
+    /**
+     * Combinar vencimientos de dos bloqueos de la misma IP: gana el más largo.
+     */
+    private static function merge_expiry( ?int $current, int $expires ): int {
+        if ( null === $current ) {
+            return $expires;
+        }
+        if ( 0 === $current || 0 === $expires ) {
+            return 0;
+        }
+        return max( $current, $expires );
+    }
 
-        file_put_contents( $file, $content, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+    /**
+     * Escribir un archivo PHP que otra petición puede estar incluyendo.
+     *
+     * Se escribe en un temporal y se renombra: el rename es atómico, así que
+     * la Capa 0 lee la versión anterior o la nueva, nunca una a medio escribir
+     * (que daría un ParseError en cada petición). Después se invalida OPcache,
+     * que con validate_timestamps desactivado serviría el archivo viejo.
+     */
+    public static function write_file_atomically( string $file, string $content ): bool {
+        $tmp = $file . '.' . uniqid( 'tmp', true );
+
+        if ( false === @file_put_contents( $tmp, $content, LOCK_EX ) ) { // phpcs:ignore
+            return false;
+        }
+
+        if ( ! @rename( $tmp, $file ) ) { // phpcs:ignore
+            @unlink( $tmp ); // phpcs:ignore
+            return false;
+        }
+
+        if ( function_exists( 'opcache_invalidate' ) ) {
+            @opcache_invalidate( $file, true ); // phpcs:ignore
+        }
+
+        return true;
     }
 }

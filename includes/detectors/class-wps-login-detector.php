@@ -108,6 +108,13 @@ class WPS_Login_Detector {
             return $user;
         }
 
+        // Modo Inseguro o kill switch: el login no se rechaza. Sin esto, una
+        // IP bloqueada no podía entrar al panel ni siquiera con el bloqueo
+        // suspendido, que es justamente cuando se lo necesita.
+        if ( WPS_Blocker::blocking_disabled() ) {
+            return $user;
+        }
+
         $request = WPS_Request::get_instance();
         $ip      = $request->ip();
 

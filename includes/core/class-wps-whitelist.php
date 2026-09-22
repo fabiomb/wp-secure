@@ -98,6 +98,7 @@ class WPS_Whitelist {
         }
 
         $this->cache = null; // Invalidar cache.
+        WPS_Blocker::schedule_layer0_sync();
 
         return $this->db->insert( 'whitelist', array(
             'ip_address'     => $ip,
@@ -116,6 +117,7 @@ class WPS_Whitelist {
         }
 
         $this->cache = null;
+        WPS_Blocker::schedule_layer0_sync();
 
         return $this->db->insert( 'whitelist', array(
             'cidr'           => $cidr,
@@ -130,6 +132,7 @@ class WPS_Whitelist {
      */
     public function remove( int $id ): bool {
         $this->cache = null;
+        WPS_Blocker::schedule_layer0_sync();
         return $this->db->delete( 'whitelist', array( 'id' => $id ) ) > 0;
     }
 

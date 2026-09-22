@@ -15,6 +15,9 @@ class WPS_Blocker {
     /** @var WPS_Loader */
     private $loader;
 
+    /** @var bool Si ya se programó regenerar el archivo de la Capa 0. */
+    private static $layer0_sync_scheduled = false;
+
     private function __construct() {
         $this->db     = WPS_Db::get_instance();
         $this->loader = WPS_Loader::get_instance();
@@ -124,6 +127,8 @@ class WPS_Blocker {
         $id = $this->db->insert( 'blocked_ips', $data );
 
         if ( $id ) {
+            self::schedule_layer0_sync();
+
             $logger = WPS_Logger::get_instance();
             $logger->event( WPS_Event_Types::IP_BLOCKED, array(
                 'ip_address' => $ip,
@@ -165,7 +170,13 @@ class WPS_Blocker {
             $data['expires_at'] = gmdate( 'Y-m-d H:i:s', time() + ( $minutes * 60 ) );
         }
 
-        return $this->db->insert( 'blocked_ips', $data );
+        $id = $this->db->insert( 'blocked_ips', $data );
+
+        if ( $id ) {
+            self::schedule_layer0_sync();
+        }
+
+        return $id;
     }
 
     /**
@@ -179,6 +190,8 @@ class WPS_Blocker {
         );
 
         if ( $result ) {
+            self::schedule_layer0_sync();
+
             $logger = WPS_Logger::get_instance();
             $logger->event( WPS_Event_Types::MANUAL_UNBLOCK, array(
                 'details'    => array( 'block_id' => $id ),
@@ -193,12 +206,18 @@ class WPS_Blocker {
      * Desbloquear una IP específica (todos los bloqueos activos).
      */
     public function unblock_ip( string $ip ): int {
-        $table = WPS_Db_Schema::table( 'blocked_ips' );
-        return $this->db->query(
+        $table    = WPS_Db_Schema::table( 'blocked_ips' );
+        $affected = $this->db->query(
             // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             "UPDATE {$table} SET is_active = 0 WHERE ip_address = %s AND is_active = 1",
             $ip
         );
+
+        if ( $affected ) {
+            self::schedule_layer0_sync();
+        }
+
+        return $affected;
     }
 
     /**
@@ -223,7 +242,43 @@ class WPS_Blocker {
             array( 'id' => $id, 'is_active' => 1 )
         );
 
+        if ( $result ) {
+            self::schedule_layer0_sync();
+        }
+
         return $result > 0;
+    }
+
+    /**
+     * Programar la regeneración del archivo de la Capa 0 al final de la petición.
+     *
+     * La Capa 0 no consulta la base de datos: sin esto, un desbloqueo desde el
+     * panel no tenía efecto ahí hasta la siguiente pasada del cron horario.
+     * Se difiere a `shutdown` para regenerar una sola vez aunque la petición
+     * haga varios cambios, y porque también corre tras un `exit` de bloqueo.
+     */
+    public static function schedule_layer0_sync(): void {
+        if ( self::$layer0_sync_scheduled || ! function_exists( 'add_action' ) ) {
+            return;
+        }
+
+        self::$layer0_sync_scheduled = true;
+        add_action( 'shutdown', array( __CLASS__, 'run_layer0_sync' ), 20 );
+    }
+
+    /**
+     * Regenerar el archivo de la Capa 0 (callback de `shutdown`).
+     */
+    public static function run_layer0_sync(): void {
+        // En la Capa 1 el autoloader del plugin puede no estar registrado.
+        if ( ! class_exists( 'WPS_Activator' ) && defined( 'WPS_INCLUDES_DIR' )
+            && is_file( WPS_INCLUDES_DIR . 'class-wps-activator.php' ) ) {
+            require_once WPS_INCLUDES_DIR . 'class-wps-activator.php';
+        }
+
+        if ( class_exists( 'WPS_Activator' ) ) {
+            WPS_Activator::sync_blocked_ips_file();
+        }
     }
 
     /**
@@ -286,8 +341,8 @@ class WPS_Blocker {
      * la detección y el log continúen funcionando normalmente.
      */
     public function send_block_response( string $reason = '' ): void {
-        // Modo inseguro activo: detectar y registrar, pero no bloquear.
-        if ( get_option( 'wps_unsafe_mode', false ) ) {
+        // Modo inseguro o kill switch: detectar y registrar, pero no bloquear.
+        if ( self::blocking_disabled() ) {
             return;
         }
 
@@ -319,6 +374,21 @@ class WPS_Blocker {
         echo '<p>' . esc_html( $message ) . '</p>';
         echo '</body></html>';
         exit;
+    }
+
+    /**
+     * ¿Está suspendido el bloqueo?
+     *
+     * Dos vías: el Modo Inseguro (opción del panel) y la constante
+     * `WPS_DISABLE_BLOCKING`, que se define en wp-config.php para recuperar el
+     * acceso cuando uno mismo quedó bloqueado y no puede entrar al panel.
+     */
+    public static function blocking_disabled(): bool {
+        if ( defined( 'WPS_DISABLE_BLOCKING' ) && WPS_DISABLE_BLOCKING ) {
+            return true;
+        }
+
+        return function_exists( 'get_option' ) && (bool) get_option( 'wps_unsafe_mode', false );
     }
 
     /**

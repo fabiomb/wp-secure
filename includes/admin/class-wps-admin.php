@@ -43,11 +43,55 @@ class WPS_Admin {
         // Aviso global cuando el Modo Inseguro está activo.
         add_action( 'admin_notices', array( $this, 'maybe_show_unsafe_mode_notice' ) );
 
+        // Aviso cuando auto_prepend_file apunta dentro de la carpeta del plugin.
+        add_action( 'admin_notices', array( $this, 'maybe_show_prepend_path_notice' ) );
+
+        // Aviso mientras el kill switch de wp-config.php esté activo.
+        add_action( 'admin_notices', array( $this, 'maybe_show_kill_switch_notice' ) );
+
         // Widget en el dashboard de WordPress.
         add_action( 'wp_dashboard_setup', array( $this, 'register_dashboard_widget' ) );
 
         // Redirigir al wizard o dashboard después de activar.
         add_action( 'admin_init', array( $this, 'maybe_redirect_after_activation' ) );
+    }
+
+    /**
+     * Recordar que el kill switch de wp-config.php está activo.
+     */
+    public function maybe_show_kill_switch_notice(): void {
+        if ( ! defined( 'WPS_DISABLE_BLOCKING' ) || ! WPS_DISABLE_BLOCKING || ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        ?>
+        <div class="notice notice-error">
+            <p>
+                <strong><?php esc_html_e( 'WP Seguro: el bloqueo está suspendido por la constante WPS_DISABLE_BLOCKING.', 'wp-secure' ); ?></strong>
+                <?php esc_html_e( 'El firewall sólo detecta y registra. Quitá la constante de wp-config.php cuando termines.', 'wp-secure' ); ?>
+            </p>
+        </div>
+        <?php
+    }
+
+    /**
+     * Avisar si `auto_prepend_file` apunta al firewall dentro del plugin.
+     *
+     * Con esa configuración, actualizar, renombrar o eliminar el plugin deja
+     * al sitio entero en error fatal. Se indica la ruta del cargador estable.
+     */
+    public function maybe_show_prepend_path_notice(): void {
+        if ( ! current_user_can( $this->capability ) || ! WPS_Activator::prepend_points_into_plugin() ) {
+            return;
+        }
+        ?>
+        <div class="notice notice-warning">
+            <p>
+                <strong><?php esc_html_e( 'WP Seguro: la Capa 0 apunta dentro de la carpeta del plugin.', 'wp-secure' ); ?></strong>
+                <?php esc_html_e( 'Si el plugin se actualiza, se renombra o se elimina, todo el sitio quedará en error fatal. Cambiá la directiva auto_prepend_file para que apunte a:', 'wp-secure' ); ?>
+                <code><?php echo esc_html( WPS_Activator::prepend_loader_path() ); ?></code>
+            </p>
+        </div>
+        <?php
     }
 
     /**
@@ -348,6 +392,9 @@ class WPS_Admin {
 
         $settings_page = new WPS_Admin_Settings( $this->loader );
         $settings_page->save();
+
+        // Encender o apagar la Capa 0 crea o elimina su archivo de datos.
+        WPS_Activator::sync_blocked_ips_file();
 
         // Log del cambio.
         $logger = WPS_Logger::get_instance();

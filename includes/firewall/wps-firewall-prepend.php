@@ -107,11 +107,16 @@ final class WPS_Firewall_Prepend {
 	 *
 	 * Estructura esperada del archivo:
 	 * <?php return array(
-	 *     'ips'       => array( '1.2.3.4' => 1, '5.6.7.8' => 1, ... ),
-	 *     'cidrs'     => array( '10.0.0.0/8', '192.168.0.0/16', ... ),
-	 *     'whitelist' => array( '127.0.0.1' => 1, ... ),
-	 *     'updated'   => 1700000000,
+	 *     'ips'             => array( '1.2.3.4' => 0, '5.6.7.8' => 1700000900, ... ),
+	 *     'cidrs'           => array( '10.0.0.0/8' => 0, ... ),
+	 *     'whitelist'       => array( '127.0.0.1' => 1, ... ),
+	 *     'whitelist_cidrs' => array( '203.0.113.0/24', ... ),
+	 *     'updated'         => 1700000000,
 	 * );
+	 *
+	 * El valor de cada IP o CIDR bloqueado es el timestamp de vencimiento, o
+	 * 0 si es permanente. Archivos de versiones anteriores (valor 1 en `ips`,
+	 * lista plana en `cidrs`) se interpretan como bloqueos permanentes.
 	 *
 	 * @return array|null
 	 */
@@ -130,32 +135,57 @@ final class WPS_Firewall_Prepend {
 	 * Comprobar si la IP está en whitelist.
 	 */
 	private static function is_whitelisted( string $ip, array $data ): bool {
-		if ( empty( $data['whitelist'] ) ) {
-			return false;
-		}
-
-		return isset( $data['whitelist'][ $ip ] );
-	}
-
-	/**
-	 * Comprobar si la IP está bloqueada.
-	 */
-	private static function is_blocked( string $ip, array $data ): bool {
-		// 1. Verificar IP individual (O(1) lookup en array).
-		if ( ! empty( $data['ips'] ) && isset( $data['ips'][ $ip ] ) ) {
+		if ( ! empty( $data['whitelist'] ) && isset( $data['whitelist'][ $ip ] ) ) {
 			return true;
 		}
 
-		// 2. Verificar CIDRs.
-		if ( ! empty( $data['cidrs'] ) ) {
-			foreach ( $data['cidrs'] as $cidr ) {
-				if ( self::ip_in_cidr( $ip, $cidr ) ) {
+		if ( ! empty( $data['whitelist_cidrs'] ) ) {
+			foreach ( $data['whitelist_cidrs'] as $cidr ) {
+				if ( self::ip_in_cidr( $ip, (string) $cidr ) ) {
 					return true;
 				}
 			}
 		}
 
 		return false;
+	}
+
+	/**
+	 * Comprobar si la IP está bloqueada.
+	 */
+	private static function is_blocked( string $ip, array $data ): bool {
+		$now = time();
+
+		// 1. Verificar IP individual (O(1) lookup en array).
+		if ( ! empty( $data['ips'] ) && isset( $data['ips'][ $ip ] )
+			&& self::is_active( (int) $data['ips'][ $ip ], $now ) ) {
+			return true;
+		}
+
+		// 2. Verificar CIDRs.
+		if ( ! empty( $data['cidrs'] ) ) {
+			foreach ( $data['cidrs'] as $key => $value ) {
+				// Formato anterior: lista plana de CIDRs, todos permanentes.
+				$cidr    = is_int( $key ) ? (string) $value : (string) $key;
+				$expires = is_int( $key ) ? 0 : (int) $value;
+
+				if ( self::is_active( $expires, $now ) && self::ip_in_cidr( $ip, $cidr ) ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * ¿Sigue vigente un bloqueo con este vencimiento?
+	 *
+	 * 0 es permanente; 1 es el valor que usaban las versiones anteriores para
+	 * marcar una IP y también se toma como permanente.
+	 */
+	private static function is_active( int $expires, int $now ): bool {
+		return $expires <= 1 || $expires > $now;
 	}
 
 	/**
