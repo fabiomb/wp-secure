@@ -11,6 +11,21 @@ El ajuste **Notificar login desde IP nueva** venía activado por defecto y se mo
 - **Sin avisos al instalar**: el primer login de un usuario sin historial no avisa, porque toda red sería «nueva». Las redes se registran aunque el aviso esté desactivado, para que activarlo después no dispare un mail por cada red ya usada.
 - **`WPS_Admin_Notifier::notify_new_login_ip()`** devuelve ahora si el mail se envió.
 
+### Corrección: Los avisos de cambios de configuración y de bloqueos automáticos tampoco se enviaban
+
+Igual que el anterior, `notify_settings_change()` y `notify_auto_block()` existían con su ajuste en el panel, pero nada las invocaba. De las cuatro notificaciones configurables sólo funcionaba el resumen diario.
+
+- **Cambios de configuración** (activado por defecto): se avisa al guardar la configuración, al activar o desactivar el Modo Inseguro y al importar una configuración desde archivo. El mail indica qué cambió, quién y desde qué IP: apagar el firewall es lo primero que haría quien tomara una cuenta de administrador.
+- **Bloqueos automáticos** (desactivado por defecto): un mail por bloqueo inundaría el correo durante un ataque, así que ahora se envía **un resumen por hora**, y sólo si hubo bloqueos. `WPS_Blocker` encola cada bloqueo automático, de IP o de red, en la opción `wps_block_digest` (los manuales no, porque los hace el propio administrador). `WPS_Admin_Notifier::send_block_digest()` (nuevo, reemplaza a `notify_auto_block()`) corre con el cron horario, envía un único mail con hasta 100 bloqueos detallados más el total, y vacía la cola. La cola vive en `WPS_Blocker` porque la Capa 1 bloquea antes de que el autoloader del plugin esté registrado.
+- **Importar configuración** regenera el archivo de la Capa 0, que la importación puede encender o apagar.
+- **Desinstalación**: elimina también la opción `wps_block_digest`.
+- **`configuration.md`**: la sección de notificaciones describía ajustes que no existen («Frecuencia de resumen» semanal); ahora lista los reales.
+
+### Corrección: Consulta extra por petición en sitios actualizados
+
+- **`WPS_Blocker::client_key()`** leía el ajuste `ipv6_block_prefix` también para IPs IPv4. En instalaciones actualizadas desde versiones anteriores ese ajuste no estaba guardado, y cada petición hacía una consulta a la base de datos para buscarlo. Ahora sólo se lee para IPv6.
+- **Migraciones**: cada cambio de versión completa los ajustes por defecto que falten (`WPS_Activator::set_defaults()`, ahora público), así los ajustes nuevos existen también en sitios actualizados.
+
 ## [0.4.0] — 2026-09-22
 
 ### Seguridad: En IPv6 bastaba con cambiar de dirección para esquivar el firewall

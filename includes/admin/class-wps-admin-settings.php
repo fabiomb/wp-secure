@@ -777,7 +777,7 @@ class WPS_Admin_Settings {
                         'label'          => __( 'Notificar bloqueos automáticos', 'wp-secure' ),
                         'type'           => 'checkbox',
                         'default'        => false,
-                        'checkbox_label' => __( 'Enviar email por cada bloqueo automático (puede generar mucho correo)', 'wp-secure' ),
+                        'checkbox_label' => __( 'Enviar un resumen por hora de los bloqueos automáticos (sólo si hubo alguno)', 'wp-secure' ),
                     ),
                     array(
                         'key'            => 'notify_new_login_ip',

@@ -18,6 +18,12 @@ class WPS_Blocker {
     /** @var bool Si ya se programó regenerar el archivo de la Capa 0. */
     private static $layer0_sync_scheduled = false;
 
+    /** Opción con los bloqueos automáticos pendientes de notificar. */
+    const DIGEST_OPTION = 'wps_block_digest';
+
+    /** Bloqueos detallados por resumen; el resto sólo se cuenta. */
+    const DIGEST_MAX_ITEMS = 100;
+
     private function __construct() {
         $this->db     = WPS_Db::get_instance();
         $this->loader = WPS_Loader::get_instance();
@@ -128,6 +134,7 @@ class WPS_Blocker {
 
         if ( $id ) {
             self::schedule_layer0_sync();
+            $this->queue_block_notice( $ip, $block_type, $reason, $minutes );
 
             $logger = WPS_Logger::get_instance();
             $logger->event( WPS_Event_Types::IP_BLOCKED, array(
@@ -149,6 +156,12 @@ class WPS_Blocker {
      * @see WPS_Ip_Utils::client_key()
      */
     public function client_key( string $ip ): string {
+        // IPv4 no depende del ajuste: no leerlo evita una consulta por
+        // petición en instalaciones donde todavía no está guardado.
+        if ( ! WPS_Ip_Utils::is_ipv6( $ip ) ) {
+            return $ip;
+        }
+
         return WPS_Ip_Utils::client_key( $ip, $this->ipv6_prefix() );
     }
 
@@ -261,9 +274,53 @@ class WPS_Blocker {
 
         if ( $id ) {
             self::schedule_layer0_sync();
+            $this->queue_block_notice( $cidr, $block_type, $reason, $minutes );
         }
 
         return $id;
+    }
+
+    /**
+     * Encolar un bloqueo automático para el resumen por mail.
+     *
+     * Un mail por bloqueo inundaría el correo durante un ataque, así que los
+     * bloqueos se acumulan y WPS_Admin_Notifier::send_block_digest() envía un
+     * único resumen por hora. Vive acá y no en el notificador porque la Capa 1
+     * bloquea antes de que el autoloader del plugin esté registrado.
+     *
+     * @param string   $target     IP o red bloqueada.
+     * @param string   $block_type Tipo de bloqueo.
+     * @param string   $reason     Razón.
+     * @param int|null $minutes    Duración; null o 0 = permanente.
+     */
+    private function queue_block_notice( string $target, string $block_type, string $reason, ?int $minutes ): void {
+        if ( 'manual' === $block_type || ! function_exists( 'get_option' ) ) {
+            return;
+        }
+
+        if ( ! $this->loader->get_setting( 'notify_auto_blocks', false ) ) {
+            return;
+        }
+
+        $digest = get_option( self::DIGEST_OPTION, array() );
+        if ( ! is_array( $digest ) ) {
+            $digest = array();
+        }
+
+        $digest['count'] = (int) ( $digest['count'] ?? 0 ) + 1;
+        $digest['items'] = (array) ( $digest['items'] ?? array() );
+
+        if ( count( $digest['items'] ) < self::DIGEST_MAX_ITEMS ) {
+            $digest['items'][] = array(
+                'target'  => $target,
+                'type'    => $block_type,
+                'reason'  => substr( $reason, 0, 200 ),
+                'minutes' => $minutes ? (int) $minutes : 0,
+                'time'    => time(),
+            );
+        }
+
+        update_option( self::DIGEST_OPTION, $digest, false );
     }
 
     /**

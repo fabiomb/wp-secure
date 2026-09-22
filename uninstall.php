@@ -17,6 +17,7 @@ WPS_Db_Schema::drop_tables();
 delete_option( 'wps_version' );
 delete_option( 'wps_activated' );
 delete_option( 'wps_unsafe_mode' );
+delete_option( 'wps_block_digest' );
 
 // Eliminar transients propios (cache de geolocalización y de verificación
 // de crawlers): uno por IP, pueden ser miles de filas en wp_options.

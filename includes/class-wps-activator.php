@@ -61,8 +61,12 @@ class WPS_Activator {
 
     /**
      * Establecer valores de configuración por defecto.
+     *
+     * Sólo completa las claves que faltan. Se llama al activar y en cada
+     * migración de versión, para que los ajustes nuevos existan también en
+     * instalaciones actualizadas (si no, cada petición los busca en la BD).
      */
-    private static function set_defaults(): void {
+    public static function set_defaults(): void {
         $db = WPS_Db::get_instance();
 
         $defaults = array(

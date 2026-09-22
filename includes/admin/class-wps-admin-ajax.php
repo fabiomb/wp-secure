@@ -457,6 +457,14 @@ class WPS_Admin_Ajax {
         $result = WPS_Admin_Export::import_config( $data );
 
         if ( $result['success'] ) {
+            // La importación puede encender o apagar la Capa 0.
+            WPS_Activator::sync_blocked_ips_file();
+
+            WPS_Admin_Notifier::get_instance( $this->loader )->notify_settings_change(
+                get_current_user_id(),
+                __( 'Configuración importada desde archivo', 'wp-secure' )
+            );
+
             wp_send_json_success( array( 'message' => $result['message'] ) );
         }
 
@@ -504,6 +512,13 @@ class WPS_Admin_Ajax {
                 'unsafe_mode' => $new,
             ),
         ), WPS_Event_Types::SEVERITY_INFO );
+
+        WPS_Admin_Notifier::get_instance( $this->loader )->notify_settings_change(
+            get_current_user_id(),
+            $new
+                ? __( 'Modo Inseguro activado (el firewall no bloquea)', 'wp-secure' )
+                : __( 'Modo Inseguro desactivado', 'wp-secure' )
+        );
 
         wp_send_json_success( array(
             'unsafe_mode' => $new,

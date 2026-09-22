@@ -396,6 +396,8 @@ class WPS_Admin {
         // Encender o apagar la Capa 0 crea o elimina su archivo de datos.
         WPS_Activator::sync_blocked_ips_file();
 
+        WPS_Admin_Notifier::get_instance( $this->loader )->notify_settings_change( get_current_user_id() );
+
         // Log del cambio.
         $logger = WPS_Logger::get_instance();
         $logger->event_immediate( WPS_Event_Types::SETTINGS_CHANGED, array(

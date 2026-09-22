@@ -21,6 +21,9 @@ class WPS_Db_Migrations {
 
             self::adopt_existing_layer0( $db, $current_version );
 
+            // Ajustes agregados en versiones posteriores a la instalación.
+            WPS_Activator::set_defaults();
+
             $db->set_setting( 'db_version', WPS_VERSION );
         }
     }

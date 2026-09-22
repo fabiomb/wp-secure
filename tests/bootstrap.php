@@ -126,6 +126,28 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 			return true;
 		}
 	}
+	// Opciones de WordPress en $GLOBALS['wps_test_options'].
+	if ( ! function_exists( 'get_option' ) ) {
+		function get_option( $key, $default = false ) { return $GLOBALS['wps_test_options'][ $key ] ?? $default; }
+	}
+	if ( ! function_exists( 'update_option' ) ) {
+		function update_option( $key, $value, $autoload = null ) {
+			$GLOBALS['wps_test_options'][ $key ] = $value;
+			return true;
+		}
+	}
+	if ( ! function_exists( 'delete_option' ) ) {
+		function delete_option( $key ) {
+			unset( $GLOBALS['wps_test_options'][ $key ] );
+			return true;
+		}
+	}
+	if ( ! function_exists( '_n' ) ) {
+		function _n( $single, $plural, $number, $domain = 'default' ) { return 1 === (int) $number ? $single : $plural; }
+	}
+	if ( ! function_exists( 'get_userdata' ) ) {
+		function get_userdata( $user_id ) { return (object) array( 'ID' => $user_id, 'display_name' => 'Admin de prueba' ); }
+	}
 	if ( ! function_exists( 'get_bloginfo' ) ) {
 		function get_bloginfo( $show = '' ) { return 'Sitio de prueba'; }
 	}
@@ -178,6 +200,7 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 			$this->queries       = array();
 			$this->inserts       = array();
 			$this->prepared_args = array();
+			$this->insert_id     = 0;
 		}
 
 		public function prepare( $query, ...$args ) {
@@ -191,7 +214,8 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 		public function query( $query ) { $this->queries[] = $query; return 0; }
 		public function insert( $table, $data, $format = null ) {
 			$this->inserts[] = array( $table, $data );
-			return false;
+			$this->insert_id = count( $this->inserts );
+			return 1;
 		}
 		public function update( $table, $data, $where, $format = null, $where_format = null ) { return false; }
 		public function delete( $table, $where, $where_format = null ) { return false; }

@@ -53,6 +53,19 @@ class Test_WPS_Ipv6_Client extends \PHPUnit\Framework\TestCase {
 		$this->assertSame( 48, WPS_Ip_Utils::clamp_ipv6_prefix( 48 ) );
 	}
 
+	public function test_ipv4_key_does_not_read_settings(): void {
+		// En sitios actualizados el ajuste puede no estar guardado: leerlo
+		// para una IPv4 costaba una consulta por petición.
+		$cache = new \ReflectionProperty( 'WPS_Loader', 'settings_cache' );
+		$cache->setAccessible( true );
+		$cache->setValue( WPS_Loader::get_instance(), array() );
+		$GLOBALS['wpdb']->reset_queries();
+
+		WPS_Blocker::get_instance()->client_key( '45.33.32.156' );
+
+		$this->assertCount( 0, $GLOBALS['wpdb']->queries );
+	}
+
 	/*──────────────────────────────────────────────
 	 * Bloqueo automático
 	 *──────────────────────────────────────────────*/

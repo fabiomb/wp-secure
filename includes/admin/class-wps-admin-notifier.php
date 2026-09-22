@@ -40,33 +40,75 @@ class WPS_Admin_Notifier {
 	 */
 	public function init(): void {
 		add_action( 'wps_daily_maintenance', array( $this, 'send_daily_summary' ) );
+		add_action( 'wps_hourly_maintenance', array( $this, 'send_block_digest' ) );
 	}
 
 	/**
-	 * Notificar un bloqueo automático.
+	 * Enviar el resumen de bloqueos automáticos acumulados.
+	 *
+	 * Corre con el cron horario. WPS_Blocker encola cada bloqueo automático
+	 * (no los manuales) mientras el aviso esté activo; acá se envía un único
+	 * mail con todos y se vacía la cola.
+	 *
+	 * @return bool Si se envió el resumen.
 	 */
-	public function notify_auto_block( string $ip, string $block_type, string $reason ): void {
-		if ( ! $this->loader->get_setting( 'notify_auto_blocks', false ) ) {
-			return;
+	public function send_block_digest(): bool {
+		$digest = get_option( WPS_Blocker::DIGEST_OPTION, array() );
+		if ( ! is_array( $digest ) || empty( $digest['count'] ) ) {
+			return false;
 		}
 
+		// Vaciar antes de enviar: si el envío falla o tarda, la cola no se
+		// reenvía en la próxima pasada del cron.
+		delete_option( WPS_Blocker::DIGEST_OPTION );
+
+		if ( ! $this->loader->get_setting( 'notify_auto_blocks', false ) ) {
+			return false;
+		}
+
+		$count = (int) $digest['count'];
+		$items = (array) ( $digest['items'] ?? array() );
+
 		$subject = sprintf(
-			/* translators: %s: IP address */
-			__( '[WP Seguro] IP bloqueada: %s', 'wp-secure' ),
-			$ip
+			/* translators: 1: number of blocks, 2: site name */
+			_n( '[WP Seguro] %1$d bloqueo automático en %2$s', '[WP Seguro] %1$d bloqueos automáticos en %2$s', $count, 'wp-secure' ),
+			$count,
+			get_bloginfo( 'name' )
 		);
 
-		$body = sprintf(
-			/* translators: 1: IP, 2: block type, 3: reason, 4: site name */
-			__( "Se ha bloqueado automáticamente una IP en %4\$s.\n\nIP: %1\$s\nTipo: %2\$s\nRazón: %3\$s\nFecha: %5\$s", 'wp-secure' ),
-			$ip,
-			$block_type,
-			$reason,
-			get_bloginfo( 'name' ),
-			wp_date( 'Y-m-d H:i:s' )
-		);
+		$lines = array();
+		foreach ( $items as $item ) {
+			$duration = empty( $item['minutes'] )
+				? __( 'permanente', 'wp-secure' )
+				: sprintf( __( '%d min', 'wp-secure' ), (int) $item['minutes'] );
 
-		$this->send( $subject, $body );
+			$lines[] = sprintf(
+				'%s  %s  [%s, %s]  %s',
+				wp_date( 'Y-m-d H:i', (int) ( $item['time'] ?? time() ) ),
+				$item['target'] ?? '',
+				$item['type'] ?? '',
+				$duration,
+				$item['reason'] ?? ''
+			);
+		}
+
+		$body  = sprintf(
+			/* translators: 1: number of blocks, 2: site name */
+			__( "Desde el último resumen se aplicaron %1\$d bloqueos automáticos en %2\$s.\n\n", 'wp-secure' ),
+			$count,
+			get_bloginfo( 'name' )
+		);
+		$body .= implode( "\n", $lines );
+
+		if ( $count > count( $items ) ) {
+			$body .= "\n" . sprintf(
+				/* translators: %d: number of blocks not listed */
+				__( '… y %d más. El detalle completo está en WP Seguro → Bloqueos.', 'wp-secure' ),
+				$count - count( $items )
+			);
+		}
+
+		return $this->send( $subject, $body );
 	}
 
 	/**
@@ -154,26 +196,44 @@ class WPS_Admin_Notifier {
 
 	/**
 	 * Notificar cambios de configuración.
+	 *
+	 * Un cambio no autorizado en el firewall (apagar detectores, activar el
+	 * Modo Inseguro) es lo primero que haría quien tomó una cuenta de
+	 * administrador, así que el aviso incluye quién, desde dónde y qué.
+	 *
+	 * @param int    $user_id Usuario que hizo el cambio.
+	 * @param string $change  Descripción del cambio.
+	 * @return bool Si se envió el aviso.
 	 */
-	public function notify_settings_change( int $user_id ): void {
+	public function notify_settings_change( int $user_id, string $change = '' ): bool {
 		if ( ! $this->loader->get_setting( 'notify_settings_change', true ) ) {
-			return;
+			return false;
 		}
 
 		$user = get_userdata( $user_id );
 		$name = $user ? $user->display_name : __( 'Desconocido', 'wp-secure' );
 
-		$subject = __( '[WP Seguro] Configuración modificada', 'wp-secure' );
+		if ( '' === $change ) {
+			$change = __( 'Configuración guardada', 'wp-secure' );
+		}
 
-		$body = sprintf(
-			/* translators: 1: user name, 2: site name, 3: date */
-			__( "La configuración de WP Seguro ha sido modificada en %2\$s.\n\nUsuario: %1\$s\nFecha: %3\$s", 'wp-secure' ),
-			$name,
-			get_bloginfo( 'name' ),
-			wp_date( 'Y-m-d H:i:s' )
+		$subject = sprintf(
+			/* translators: %s: description of the change */
+			__( '[WP Seguro] Configuración modificada: %s', 'wp-secure' ),
+			$change
 		);
 
-		$this->send( $subject, $body );
+		$body = sprintf(
+			/* translators: 1: user name, 2: site name, 3: date, 4: change, 5: IP */
+			__( "La configuración de WP Seguro ha sido modificada en %2\$s.\n\nCambio: %4\$s\nUsuario: %1\$s\nIP: %5\$s\nFecha: %3\$s\n\nSi no reconoces este cambio, revisa la seguridad de tu sitio.", 'wp-secure' ),
+			$name,
+			get_bloginfo( 'name' ),
+			wp_date( 'Y-m-d H:i:s' ),
+			$change,
+			WPS_Request::get_instance()->ip()
+		);
+
+		return $this->send( $subject, $body );
 	}
 
 	/**
