@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.4.1] — Sin publicar
+## [0.4.1] — 2026-09-22
 
 ### Corrección: El aviso de login desde IP nueva nunca se enviaba
 
@@ -25,6 +25,10 @@ Igual que el anterior, `notify_settings_change()` y `notify_auto_block()` exist�
 
 - **`WPS_Blocker::client_key()`** leía el ajuste `ipv6_block_prefix` también para IPs IPv4. En instalaciones actualizadas desde versiones anteriores ese ajuste no estaba guardado, y cada petición hacía una consulta a la base de datos para buscarlo. Ahora sólo se lee para IPv6.
 - **Migraciones**: cada cambio de versión completa los ajustes por defecto que falten (`WPS_Activator::set_defaults()`, ahora público), así los ajustes nuevos existen también en sitios actualizados.
+
+### Versión
+
+- Versión actualizada a `0.4.1` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin.
 
 ## [0.4.0] — 2026-09-22
 
