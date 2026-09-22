@@ -100,6 +100,38 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	if ( ! function_exists( 'wp_remote_retrieve_body' ) ) {
 		function wp_remote_retrieve_body( $response ) { return $response['body'] ?? ''; }
 	}
+	// Usuarios: capacidades en $GLOBALS['wps_test_user_caps'][ ID ][ cap ],
+	// meta en $GLOBALS['wps_test_user_meta'][ ID ][ key ].
+	if ( ! function_exists( 'user_can' ) ) {
+		function user_can( $user, $capability ) {
+			$id = is_object( $user ) ? $user->ID : (int) $user;
+			return ! empty( $GLOBALS['wps_test_user_caps'][ $id ][ $capability ] );
+		}
+	}
+	if ( ! function_exists( 'get_user_meta' ) ) {
+		function get_user_meta( $user_id, $key = '', $single = false ) {
+			return $GLOBALS['wps_test_user_meta'][ $user_id ][ $key ] ?? ( $single ? '' : array() );
+		}
+	}
+	if ( ! function_exists( 'update_user_meta' ) ) {
+		function update_user_meta( $user_id, $key, $value ) {
+			$GLOBALS['wps_test_user_meta'][ $user_id ][ $key ] = $value;
+			return true;
+		}
+	}
+	// Correo: cada envío queda en $GLOBALS['wps_test_mails'].
+	if ( ! function_exists( 'wp_mail' ) ) {
+		function wp_mail( $to, $subject, $message, $headers = '' ) {
+			$GLOBALS['wps_test_mails'][] = compact( 'to', 'subject', 'message' );
+			return true;
+		}
+	}
+	if ( ! function_exists( 'get_bloginfo' ) ) {
+		function get_bloginfo( $show = '' ) { return 'Sitio de prueba'; }
+	}
+	if ( ! function_exists( 'wp_date' ) ) {
+		function wp_date( $format, $timestamp = null ) { return gmdate( $format, $timestamp ?? time() ); }
+	}
 	if ( ! function_exists( 'wp_normalize_path' ) ) {
 		function wp_normalize_path( $path ) { return str_replace( '\\', '/', $path ); }
 	}

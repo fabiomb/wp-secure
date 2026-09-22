@@ -202,6 +202,9 @@ class WPS_Login_Detector {
             'wp_user_id'  => $user->ID,
             'details'     => array( 'username' => $username ),
         ), WPS_Event_Types::SEVERITY_INFO );
+
+        // Aviso de login de un administrador desde una red desconocida.
+        WPS_Admin_Notifier::get_instance( $this->loader )->track_login( $user, $ip );
     }
 
     /**

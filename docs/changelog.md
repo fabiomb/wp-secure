@@ -1,5 +1,16 @@
 # Registro de Cambios
 
+## [0.4.1] — Sin publicar
+
+### Corrección: El aviso de login desde IP nueva nunca se enviaba
+
+El ajuste **Notificar login desde IP nueva** venía activado por defecto y se mostraba en Configuración → Notificaciones, pero ningún código invocaba el aviso: un administrador que iniciaba sesión desde una red desconocida nunca generaba el mail.
+
+- **`WPS_Admin_Notifier::track_login()`** (nuevo): se llama desde `WPS_Login_Detector::on_login_success()` y avisa cuando un usuario con `manage_options` inicia sesión desde una red que no usó antes. No aplica a clientes, alumnos ni otros usuarios sin permisos de administración, para no inundar el correo en sitios con muchas cuentas.
+- **Red conocida**: se identifica con la clave de cliente, así que en IPv6 rotar de dirección dentro del mismo prefijo (por defecto `/64`) no genera avisos. Las redes conocidas se guardan en user meta (`wps_known_login_keys`, hasta 20 por usuario, se descartan las más viejas) y no en la tabla de intentos de login, que se purga a los pocos días.
+- **Sin avisos al instalar**: el primer login de un usuario sin historial no avisa, porque toda red sería «nueva». Las redes se registran aunque el aviso esté desactivado, para que activarlo después no dispare un mail por cada red ya usada.
+- **`WPS_Admin_Notifier::notify_new_login_ip()`** devuelve ahora si el mail se envió.
+
 ## [0.4.0] — 2026-09-22
 
 ### Seguridad: En IPv6 bastaba con cambiar de dirección para esquivar el firewall
