@@ -143,7 +143,7 @@ class WPS_Scanner_Detector {
 					) );
 
 					$minutes = (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
-					$this->blocker->block_ip(
+					$this->blocker->block_offender(
 						$ip,
 						'auto_crawler_spoof',
 						sprintf( 'Crawler falsificado: %s', $crawler_id ),
@@ -263,7 +263,7 @@ class WPS_Scanner_Detector {
 			'details'     => $detection,
 		) );
 
-		$this->blocker->block_ip(
+		$this->blocker->block_offender(
 			$ip,
 			'auto_scanner',
 			sprintf( 'Scanner detectado: %s', $detection['type'] ),

@@ -91,7 +91,7 @@ class WPS_Login_Detector {
              AND user_exists = 0
              AND success = 0
              AND attempted_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 HOUR)",
-            $ip
+            $this->blocker->client_key( $ip )
         );
     }
 
@@ -247,7 +247,7 @@ class WPS_Login_Detector {
      */
     private function record_attempt( string $ip, string $username, bool $user_exists, bool $success ): void {
         $this->db->insert( 'login_attempts', array(
-            'ip_address'   => $ip,
+            'ip_address'   => $this->blocker->client_key( $ip ),
             'username'     => substr( $username, 0, 255 ),
             'user_exists'  => $user_exists ? 1 : 0,
             'success'      => $success ? 1 : 0,
@@ -262,7 +262,7 @@ class WPS_Login_Detector {
         $minutes = (int) $this->loader->get_setting( 'login_block_minutes', 15 );
         $minutes = $this->calculate_escalated_duration( $ip, 'auto_login', $minutes );
 
-        $this->blocker->block_ip(
+        $this->blocker->block_offender(
             $ip,
             'auto_login',
             sprintf( 'Login con usuario inexistente: %s', substr( $username, 0, 50 ) ),
@@ -293,14 +293,14 @@ class WPS_Login_Detector {
              WHERE ip_address = %s
              AND success = 0
              AND attempted_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 HOUR)",
-            $ip
+            $this->blocker->client_key( $ip )
         );
 
         if ( $failed_count >= $max_attempts ) {
             $minutes = (int) $this->loader->get_setting( 'login_block_minutes', 15 );
             $minutes = $this->calculate_escalated_duration( $ip, 'auto_login', $minutes );
 
-            $this->blocker->block_ip(
+            $this->blocker->block_offender(
                 $ip,
                 'auto_login',
                 sprintf( 'Excedió %d intentos de login fallidos en 1 hora', $max_attempts ),

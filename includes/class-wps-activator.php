@@ -95,6 +95,7 @@ class WPS_Activator {
             'rate_login_per_hour'  => 5,
             'rate_xmlrpc_per_hour' => 0,
             'rate_block_minutes'   => 15,
+            'ipv6_block_prefix'    => 64,
 
             // Firewall layers.
             'firewall_layer0_enabled' => false,

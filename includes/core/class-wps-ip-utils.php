@@ -38,6 +38,50 @@ class WPS_Ip_Utils {
         );
     }
 
+    /** Prefijo IPv6 por defecto para agrupar a un mismo cliente. */
+    const DEFAULT_IPV6_PREFIX = 64;
+
+    /**
+     * Clave con la que se cuenta y se bloquea a un cliente.
+     *
+     * En IPv4 es la propia IP. En IPv6 es la red del prefijo indicado: a un
+     * cliente se le asigna normalmente un /64 entero, y una IP exacta la
+     * cambia en cada petición sin esfuerzo, lo que anula el rate limiting, el
+     * conteo de intentos de login y cualquier bloqueo por IP.
+     *
+     * @param string $ip     IP del visitante.
+     * @param int    $prefix Prefijo IPv6 (128 = IP exacta).
+     * @return string IP (IPv4, o IPv6 con prefijo 128) o red en notación CIDR.
+     */
+    public static function client_key( string $ip, int $prefix = self::DEFAULT_IPV6_PREFIX ): string {
+        if ( ! self::is_ipv6( $ip ) ) {
+            return $ip;
+        }
+
+        $prefix = self::clamp_ipv6_prefix( $prefix );
+        if ( 128 === $prefix ) {
+            return $ip;
+        }
+
+        return self::get_network( $ip, $prefix ) ?? $ip;
+    }
+
+    /**
+     * Validar el prefijo IPv6 configurado.
+     *
+     * Por debajo de /48 (lo que recibe un sitio completo) se bloquearía a
+     * organizaciones o ISPs enteros. Un valor fuera de rango (p. ej. un 0 que
+     * dejó el formulario vacío) vuelve al valor por defecto en lugar de
+     * acercarse al extremo más amplio.
+     */
+    public static function clamp_ipv6_prefix( int $prefix ): int {
+        if ( $prefix < 48 || $prefix > 128 ) {
+            return self::DEFAULT_IPV6_PREFIX;
+        }
+
+        return $prefix;
+    }
+
     /**
      * ¿La IP es el propio servidor?
      *

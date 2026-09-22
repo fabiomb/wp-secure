@@ -473,6 +473,15 @@ class WPS_Admin_Settings {
                         ),
                     ),
                     array(
+                        'key'         => 'ipv6_block_prefix',
+                        'label'       => __( 'Prefijo IPv6 por cliente', 'wp-secure' ),
+                        'type'        => 'number',
+                        'default'     => 64,
+                        'min'         => 48,
+                        'max'         => 128,
+                        'description' => __( 'En IPv6 cada cliente recibe normalmente un /64 completo y puede cambiar de dirección en cada petición. El rate limiting, el conteo de intentos de login y los bloqueos automáticos se aplican a toda la red de este prefijo. 128 = dirección exacta. Los bloqueos manuales y la whitelist siempre usan la dirección exacta.', 'wp-secure' ),
+                    ),
+                    array(
                         'key'            => 'firewall_layer1_enabled',
                         'label'          => __( 'Capa 1: MU-Plugin', 'wp-secure' ),
                         'type'           => 'checkbox',

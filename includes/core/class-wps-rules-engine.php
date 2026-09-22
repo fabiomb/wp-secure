@@ -367,7 +367,7 @@ class WPS_Rules_Engine {
 			? null
 			: (int) $this->loader->get_setting( 'rate_block_minutes', 15 );
 
-		$this->blocker->block_ip(
+		$this->blocker->block_offender(
 			$ip,
 			'auto_risk',
 			sprintf( 'Puntuación de riesgo elevada: %d (%s)', $score, implode( ', ', $assessment['factors'] ) ),

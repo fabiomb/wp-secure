@@ -144,6 +144,93 @@ class WPS_Blocker {
     }
 
     /**
+     * Clave de cliente de una IP según el prefijo IPv6 configurado.
+     *
+     * @see WPS_Ip_Utils::client_key()
+     */
+    public function client_key( string $ip ): string {
+        return WPS_Ip_Utils::client_key( $ip, $this->ipv6_prefix() );
+    }
+
+    /**
+     * Prefijo IPv6 configurado (`ipv6_block_prefix`), acotado a /48–/128.
+     */
+    public function ipv6_prefix(): int {
+        return WPS_Ip_Utils::clamp_ipv6_prefix(
+            (int) $this->loader->get_setting( 'ipv6_block_prefix', WPS_Ip_Utils::DEFAULT_IPV6_PREFIX )
+        );
+    }
+
+    /**
+     * Bloquear automáticamente al cliente que originó una petición.
+     *
+     * En IPv4 bloquea la IP. En IPv6 bloquea la red del prefijo configurado
+     * (por defecto /64): bloquear la dirección exacta no sirve, porque el
+     * cliente puede usar otra de su /64 en la petición siguiente.
+     *
+     * Las mismas salvaguardas que block_ip(): nunca el propio servidor ni una
+     * IP de la whitelist. Si la red incluye la IP del servidor, se bloquea
+     * sólo la dirección exacta, porque la Capa 0 no exime al servidor y le
+     * cortaría wp-cron y los loopbacks.
+     *
+     * @param string   $ip         IP del visitante.
+     * @param string   $block_type Tipo de bloqueo automático (auto_rate, auto_sqli, …).
+     * @param string   $reason     Razón del bloqueo.
+     * @param int|null $minutes    Minutos de bloqueo temporal. Null = permanente.
+     * @return int|false ID del bloqueo o false si no se bloqueó.
+     */
+    public function block_offender( string $ip, string $block_type, string $reason, ?int $minutes = null ) {
+        if ( ! WPS_Ip_Utils::is_valid_ip( $ip ) ) {
+            return false;
+        }
+
+        $key = $this->client_key( $ip );
+        if ( $key === $ip || $this->network_contains_server( $key ) ) {
+            return $this->block_ip( $ip, $block_type, $reason, $minutes );
+        }
+
+        if ( WPS_Ip_Utils::is_server_ip( $ip ) || WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+            return false;
+        }
+
+        $existing = $this->is_blocked( $ip );
+        if ( $existing ) {
+            $this->increment_hits( (int) $existing['id'] );
+            return (int) $existing['id'];
+        }
+
+        $id = $this->block_cidr( $key, $block_type, $reason, $minutes );
+
+        if ( $id ) {
+            WPS_Logger::get_instance()->event( WPS_Event_Types::IP_BLOCKED, array(
+                'ip_address' => $ip,
+                'details'    => array(
+                    'block_type' => $block_type,
+                    'reason'     => $reason,
+                    'network'    => $key,
+                    'duration'   => $minutes ? $minutes . ' min' : 'permanent',
+                ),
+            ) );
+        }
+
+        return $id;
+    }
+
+    /**
+     * ¿La red incluye alguna de las IPs del propio servidor?
+     */
+    private function network_contains_server( string $cidr ): bool {
+        foreach ( array( 'SERVER_ADDR', 'LOCAL_ADDR' ) as $key ) {
+            $server_ip = WPS_Ip_Utils::strip_port( (string) ( $_SERVER[ $key ] ?? '' ) );
+            if ( WPS_Ip_Utils::is_valid_ip( $server_ip ) && WPS_Ip_Utils::ip_in_cidr( $server_ip, $cidr ) ) {
+                return true;
+            }
+        }
+
+        return WPS_Ip_Utils::ip_in_cidr( '::1', $cidr );
+    }
+
+    /**
      * Bloquear un rango CIDR.
      */
     public function block_cidr( string $cidr, string $block_type, string $reason, ?int $minutes = null ) {
@@ -396,13 +483,17 @@ class WPS_Blocker {
      */
     public function count_previous_blocks( string $ip, string $block_type, int $hours = 24 ): int {
         $table = WPS_Db_Schema::table( 'blocked_ips' );
+
+        // En IPv6 los bloqueos automáticos son de red: se cuentan los de la
+        // IP exacta y los de su red, para que la escalada funcione igual.
         return (int) $this->db->get_var(
             // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             "SELECT COUNT(*) FROM {$table}
-             WHERE ip_address = %s
+             WHERE ( ip_address = %s OR cidr = %s )
              AND block_type = %s
              AND blocked_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d HOUR)",
             $ip,
+            $this->client_key( $ip ),
             $block_type,
             $hours
         );

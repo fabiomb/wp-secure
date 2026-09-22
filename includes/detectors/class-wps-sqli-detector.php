@@ -259,7 +259,7 @@ class WPS_Sqli_Detector {
 			),
 		) );
 
-		$this->blocker->block_ip(
+		$this->blocker->block_offender(
 			$ip,
 			'auto_sqli',
 			'Patrón de inyección SQL detectado',

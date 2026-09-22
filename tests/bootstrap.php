@@ -139,12 +139,19 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 		/** @var array[] Inserts ejecutados: array( tabla, datos ). */
 		public $inserts = array();
 
+		/** @var array[] Argumentos pasados a prepare(), en orden. */
+		public $prepared_args = array();
+
 		public function reset_queries() {
-			$this->queries = array();
-			$this->inserts = array();
+			$this->queries       = array();
+			$this->inserts       = array();
+			$this->prepared_args = array();
 		}
 
-		public function prepare( $query, ...$args ) { return $query; }
+		public function prepare( $query, ...$args ) {
+			$this->prepared_args[] = $args;
+			return $query;
+		}
 		public function get_var( $query = null ) { $this->queries[] = $query; return null; }
 		public function get_row( $query = null, $output = null ) { $this->queries[] = $query; return null; }
 		public function get_results( $query = null, $output = null ) { $this->queries[] = $query; return array(); }

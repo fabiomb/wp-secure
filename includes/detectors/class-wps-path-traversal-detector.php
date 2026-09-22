@@ -279,7 +279,7 @@ class WPS_Path_Traversal_Detector {
 			),
 		) );
 
-		$this->blocker->block_ip(
+		$this->blocker->block_offender(
 			$ip,
 			'auto_traversal',
 			'Path traversal detectado',

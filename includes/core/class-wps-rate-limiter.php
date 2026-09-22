@@ -98,7 +98,9 @@ class WPS_Rate_Limiter {
 		$window_seconds = $this->get_window_seconds( $type );
 		$window_start   = $this->get_window_start( $window_seconds );
 
-		$count = $this->increment( $ip, $type, $window_start );
+		// En IPv6 se cuenta por red: rotar de dirección dentro del /64 no
+		// reinicia el contador.
+		$count = $this->increment( $this->blocker->client_key( $ip ), $type, $window_start );
 
 		if ( $count > $limit ) {
 			$this->handle_exceeded( $ip, $type, $count, $limit );
@@ -120,7 +122,7 @@ class WPS_Rate_Limiter {
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$count = $wpdb->get_var( $wpdb->prepare(
 			"SELECT request_count FROM {$this->table} WHERE ip_address = %s AND limit_type = %s AND window_start = %s",
-			$ip,
+			$this->blocker->client_key( $ip ),
 			$type,
 			$window_start
 		) );
@@ -216,7 +218,7 @@ class WPS_Rate_Limiter {
 			),
 		) );
 
-		$this->blocker->block_ip(
+		$this->blocker->block_offender(
 			$ip,
 			'auto_rate',
 			sprintf( 'Rate limit excedido: %s (%d/%d)', $type, $count, $limit ),

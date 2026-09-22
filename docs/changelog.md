@@ -1,5 +1,25 @@
 # Registro de Cambios
 
+## [0.4.0] — Sin publicar
+
+### Seguridad: En IPv6 bastaba con cambiar de dirección para esquivar el firewall
+
+Un proveedor asigna normalmente un `/64` entero a cada cliente IPv6: 18 trillones de direcciones que el cliente puede usar a voluntad, una distinta en cada petición. El rate limiting, el conteo de intentos de login y los bloqueos automáticos trabajaban con la dirección exacta, así que un atacante con IPv6 rotaba de dirección y ninguno de los tres lo alcanzaba: nunca superaba un límite, nunca acumulaba intentos fallidos y cada bloqueo caía sobre una dirección que ya no usaba.
+
+- **Clave de cliente** (`WPS_Ip_Utils::client_key()`, nuevo): en IPv4 es la IP; en IPv6, la red del prefijo configurado.
+- **Nuevo ajuste `ipv6_block_prefix`** (Configuración → Firewall Avanzado → Prefijo IPv6 por cliente): por defecto `64`, admite de `48` a `128`. `128` vuelve al comportamiento anterior (dirección exacta). Un valor fuera de rango vuelve al valor por defecto, para que un campo vacío no termine bloqueando un `/48`.
+- **Rate limiting**: `WPS_Rate_Limiter` cuenta por clave de cliente.
+- **Intentos de login**: `WPS_Login_Detector` registra y cuenta los intentos por clave de cliente, así que el máximo de intentos fallidos y el umbral de usuarios inexistentes valen para toda la red.
+- **Bloqueos automáticos** (`WPS_Blocker::block_offender()`, nuevo): los detectores de SQLi, XSS, path traversal, scanner y crawlers falsificados, el rate limiter, el detector de login y el motor de riesgo bloquean en IPv6 la red completa como rango CIDR. La Capa 0 ya aplicaba rangos, con su vencimiento. Mantiene las salvaguardas de `block_ip()` (nunca el propio servidor ni una IP de la whitelist) y, si la red incluye la IP del servidor, bloquea sólo la dirección exacta: la Capa 0 no exime al servidor y le cortaría wp-cron.
+- **Escalada de bloqueos**: `WPS_Blocker::count_previous_blocks()` cuenta los bloqueos de la dirección y los de su red, así que la escalada a bloqueos largos y permanentes sigue funcionando con bloqueos de red.
+- **Sin cambios**: los bloqueos manuales, las reglas personalizadas y la whitelist siguen usando la dirección exacta. El log de eventos y el de tráfico siguen registrando la dirección exacta; el evento de bloqueo agrega la red bloqueada en sus detalles.
+
+Algunos proveedores de hosting comparten un `/64` entre servidores de clientes distintos. Si aparecen bloqueos de red que alcanzan a terceros legítimos, se puede subir el prefijo o usar la whitelist.
+
+### Documentación
+
+- **`configuration.md`**: la tabla de rate limiting describía ajustes que no existen («Activar rate limiting», «Ventana de análisis»); ahora lista los reales. Se documenta el prefijo IPv6 y el resultado *no verificado* de la verificación de crawlers.
+
 ## [0.3.1] — 2026-09-22
 
 Continuación de la revisión de la 0.3.0: Capa 0, resiliencia ante fallas externas y documentación.

@@ -232,7 +232,7 @@ class WPS_Xss_Detector {
 			),
 		) );
 
-		$this->blocker->block_ip(
+		$this->blocker->block_offender(
 			$ip,
 			'auto_xss',
 			'Patrón de XSS detectado',

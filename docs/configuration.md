@@ -50,9 +50,14 @@ Para permitir un servicio que necesita XML-RPC (Jetpack, la app móvil), creá u
 
 | Opción | Descripción | Valor por defecto |
 |--------|-------------|-------------------|
-| Activar rate limiting | Limitar el número de peticiones por IP. | Activado |
-| Peticiones por minuto | Máximo de peticiones permitidas por minuto por IP. | 60 |
-| Ventana de análisis | Período en segundos para evaluar el rate limit. | 60 |
+| Páginas por minuto | Peticiones que cargan WordPress (páginas, admin, REST, AJAX). `0` desactiva el límite. | 60 |
+| Peticiones totales por minuto | Todas las peticiones que llegan a PHP, incluidos recursos estáticos servidos por WordPress. | 240 |
+| Errores 404 por minuto | Útil contra la enumeración de rutas. | 10 |
+| Intentos de login por hora | | 5 |
+| Peticiones XML-RPC por hora | `0` desactiva el límite. | 0 |
+| Duración del bloqueo (minutos) | Cuánto dura el bloqueo al superar un límite. | 15 |
+
+Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, la red del prefijo configurado en **Firewall → Prefijo IPv6 por cliente** (ver abajo). El propio servidor (wp-cron, loopbacks) nunca se limita.
 
 ---
 
@@ -66,6 +71,19 @@ Para permitir un servicio que necesita XML-RPC (Jetpack, la app móvil), creá u
 | Bloquear métodos HTTP peligrosos | Bloquear TRACE, TRACK, DEBUG, CONNECT. | Activado |
 | Bloquear User-Agent vacío | Bloquear peticiones sin cabecera User-Agent. | Desactivado |
 | Bloquear peticiones sin Host | Bloquear peticiones sin cabecera Host válida. | Activado |
+| Prefijo IPv6 por cliente | Tamaño de la red IPv6 que se trata como un solo cliente (48–128). `128` = dirección exacta. | 64 |
+
+### Prefijo IPv6 por cliente
+
+En IPv6 un proveedor asigna normalmente un `/64` entero a cada cliente, y el cliente puede usar una dirección distinta en cada petición. Si el firewall trabajara con la dirección exacta, bastaría con rotarla para esquivar el rate limiting, el conteo de intentos de login y cualquier bloqueo.
+
+Por eso, con el valor por defecto (`64`):
+
+- El **rate limiting** y los **intentos de login** se cuentan por red `/64`.
+- Los **bloqueos automáticos** (detectores, rate limit, login, motor de riesgo) bloquean la red `/64` como rango CIDR. Si la red incluye la IP del propio servidor, se bloquea sólo la dirección exacta.
+- Los **bloqueos manuales**, las **reglas personalizadas** y la **whitelist** siguen usando la dirección exacta.
+
+Algunos proveedores de hosting comparten un `/64` entre varios servidores de clientes distintos. Si ves bloqueos de red que alcanzan a terceros legítimos, podés subir el valor (p. ej. `128`) o agregar esas direcciones a la whitelist.
 
 ### Verificación rDNS de Crawlers
 
@@ -75,7 +93,7 @@ Cuando está activo, WP Seguro verifica que los bots que se identifican como Goo
 2. Se verifica que el dominio obtenido corresponda al crawler declarado.
 3. Se realiza una consulta DNS directa para confirmar que el dominio resuelve a la misma IP.
 
-Los crawlers verificados se excluyen de las reglas del scanner. Los crawlers falsos (spoofed) se bloquean automáticamente. Los resultados se cachean durante 24 horas.
+Los crawlers verificados se excluyen de las reglas del scanner. Los crawlers falsos (spoofed) se bloquean automáticamente. Si el DNS no responde, el resultado queda como *no verificado*: no se bloquea y se reintenta a los 10 minutos. Los resultados firmes se cachean durante 24 horas.
 
 **Crawlers soportados:** Googlebot, Bingbot, YandexBot, Baiduspider, DuckDuckBot, Applebot, Facebookbot, LinkedInBot.
 
