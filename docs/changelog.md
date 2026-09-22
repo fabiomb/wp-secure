@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.4.0] — Sin publicar
+## [0.4.0] — 2026-09-22
 
 ### Seguridad: En IPv6 bastaba con cambiar de dirección para esquivar el firewall
 
@@ -19,6 +19,10 @@ Algunos proveedores de hosting comparten un `/64` entre servidores de clientes d
 ### Documentación
 
 - **`configuration.md`**: la tabla de rate limiting describía ajustes que no existen («Activar rate limiting», «Ventana de análisis»); ahora lista los reales. Se documenta el prefijo IPv6 y el resultado *no verificado* de la verificación de crawlers.
+
+### Versión
+
+- Versión actualizada a `0.4.0` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin.
 
 ## [0.3.1] — 2026-09-22
 

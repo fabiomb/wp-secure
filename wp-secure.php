@@ -3,7 +3,7 @@
  * Plugin Name: WP Seguro
  * Plugin URI:  https://github.com/wp-secure
  * Description: Sistema de protección contra bots, spiders e intrusiones. Orientado a rendimiento y claridad.
- * Version:     0.3.1
+ * Version:     0.4.0
  * Author:      Fabio Baccaglioni
  * Author URI:  https://wpsecure.fabio.com.ar
  * License:     GPL-2.0-or-later
@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
 /*──────────────────────────────────────────────
  * Constantes globales
  *──────────────────────────────────────────────*/
-defined( 'WPS_VERSION' )         || define( 'WPS_VERSION', '0.3.1' );
+defined( 'WPS_VERSION' )         || define( 'WPS_VERSION', '0.4.0' );
 defined( 'WPS_PLUGIN_FILE' )     || define( 'WPS_PLUGIN_FILE', __FILE__ );
 defined( 'WPS_PLUGIN_DIR' )      || define( 'WPS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 defined( 'WPS_PLUGIN_URL' )      || define( 'WPS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

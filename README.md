@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fabiomb/wp-secure/releases/latest"><img alt="Última versión" src="https://img.shields.io/github/v/release/fabiomb/wp-secure?label=v0.3.1&color=34d399"></a>
+  <a href="https://github.com/fabiomb/wp-secure/releases/latest"><img alt="Última versión" src="https://img.shields.io/github/v/release/fabiomb/wp-secure?label=v0.4.0&color=34d399"></a>
   <a href="LICENSE"><img alt="Licencia GPL-2.0" src="https://img.shields.io/badge/licencia-GPL--2.0--or--later-blue"></a>
   <img alt="WordPress 6.0+" src="https://img.shields.io/badge/WordPress-6.0%2B-21759b">
   <img alt="PHP 7.4+" src="https://img.shields.io/badge/PHP-7.4%2B-777bb4">
