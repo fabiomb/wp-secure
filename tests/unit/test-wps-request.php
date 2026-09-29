@@ -112,6 +112,40 @@ class Test_WPS_Request extends \PHPUnit\Framework\TestCase {
 		);
 	}
 
+	/**
+	 * @dataProvider path_info_bypasses
+	 */
+	public function test_php_script_with_static_suffix_is_not_static( string $uri, string $expected_type ): void {
+		$this->given_request( '45.33.32.156' );
+		$_SERVER['REQUEST_URI'] = $uri;
+
+		$this->assertEquals(
+			$expected_type,
+			$this->fresh_request()->visitor_type(),
+			'Una ruta que ejecuta PHP no puede eximirse de los detectores por terminar en una extensión estática.'
+		);
+	}
+
+	public function path_info_bypasses(): array {
+		return array(
+			'admin-ajax con css'     => array( '/wp-admin/admin-ajax.php/x.css?action=a&id=1', 'ajax' ),
+			'mayusculas'             => array( '/wp-admin/admin-ajax.PHP/x.CSS?action=a', 'ajax' ),
+			'barra codificada'       => array( '/wp-admin/admin-ajax.php%2Fx.js?action=a', 'ajax' ),
+			'login con png'          => array( '/wp-login.php/logo.png', 'login' ),
+			'xmlrpc con ico'         => array( '/xmlrpc.php/favicon.ico', 'xmlrpc' ),
+			'index con pathinfo'     => array( '/index.php/2026/articulo.css', 'page' ),
+			'script de plugin'       => array( '/wp-content/plugins/x/api.php/a/b.jpg?q=1', 'page' ),
+		);
+	}
+
+	public function test_static_path_detection(): void {
+		$this->assertTrue( WPS_Request::is_static_path( '/wp-content/themes/t/style.css' ) );
+		$this->assertTrue( WPS_Request::is_static_path( '/uploads/foto.JPG' ) );
+		$this->assertTrue( WPS_Request::is_static_path( '/archivo.php.css' ), 'Un archivo llamado x.php.css no ejecuta PHP.' );
+		$this->assertFalse( WPS_Request::is_static_path( '/wp-admin/admin-ajax.php/x.css' ) );
+		$this->assertFalse( WPS_Request::is_static_path( '/2026/mi-articulo/' ) );
+	}
+
 	public function test_classifies_plain_permalink_as_page(): void {
 		$this->given_request( '45.33.32.156' );
 		$_SERVER['REQUEST_URI'] = '/2026/mi-articulo/';

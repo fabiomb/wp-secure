@@ -288,14 +288,30 @@ class WPS_Request {
     }
 
     /**
+     * ¿La ruta pide un recurso estático, sin ejecutar ningún script PHP?
+     *
+     * @param string $path Ruta de la URL, sin query string.
+     */
+    public static function is_static_path( string $path ): bool {
+        if ( preg_match( '#\.php/#i', $path ) ) {
+            return false;
+        }
+
+        return (bool) preg_match( '/\.(css|js|jpg|jpeg|png|gif|svg|ico|woff2?|ttf|eot|map|webp|avif)$/i', $path );
+    }
+
+    /**
      * Clasificar el tipo de visita basado en la URI.
      */
     private function classify_visitor_type(): string {
         $uri = strtolower( $this->uri );
         $path = wp_parse_url( $uri, PHP_URL_PATH ) ?: $uri;
 
-        // Recurso estático.
-        if ( preg_match( '/\.(css|js|jpg|jpeg|png|gif|svg|ico|woff2?|ttf|eot|map|webp|avif)$/i', $path ) ) {
+        // Recurso estático. Una ruta que atraviesa un ".php/" ejecuta ese
+        // script con PATH_INFO: "/wp-admin/admin-ajax.php/x.css" corre
+        // admin-ajax.php aunque termine en .css, y clasificarla como estática
+        // la eximía de todos los detectores y del rate limit de páginas.
+        if ( self::is_static_path( $path ) ) {
             return 'static';
         }
 

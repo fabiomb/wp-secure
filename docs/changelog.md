@@ -8,6 +8,12 @@ La `.htaccess` de WordPress manda a PHP todo archivo inexistente, así que una i
 
 - **`WPS_Loader::should_count_404()`** (nuevo): los 404 de recursos estáticos (imágenes, CSS, JS, fuentes, source maps) ya no cuentan para el límite. Los de páginas, REST y demás rutas siguen contando.
 
+### Seguridad: Los detectores se salteaban agregando una extensión estática a la URL ([#2](https://github.com/fabiomb/wp-secure/issues/2))
+
+Una petición se clasificaba como recurso estático mirando sólo el final de la ruta. `/wp-admin/admin-ajax.php/x.css?action=…&id=1 UNION SELECT…` ejecuta `admin-ajax.php` (el resto de la ruta llega como `PATH_INFO`), pero terminaba en `.css`: los detectores de SQLi, XSS, path traversal y scanner no la analizaban, y no sumaba al rate limit de páginas. Bastaba ese sufijo para atacar cualquier script PHP del sitio sin que el firewall mirara la petición.
+
+- **`WPS_Request::is_static_path()`** (nuevo): una ruta que atraviesa un `.php/` nunca es estática, con cualquier combinación de mayúsculas y también con la barra codificada (`%2F`). La petición se clasifica según el script que ejecuta (`ajax`, `login`, `xmlrpc`, `page`) y pasa por todos los detectores.
+
 ## [0.4.1] — 2026-09-22
 
 ### Corrección: El aviso de login desde IP nueva nunca se enviaba
