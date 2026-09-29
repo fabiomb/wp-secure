@@ -14,6 +14,14 @@ Una petición se clasificaba como recurso estático mirando sólo el final de la
 
 - **`WPS_Request::is_static_path()`** (nuevo): una ruta que atraviesa un `.php/` nunca es estática, con cualquier combinación de mayúsculas y también con la barra codificada (`%2F`). La petición se clasifica según el script que ejecuta (`ajax`, `login`, `xmlrpc`, `page`) y pasa por todos los detectores.
 
+### Seguridad: Los cuerpos JSON no se analizaban ([#3](https://github.com/fabiomb/wp-secure/issues/3))
+
+Los detectores de SQLi, XSS y path traversal sólo recorrían `$_POST`, que PHP llena únicamente con formularios enviados por POST. Un cuerpo JSON (el formato habitual de la REST API y de muchos plugins) o un formulario enviado con PUT, PATCH o DELETE pasaba sin analizar, y ahí suelen estar las vulnerabilidades de plugins de terceros.
+
+- **`WPS_Request::body_values()`** (nuevo): reúne los valores string del cuerpo, de `$_POST`, de cuerpos JSON (`application/json` y variantes como `application/merge-patch+json`) y de formularios `x-www-form-urlencoded` enviados con otros métodos. Los tres detectores lo usan en lugar de recorrer `$_POST` por su cuenta.
+- **Límites**: se decodifican cuerpos de hasta 1 MB. Un JSON inválido o más grande se analiza como texto (truncado a 1 MB). Se analizan hasta 1000 valores por separado y los sobrantes se juntan en un único texto que también se analiza, así que rellenar con miles de valores basura no alcanza para esconder un payload.
+- **A tener en cuenta**: las peticiones JSON de visitantes sin permisos de edición (por ejemplo, el checkout por la Store API de WooCommerce) se analizan ahora igual que los formularios. Los usuarios con `edit_posts` siguen exentos, así que el editor de bloques no se ve afectado.
+
 ## [0.4.1] — 2026-09-22
 
 ### Corrección: El aviso de login desde IP nueva nunca se enviaba

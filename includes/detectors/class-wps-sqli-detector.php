@@ -167,20 +167,9 @@ class WPS_Sqli_Detector {
 		// Query string.
 		$inputs[] = $request->query_string();
 
-		// POST parameters (solo valores, no claves).
-		if ( 'POST' === $request->method() && ! empty( $_POST ) ) {
-			// phpcs:ignore WordPress.Security.NonceVerification.Missing
-			foreach ( $_POST as $value ) {
-				if ( is_string( $value ) ) {
-					$inputs[] = $value;
-				} elseif ( is_array( $value ) ) {
-					array_walk_recursive( $value, function ( $v ) use ( &$inputs ) {
-						if ( is_string( $v ) ) {
-							$inputs[] = $v;
-						}
-					} );
-				}
-			}
+		// Cuerpo: $_POST, JSON y formularios de PUT/PATCH/DELETE (sólo valores).
+		foreach ( $request->body_values() as $value ) {
+			$inputs[] = $value;
 		}
 
 		// Cookies (solo valores).

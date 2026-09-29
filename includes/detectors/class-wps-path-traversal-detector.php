@@ -157,14 +157,14 @@ class WPS_Path_Traversal_Detector {
 			}
 		}
 
-		// POST parameters.
-		if ( 'POST' === $request->method() && ! empty( $_POST ) ) {
-			// phpcs:ignore WordPress.Security.NonceVerification.Missing
-			foreach ( $_POST as $value ) {
-				$match = $this->check_value( $value );
-				if ( $match ) {
-					return $match;
-				}
+		// Cuerpo: $_POST, JSON y formularios de PUT/PATCH/DELETE.
+		foreach ( $request->body_values() as $value ) {
+			if ( strlen( $value ) < 3 ) {
+				continue;
+			}
+			$match = self::detect_in_value( $value );
+			if ( $match ) {
+				return $match;
 			}
 		}
 
@@ -234,30 +234,6 @@ class WPS_Path_Traversal_Detector {
 		}
 
 		return null;
-	}
-
-	/**
-	 * Comprobar un valor individual (recursivo para arrays).
-	 *
-	 * @param mixed $value Valor a comprobar.
-	 * @return string|null
-	 */
-	private function check_value( $value ): ?string {
-		if ( is_array( $value ) ) {
-			foreach ( $value as $v ) {
-				$match = $this->check_value( $v );
-				if ( $match ) {
-					return $match;
-				}
-			}
-			return null;
-		}
-
-		if ( ! is_string( $value ) || strlen( $value ) < 3 ) {
-			return null;
-		}
-
-		return self::detect_in_value( $value );
 	}
 
 	/**

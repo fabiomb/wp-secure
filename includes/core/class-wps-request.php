@@ -42,6 +42,18 @@ class WPS_Request {
     /** @var float */
     private $start_time;
 
+    /** Tamaño máximo de cuerpo que se decodifica para analizar. */
+    const BODY_MAX_BYTES = 1048576;
+
+    /** Valores del cuerpo que se analizan por separado. */
+    const BODY_MAX_VALUES = 1000;
+
+    /** @var string[]|null Valores string del cuerpo (cache por petición). */
+    private $body_values = null;
+
+    /** @var string|null Cuerpo crudo inyectado (tests); null = php://input. */
+    private static $raw_body = null;
+
     private function __construct() {
         $this->start_time   = microtime( true );
         $this->ip           = $this->resolve_ip();
@@ -131,6 +143,99 @@ class WPS_Request {
         }
 
         return current_user_can( 'edit_posts' );
+    }
+
+    /**
+     * Valores string del cuerpo de la petición, para los detectores.
+     *
+     * Además de `$_POST`, incluye los cuerpos que PHP no parsea: JSON (el
+     * formato habitual de la REST API y de muchos plugins, que antes pasaba
+     * sin analizar) y formularios enviados con PUT, PATCH o DELETE.
+     *
+     * Se analizan hasta BODY_MAX_VALUES valores por separado; los que sobran
+     * se juntan en un único texto que también se analiza. Rellenar con miles
+     * de valores basura no alcanza para esconder un payload al final.
+     *
+     * @return string[]
+     */
+    public function body_values(): array {
+        if ( null !== $this->body_values ) {
+            return $this->body_values;
+        }
+
+        $values = array();
+        $rest   = '';
+
+        if ( ! empty( $_POST ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+            self::collect_strings( $_POST, $values, $rest ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+        }
+
+        if ( ! in_array( $this->method, array( 'GET', 'HEAD', 'OPTIONS' ), true ) ) {
+            $type    = strtolower( (string) ( $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '' ) );
+            $is_json = false !== strpos( $type, 'json' );
+            $is_form = false !== strpos( $type, 'application/x-www-form-urlencoded' ) && empty( $_POST ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+            $raw     = ( $is_json || $is_form ) ? self::read_body() : '';
+
+            if ( '' !== $raw && $is_json ) {
+                $decoded = strlen( $raw ) <= self::BODY_MAX_BYTES ? json_decode( $raw, true, 64 ) : null;
+
+                if ( is_array( $decoded ) ) {
+                    self::collect_strings( $decoded, $values, $rest );
+                } elseif ( is_string( $decoded ) ) {
+                    $values[] = $decoded;
+                } else {
+                    // JSON inválido o demasiado grande: se analiza el texto.
+                    $values[] = substr( $raw, 0, self::BODY_MAX_BYTES );
+                }
+            } elseif ( '' !== $raw ) {
+                parse_str( substr( $raw, 0, self::BODY_MAX_BYTES ), $parsed );
+                self::collect_strings( $parsed, $values, $rest );
+            }
+        }
+
+        if ( '' !== $rest ) {
+            $values[] = $rest;
+        }
+
+        return $this->body_values = $values;
+    }
+
+    /**
+     * Juntar recursivamente los valores string de un array.
+     *
+     * Los primeros BODY_MAX_VALUES van a `$values`; el resto se concatena en
+     * `$rest`, hasta BODY_MAX_BYTES.
+     *
+     * @param array    $data   Datos a recorrer.
+     * @param string[] $values Valores individuales.
+     * @param string   $rest   Valores sobrantes, concatenados.
+     */
+    private static function collect_strings( array $data, array &$values, string &$rest ): void {
+        array_walk_recursive( $data, function ( $value ) use ( &$values, &$rest ) {
+            if ( ! is_string( $value ) || '' === $value ) {
+                return;
+            }
+            if ( count( $values ) < self::BODY_MAX_VALUES ) {
+                $values[] = $value;
+            } elseif ( strlen( $rest ) < self::BODY_MAX_BYTES ) {
+                $rest .= $value . "\n";
+            }
+        } );
+    }
+
+    /**
+     * Leer el cuerpo crudo de la petición, con tope de tamaño.
+     */
+    private static function read_body(): string {
+        if ( null !== self::$raw_body ) {
+            return self::$raw_body;
+        }
+
+        // php://input puede leerse varias veces; WordPress lo vuelve a leer
+        // para la REST API.
+        $raw = @file_get_contents( 'php://input', false, null, 0, self::BODY_MAX_BYTES + 1 ); // phpcs:ignore
+
+        return is_string( $raw ) ? $raw : '';
     }
 
     /**
