@@ -365,6 +365,47 @@ class WPS_Blocker {
     }
 
     /**
+     * Levantar todos los bloqueos activos que alcanzan a una IP o un CIDR.
+     *
+     * Con una IP se levantan el bloqueo exacto y los de rango que la
+     * contienen: en IPv6 los bloqueos automáticos son de red, y desbloquear
+     * sólo la dirección exacta no tendría efecto. Con un CIDR se levantan los
+     * bloqueos de ese rango.
+     *
+     * @return int Bloqueos levantados.
+     */
+    public function unblock_covering( string $target ): int {
+        $table = WPS_Db_Schema::table( 'blocked_ips' );
+
+        if ( WPS_Ip_Utils::is_valid_cidr( $target ) ) {
+            $affected = $this->db->query(
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                "UPDATE {$table} SET is_active = 0 WHERE is_active = 1 AND cidr = %s",
+                $target
+            );
+        } elseif ( WPS_Ip_Utils::is_valid_ip( $target ) ) {
+            $bin      = WPS_Ip_Utils::ip_to_binary( $target );
+            $affected = $this->db->query(
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                "UPDATE {$table} SET is_active = 0
+                 WHERE is_active = 1
+                 AND ( ip_address = %s OR ( ip_range_start IS NOT NULL AND ip_range_start <= %s AND ip_range_end >= %s ) )",
+                $target,
+                $bin,
+                $bin
+            );
+        } else {
+            return 0;
+        }
+
+        if ( $affected ) {
+            self::schedule_layer0_sync();
+        }
+
+        return $affected;
+    }
+
+    /**
      * Incrementar el contador de hits de un bloqueo activo.
      */
     public function increment_hits( int $id ): void {

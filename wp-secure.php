@@ -62,6 +62,13 @@ spl_autoload_register( function ( $class ) {
 } );
 
 /*──────────────────────────────────────────────
+ * Comandos WP-CLI (wp wps …)
+ *──────────────────────────────────────────────*/
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+    WP_CLI::add_command( 'wps', 'WPS_CLI' );
+}
+
+/*──────────────────────────────────────────────
  * Activación / Desactivación
  *──────────────────────────────────────────────*/
 register_activation_hook( __FILE__, array( 'WPS_Activator', 'activate' ) );

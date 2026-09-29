@@ -82,6 +82,7 @@ Extensiones PHP: `mbstring`, `json`, `mysqli`.
 - [Referencia de reglas](docs/rules-reference.md)
 - [Reglas personalizadas](docs/custom-rules.md)
 - [Configuración de CDN/Proxy](docs/cdn-proxy-setup.md)
+- [Comandos WP-CLI](docs/wp-cli.md)
 - [Solución de problemas](docs/troubleshooting.md)
 - [Preguntas frecuentes](docs/faq.md)
 - [Registro de cambios](docs/changelog.md)

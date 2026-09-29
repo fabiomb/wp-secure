@@ -204,6 +204,12 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 			return add_filter( $hook, $callback, $priority, $args );
 		}
 	}
+	if ( ! function_exists( 'get_current_user_id' ) ) {
+		function get_current_user_id() { return (int) ( $GLOBALS['wps_test_current_user']->ID ?? 0 ); }
+	}
+	if ( ! defined( 'WPMU_PLUGIN_DIR' ) ) {
+		define( 'WPMU_PLUGIN_DIR', sys_get_temp_dir() . '/wps-mu-plugins' );
+	}
 	if ( ! function_exists( 'wp_salt' ) ) {
 		function wp_salt( $scheme = 'auth' ) { return 'sal-de-prueba-' . $scheme; }
 	}

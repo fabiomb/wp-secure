@@ -26,7 +26,7 @@ El asistente de configuración ofrece agregar tu IP a la whitelist. Si aun así 
    ```php
    define( 'WPS_DISABLE_BLOCKING', true );
    ```
-   El firewall sigue detectando y registrando, pero no bloquea ni rechaza logins. Con WP-CLI se logra lo mismo activando el Modo Inseguro: `wp option update wps_unsafe_mode 1`.
+   El firewall sigue detectando y registrando, pero no bloquea ni rechaza logins. Con WP-CLI podés, en cambio, desbloquear tu IP directamente con `wp wps unblock <tu-ip>` o suspender el bloqueo con `wp wps unsafe-mode on` (ver [Comandos WP-CLI](wp-cli.md)).
 2. Entrá al panel y agregá tu IP en **WP Seguro → Whitelist**. Si estaba bloqueada, desbloqueala en **Bloqueos**.
 3. Quitá la constante de `wp-config.php` (o desactivá el Modo Inseguro desde el dashboard).
 

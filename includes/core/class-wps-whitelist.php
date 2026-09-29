@@ -137,6 +137,25 @@ class WPS_Whitelist {
     }
 
     /**
+     * Eliminar de la whitelist las entradas de una IP o un CIDR.
+     *
+     * @return int Entradas eliminadas.
+     */
+    public function remove_value( string $value ): int {
+        $table = WPS_Db_Schema::table( 'whitelist' );
+
+        $this->cache = null;
+        WPS_Blocker::schedule_layer0_sync();
+
+        return $this->db->query(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "DELETE FROM {$table} WHERE ip_address = %s OR cidr = %s",
+            $value,
+            $value
+        );
+    }
+
+    /**
      * Obtener todas las entradas de la whitelist, opcionalmente filtradas por tipo.
      */
     public function get_all( string $type = '' ): array {

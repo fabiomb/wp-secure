@@ -34,6 +34,16 @@ WordPress sólo permite cerrar las sesiones propias («Cerrar sesión en todas p
 - **Límite de sesiones simultáneas por administrador** (Configuración → Login, desactivado por defecto): al iniciar una sesión nueva se cierran las más viejas que excedan el límite. Limita el daño de una cookie de sesión robada.
 - **`WPS_Session_Manager`** (nuevo): lee y modifica las sesiones que WordPress guarda en el meta `session_tokens`. Si otro plugin reemplaza el gestor de sesiones de WordPress, el cierre individual puede no aplicar; el cierre de todas las sesiones usa la API de WordPress y funciona igual.
 
+### Nuevo: Comandos WP-CLI ([#15](https://github.com/fabiomb/wp-secure/issues/15))
+
+Recuperar el acceso requería editar `wp-config.php` o la base de datos. Ahora, con acceso por SSH, alcanza con un comando.
+
+- **`wp wps`** (`WPS_CLI`, nuevo): `status`, `block`, `unblock`, `blocks`, `whitelist add|remove|list`, `sync-layer0` y `unsafe-mode on|off`. Los listados aceptan `--format=table|json|csv|yaml`.
+- **`wp wps unblock <ip>`** levanta también los bloqueos de rango que contienen la IP. En IPv6 los bloqueos automáticos son de red, y levantar sólo la dirección exacta no tendría efecto. `WPS_Blocker::unblock_covering()` (nuevo) hace ese trabajo y regenera la Capa 0.
+- **`wp wps unsafe-mode`** registra el evento y envía el aviso de cambio de configuración, igual que desde el panel.
+- **`WPS_Whitelist::remove_value()`** (nuevo): quitar de la whitelist por IP o CIDR.
+- **Documentación**: nueva guía `docs/wp-cli.md`, enlazada desde el índice, el README y las guías de recuperación de acceso.
+
 ## [0.4.4] — 2026-09-29
 
 ### Nuevo: Rutas trampa ([#8](https://github.com/fabiomb/wp-secure/issues/8))
