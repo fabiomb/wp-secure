@@ -18,11 +18,11 @@ class WPS_Admin_Notifier {
 	/** @var WPS_Loader */
 	private $loader;
 
-	/** User meta con las redes desde las que el usuario ya inició sesión. */
-	const KNOWN_LOGIN_META = 'wps_known_login_keys';
+	/** @deprecated Usar WPS_Known_Clients::META_KEY. */
+	const KNOWN_LOGIN_META = WPS_Known_Clients::META_KEY;
 
-	/** Cantidad de redes recordadas por usuario (se descartan las más viejas). */
-	const KNOWN_LOGIN_MAX = 20;
+	/** @deprecated Usar WPS_Known_Clients::MAX. */
+	const KNOWN_LOGIN_MAX = WPS_Known_Clients::MAX;
 
 	private function __construct( WPS_Loader $loader ) {
 		$this->loader = $loader;
@@ -114,39 +114,28 @@ class WPS_Admin_Notifier {
 	/**
 	 * Registrar un login exitoso y avisar si viene de una red desconocida.
 	 *
-	 * Sólo aplica a administradores (`manage_options`): en un sitio con miles
-	 * de clientes o alumnos, avisar por cada uno inundaría el correo.
+	 * La red se registra para todos los usuarios (la usa también el límite de
+	 * intentos por cuenta), pero el aviso es sólo para administradores
+	 * (`manage_options`): en un sitio con miles de clientes o alumnos,
+	 * avisar por cada uno inundaría el correo.
 	 *
-	 * La red se identifica con la clave de cliente (en IPv6, el prefijo
-	 * configurado), para no avisar en cada rotación de dirección. Las redes
-	 * conocidas se guardan en user meta y no en la tabla de intentos, que se
-	 * purga a los pocos días. Se registran aunque el aviso esté desactivado,
-	 * para que activarlo más tarde no dispare un mail por cada red ya usada.
-	 *
-	 * El primer login de un usuario sin historial no avisa: al instalar el
-	 * plugin, o para una cuenta nueva, toda red sería «nueva».
+	 * Las redes se registran aunque el aviso esté desactivado, para que
+	 * activarlo más tarde no dispare un mail por cada red ya usada. El primer
+	 * login de un usuario sin historial no avisa: al instalar el plugin, o
+	 * para una cuenta nueva, toda red sería «nueva».
 	 *
 	 * @param WP_User $user Usuario que inició sesión.
 	 * @param string  $ip   IP del visitante.
 	 * @return bool Si se envió el aviso.
 	 */
 	public function track_login( $user, string $ip ): bool {
-		if ( empty( $user->ID ) || ! WPS_Ip_Utils::is_valid_ip( $ip ) || ! user_can( $user, 'manage_options' ) ) {
+		if ( empty( $user->ID ) ) {
 			return false;
 		}
 
-		$key   = WPS_Blocker::get_instance()->client_key( $ip );
-		$known = get_user_meta( $user->ID, self::KNOWN_LOGIN_META, true );
-		$known = is_array( $known ) ? $known : array();
+		list( $is_new, $had_history ) = WPS_Known_Clients::record( (int) $user->ID, $ip );
 
-		$is_new      = ! isset( $known[ $key ] );
-		$had_history = ! empty( $known );
-
-		$known[ $key ] = time();
-		arsort( $known );
-		update_user_meta( $user->ID, self::KNOWN_LOGIN_META, array_slice( $known, 0, self::KNOWN_LOGIN_MAX, true ) );
-
-		if ( ! $is_new || ! $had_history ) {
+		if ( ! $is_new || ! $had_history || ! user_can( $user, 'manage_options' ) ) {
 			return false;
 		}
 

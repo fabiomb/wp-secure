@@ -54,12 +54,14 @@ class Test_WPS_New_Login_Ip extends \PHPUnit\Framework\TestCase {
 		$this->assertFalse( $this->notifier->track_login( $this->admin(), '2001:db8:1:2:ffff::9' ) );
 	}
 
-	public function test_non_admins_are_not_tracked(): void {
+	public function test_non_admins_are_recorded_but_not_notified(): void {
+		// Sus redes conocidas las usa el límite de intentos por cuenta.
 		$customer = (object) array( 'ID' => 2, 'user_login' => 'cliente' );
 
 		$this->notifier->track_login( $customer, '10.0.0.5' );
 		$this->assertFalse( $this->notifier->track_login( $customer, '10.9.9.9' ) );
-		$this->assertArrayNotHasKey( 2, $GLOBALS['wps_test_user_meta'] );
+		$this->assertCount( 0, $GLOBALS['wps_test_mails'] );
+		$this->assertCount( 2, $GLOBALS['wps_test_user_meta'][2][ WPS_Known_Clients::META_KEY ] );
 	}
 
 	public function test_networks_are_recorded_even_with_the_notice_disabled(): void {

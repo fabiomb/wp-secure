@@ -365,6 +365,15 @@ class WPS_Admin_Settings {
                         'description' => __( 'Cantidad de intentos fallidos permitidos antes del bloqueo temporal.', 'wp-secure' ),
                     ),
                     array(
+                        'key'         => 'login_user_max_attempts',
+                        'label'       => __( 'Intentos fallidos por cuenta/hora', 'wp-secure' ),
+                        'type'        => 'number',
+                        'default'     => 10,
+                        'min'         => 0,
+                        'max'         => 1000,
+                        'description' => __( 'Contra una misma cuenta, desde cualquier IP. Al superarlo, la cuenta sólo acepta logins desde redes donde su dueño ya inició sesión, hasta que los fallos salgan de la ventana de una hora. Frena ataques distribuidos. 0 lo desactiva.', 'wp-secure' ),
+                    ),
+                    array(
                         'key'         => 'login_block_minutes',
                         'label'       => __( 'Duración del bloqueo temporal (minutos)', 'wp-secure' ),
                         'type'        => 'number',

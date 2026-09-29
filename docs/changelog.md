@@ -1,5 +1,17 @@
 # Registro de Cambios
 
+## [0.5.0] — Sin publicar
+
+### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))
+
+Los intentos fallidos se contaban sólo por IP (o por red, en IPv6). Una botnet que prueba contraseñas contra `admin` desde miles de IPs nunca llega al límite de ninguna, así que podía seguir probando indefinidamente.
+
+- **`WPS_Login_Detector::is_account_throttled()`** (nuevo): se cuentan los intentos fallidos contra cada cuenta existente en la última hora, desde cualquier IP y tanto por nombre de usuario como por email. Superado el límite (**10 por hora** por defecto, Configuración → Login), la cuenta sólo acepta logins desde redes donde su dueño ya inició sesión; a los demás se los rechaza **sin comprobar la contraseña**, así que el atacante no puede seguir probando. El bloqueo se levanta solo cuando los fallos salen de la ventana de una hora.
+- **El dueño no queda afuera**: sigue entrando desde sus redes habituales. Si necesita entrar desde una red nueva mientras la cuenta está bajo ataque, al restablecer la contraseña esa red pasa a ser conocida.
+- **`WPS_Known_Clients`** (nuevo): las redes desde las que cada usuario inició sesión se registran ahora para **todos** los usuarios (antes sólo para administradores, para el aviso de login desde IP nueva, que sigue siendo sólo para administradores).
+- Los límites por IP siguen funcionando igual, y los intentos rechazados también cuentan para ellos. Se registra el evento «Login bloqueado» con el motivo `account_throttled`.
+- **`configuration.md`**: la sección de login describía ajustes que no existen («Ventana de tiempo», un bloqueo de 30 minutos); ahora lista los reales.
+
 ## [0.4.4] — 2026-09-29
 
 ### Nuevo: Rutas trampa ([#8](https://github.com/fabiomb/wp-secure/issues/8))

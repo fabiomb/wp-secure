@@ -238,18 +238,22 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 		/** @var array[] Argumentos pasados a prepare(), en orden. */
 		public $prepared_args = array();
 
+		/** @var mixed Valor que devuelve get_var() (null por defecto). */
+		public $var_result = null;
+
 		public function reset_queries() {
 			$this->queries       = array();
 			$this->inserts       = array();
 			$this->prepared_args = array();
 			$this->insert_id     = 0;
+			$this->var_result    = null;
 		}
 
 		public function prepare( $query, ...$args ) {
 			$this->prepared_args[] = $args;
 			return $query;
 		}
-		public function get_var( $query = null ) { $this->queries[] = $query; return null; }
+		public function get_var( $query = null ) { $this->queries[] = $query; return $this->var_result; }
 		public function get_row( $query = null, $output = null ) { $this->queries[] = $query; return null; }
 		public function get_results( $query = null, $output = null ) { $this->queries[] = $query; return array(); }
 		public function get_col( $query = null, $column = 0 ) { $this->queries[] = $query; return array(); }

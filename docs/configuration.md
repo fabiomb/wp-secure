@@ -17,10 +17,22 @@ Todos los ajustes de WP Seguro se gestionan desde **WP Seguro → Configuración
 
 | Opción | Descripción | Valor por defecto |
 |--------|-------------|-------------------|
-| Protección de login | Activar/desactivar protección contra fuerza bruta. | Activado |
-| Intentos máximos | Número de intentos fallidos antes del bloqueo temporal. | 5 |
-| Ventana de tiempo | Período en minutos para contar intentos. | 15 |
-| Duración del bloqueo | Minutos que dura el bloqueo temporal. | 30 |
+| Intentos máximos antes de bloqueo | Intentos fallidos desde un mismo cliente en la última hora antes de bloquearlo. | 5 |
+| Intentos fallidos por cuenta/hora | Contra una misma cuenta, desde cualquier IP (ver abajo). `0` lo desactiva. | 10 |
+| Duración del bloqueo temporal | Minutos. | 15 |
+| Escalar bloqueo tras N bloqueos temporales | Bloqueos previos en 48 h que llevan a un bloqueo largo. | 3 |
+| Duración del bloqueo escalado | Horas. | 24 |
+| Bloquear usuario inexistente | Bloquea al cliente tras varios intentos con usuarios que no existen. | Activado |
+| Intentos con usuario inexistente | Umbral para el punto anterior. `0` lo desactiva. | 3 |
+| Login sólo desde whitelist | Rechaza todo login desde IPs fuera de la whitelist de login. | Desactivado |
+
+### Intentos fallidos por cuenta
+
+Los límites por IP no frenan a una botnet: miles de IPs prueban contraseñas contra la misma cuenta y ninguna llega a su propio límite. Por eso también se cuentan los intentos fallidos **contra cada cuenta**, desde cualquier IP, por nombre de usuario o por email.
+
+Superado el límite en la última hora, la cuenta sólo acepta logins desde **redes donde su dueño ya inició sesión** (en IPv6, su prefijo configurado); a los demás se los rechaza sin comprobar la contraseña, así que el atacante no puede seguir probando. El bloqueo se levanta solo cuando los fallos salen de la ventana de una hora.
+
+Si el dueño tiene que entrar desde una red nueva mientras la cuenta está bajo ataque, puede restablecer la contraseña: la red desde la que lo hace pasa a ser conocida.
 
 ---
 

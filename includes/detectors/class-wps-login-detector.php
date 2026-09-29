@@ -55,6 +55,7 @@ class WPS_Login_Detector {
 
         // Recuperación de contraseña y registro: límite por cliente.
         add_action( 'lostpassword_post', array( $this, 'on_lost_password' ), 10, 2 );
+        add_action( 'after_password_reset', array( $this, 'on_password_reset' ) );
         add_filter( 'registration_errors', array( $this, 'limit_registration' ), 10, 3 );
 
         // Mensajes de WordPress que revelan si una cuenta existe.
@@ -308,6 +309,19 @@ class WPS_Login_Detector {
             }
         }
 
+        // Cuenta bajo ataque: sólo entran sus redes conocidas.
+        $target = get_user_by( 'login', $username ) ?: get_user_by( 'email', $username );
+        if ( $target && $this->is_account_throttled( $target, $ip ) ) {
+            $this->logger->event_immediate( WPS_Event_Types::LOGIN_BLOCKED, array(
+                'ip_address'  => $ip,
+                'request_uri' => $request->uri(),
+                'user_agent'  => $request->user_agent(),
+                'details'     => array( 'reason' => 'account_throttled', 'username' => $username ),
+            ) );
+
+            return new \WP_Error( 'wps_blocked', self::denied_message() );
+        }
+
         // Bloquear la IP tras varios intentos con usuarios inexistentes.
         if ( $this->loader->get_setting( 'login_block_unknown_user', true ) ) {
             $user_exists = ( get_user_by( 'login', $username ) || get_user_by( 'email', $username ) );
@@ -328,6 +342,64 @@ class WPS_Login_Detector {
         }
 
         return $user;
+    }
+
+    /**
+     * ¿La cuenta está bajo ataque y el cliente no es uno de sus habituales?
+     *
+     * Los límites por IP no frenan a una botnet: miles de IPs prueban
+     * contraseñas contra la misma cuenta sin que ninguna llegue a su límite.
+     * Superados `login_user_max_attempts` fallos contra la cuenta en la
+     * última hora (desde cualquier IP), se rechazan los logins de clientes
+     * desconocidos sin comprobar la contraseña. El dueño sigue entrando desde
+     * las redes donde ya inició sesión, y el bloqueo se levanta solo cuando
+     * los fallos salen de la ventana de una hora.
+     *
+     * @param WP_User $user Cuenta objetivo.
+     * @param string  $ip   IP del visitante.
+     */
+    public function is_account_throttled( $user, string $ip ): bool {
+        $max = (int) $this->loader->get_setting( 'login_user_max_attempts', 10 );
+        if ( $max <= 0 || empty( $user->ID ) ) {
+            return false;
+        }
+
+        if ( $this->count_recent_account_failures( $user ) < $max ) {
+            return false;
+        }
+
+        return ! WPS_Known_Clients::is_known( (int) $user->ID, $ip );
+    }
+
+    /**
+     * Fallos contra una cuenta en la última hora, desde cualquier IP, por
+     * nombre de usuario o por email.
+     */
+    private function count_recent_account_failures( $user ): int {
+        $table = WPS_Db_Schema::table( 'login_attempts' );
+
+        return (int) $this->db->get_var(
+            // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            "SELECT COUNT(*) FROM {$table}
+             WHERE username IN (%s, %s)
+             AND success = 0
+             AND attempted_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 HOUR)",
+            (string) $user->user_login,
+            (string) ( $user->user_email ?? '' )
+        );
+    }
+
+    /**
+     * Tras restablecer la contraseña, la red desde la que se hizo pasa a ser
+     * conocida: el dueño que viaja puede volver a entrar aunque su cuenta
+     * esté bajo ataque.
+     *
+     * @param WP_User $user Usuario.
+     */
+    public function on_password_reset( $user ): void {
+        if ( ! empty( $user->ID ) ) {
+            WPS_Known_Clients::record( (int) $user->ID, WPS_Request::get_instance()->ip() );
+        }
     }
 
     /**
