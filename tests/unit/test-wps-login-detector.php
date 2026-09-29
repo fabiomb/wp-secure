@@ -115,6 +115,58 @@ class Test_WPS_Login_Detector extends \PHPUnit\Framework\TestCase {
 		$GLOBALS['wps_test_users'] = array();
 	}
 
+	/*──────────────────────────────────────────────
+	 * Application passwords
+	 *──────────────────────────────────────────────*/
+
+	public function test_failed_application_password_counts_as_failed_login(): void {
+		$GLOBALS['wps_test_users'] = array( 'admin' => (object) array( 'ID' => 1 ) );
+		$_SERVER['PHP_AUTH_USER']  = 'admin';
+		$GLOBALS['wpdb']->reset_queries();
+
+		$this->detector_with()->on_application_password_failed( new WP_Error( 'incorrect_password' ) );
+
+		$inserts = $this->login_attempt_inserts();
+		$this->assertCount( 1, $inserts, 'La fuerza bruta contra /wp-json/ con Basic auth no se contaba.' );
+		$this->assertSame( 'admin', $inserts[0]['username'] );
+		$this->assertSame( 0, $inserts[0]['success'] );
+		$this->assertTrue( $this->failed_count_was_checked(), 'El fallo tiene que evaluarse contra el máximo de intentos.' );
+
+		unset( $_SERVER['PHP_AUTH_USER'] );
+		$GLOBALS['wps_test_users'] = array();
+	}
+
+	public function test_application_password_with_unknown_user_is_counted(): void {
+		$_SERVER['PHP_AUTH_USER'] = 'no-existe';
+		$GLOBALS['wpdb']->reset_queries();
+
+		$this->detector_with()->on_application_password_failed( new WP_Error( 'invalid_username' ) );
+
+		$this->assertCount( 1, $this->login_attempt_inserts() );
+		unset( $_SERVER['PHP_AUTH_USER'] );
+	}
+
+	public function test_disabled_application_passwords_are_not_an_attack(): void {
+		$_SERVER['PHP_AUTH_USER'] = 'admin';
+		$GLOBALS['wpdb']->reset_queries();
+		$detector = $this->detector_with();
+
+		$detector->on_application_password_failed( new WP_Error( 'application_passwords_disabled' ) );
+		$detector->on_application_password_failed( new WP_Error( 'application_passwords_disabled_for_user' ) );
+
+		$this->assertCount( 0, $this->login_attempt_inserts() );
+		unset( $_SERVER['PHP_AUTH_USER'] );
+	}
+
+	private function failed_count_was_checked(): bool {
+		foreach ( $GLOBALS['wpdb']->queries as $query ) {
+			if ( false !== strpos( (string) $query, 'success = 0' ) && false === strpos( (string) $query, 'user_exists = 0' ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private function login_attempt_inserts(): array {
 		$rows = array();
 		foreach ( $GLOBALS['wpdb']->inserts as $insert ) {

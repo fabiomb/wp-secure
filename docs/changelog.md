@@ -22,6 +22,14 @@ Los detectores de SQLi, XSS y path traversal sólo recorrían `$_POST`, que PHP 
 - **Límites**: se decodifican cuerpos de hasta 1 MB. Un JSON inválido o más grande se analiza como texto (truncado a 1 MB). Se analizan hasta 1000 valores por separado y los sobrantes se juntan en un único texto que también se analiza, así que rellenar con miles de valores basura no alcanza para esconder un payload.
 - **A tener en cuenta**: las peticiones JSON de visitantes sin permisos de edición (por ejemplo, el checkout por la Store API de WooCommerce) se analizan ahora igual que los formularios. Los usuarios con `edit_posts` siguen exentos, así que el editor de bloques no se ve afectado.
 
+### Seguridad: Fuerza bruta sin límite contra application passwords ([#4](https://github.com/fabiomb/wp-secure/issues/4))
+
+La autenticación Basic de la REST API con *application passwords* no dispara `wp_login_failed` sino `application_password_failed_authentication`, que el detector de login no escuchaba. Se podían probar contraseñas contra `/wp-json/` sin que ningún intento se contara ni se bloqueara la IP.
+
+- **`WPS_Login_Detector::on_application_password_failed()`** (nuevo): cada fallo se registra y se evalúa igual que un login fallido, con el mismo máximo de intentos, bloqueo y escalada. El usuario se toma de la cabecera Basic, como hace WordPress.
+- Sólo cuentan los intentos reales (contraseña incorrecta, usuario o email inexistente). Los errores por application passwords desactivadas vienen de clientes mal configurados y no se cuentan.
+- El evento de login fallido indica ahora el método (`password` o `application_password`).
+
 ## [0.4.1] — 2026-09-22
 
 ### Corrección: El aviso de login desde IP nueva nunca se enviaba

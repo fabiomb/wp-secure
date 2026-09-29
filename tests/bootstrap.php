@@ -92,7 +92,16 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 		}
 	}
 	if ( ! function_exists( 'is_wp_error' ) ) {
-		function is_wp_error( $thing ) { return is_array( $thing ) && isset( $thing['error'] ); }
+		function is_wp_error( $thing ) {
+			return $thing instanceof WP_Error || ( is_array( $thing ) && isset( $thing['error'] ) );
+		}
+	}
+	if ( ! class_exists( 'WP_Error' ) ) {
+		class WP_Error {
+			private $code;
+			public function __construct( $code = '', $message = '' ) { $this->code = $code; }
+			public function get_error_code() { return $this->code; }
+		}
 	}
 	if ( ! function_exists( 'wp_remote_retrieve_response_code' ) ) {
 		function wp_remote_retrieve_response_code( $response ) { return $response['code'] ?? ''; }

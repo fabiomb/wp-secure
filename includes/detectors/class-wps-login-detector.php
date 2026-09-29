@@ -48,6 +48,10 @@ class WPS_Login_Detector {
         add_action( 'wp_login', array( $this, 'on_login_success' ), 10, 2 );
         add_action( 'wp_login_failed', array( $this, 'on_login_failed' ), 10, 2 );
         add_filter( 'authenticate', array( $this, 'check_before_auth' ), 30, 3 );
+
+        // Application passwords (Basic auth en REST): sus fallos no pasan
+        // por wp_login_failed.
+        add_action( 'application_password_failed_authentication', array( $this, 'on_application_password_failed' ) );
     }
 
     /**
@@ -214,6 +218,44 @@ class WPS_Login_Detector {
      * @param WP_Error $error
      */
     public function on_login_failed( string $username, $error = null ): void {
+        $this->register_failure( $username, 'password' );
+    }
+
+    /**
+     * Fallo de autenticación con application password.
+     *
+     * La autenticación Basic de la REST API con application passwords no
+     * dispara `wp_login_failed`: sin esto, se podían probar contraseñas contra
+     * `/wp-json/` sin límite. Se cuentan igual que un login fallido.
+     *
+     * Sólo cuentan los intentos reales (contraseña incorrecta, usuario o
+     * email inexistente). Los errores por application passwords desactivadas
+     * son de clientes mal configurados, no de un ataque.
+     *
+     * @param WP_Error $error Error de autenticación.
+     */
+    public function on_application_password_failed( $error ): void {
+        if ( ! is_wp_error( $error ) ) {
+            return;
+        }
+
+        if ( ! in_array( $error->get_error_code(), array( 'incorrect_password', 'invalid_username', 'invalid_email' ), true ) ) {
+            return;
+        }
+
+        // WordPress no pasa el usuario al hook; lo toma de la cabecera Basic.
+        $username = isset( $_SERVER['PHP_AUTH_USER'] ) ? (string) wp_unslash( $_SERVER['PHP_AUTH_USER'] ) : '';
+
+        $this->register_failure( $username, 'application_password' );
+    }
+
+    /**
+     * Registrar un intento fallido y evaluar si corresponde bloquear.
+     *
+     * @param string $username Usuario o email usado.
+     * @param string $method   `password` o `application_password`.
+     */
+    private function register_failure( string $username, string $method ): void {
         $request = WPS_Request::get_instance();
         $ip      = $request->ip();
 
@@ -238,6 +280,7 @@ class WPS_Login_Detector {
             'details'     => array(
                 'username'    => $username,
                 'user_exists' => $user_exists,
+                'method'      => $method,
             ),
         ) );
 
