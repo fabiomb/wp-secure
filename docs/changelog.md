@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.4.2] — Sin publicar
+## [0.4.2] — 2026-09-29
 
 ### Corrección: Las imágenes rotas bloqueaban a quien visitaba la página ([#1](https://github.com/fabiomb/wp-secure/issues/1))
 
@@ -29,6 +29,10 @@ La autenticación Basic de la REST API con *application passwords* no dispara `w
 - **`WPS_Login_Detector::on_application_password_failed()`** (nuevo): cada fallo se registra y se evalúa igual que un login fallido, con el mismo máximo de intentos, bloqueo y escalada. El usuario se toma de la cabecera Basic, como hace WordPress.
 - Sólo cuentan los intentos reales (contraseña incorrecta, usuario o email inexistente). Los errores por application passwords desactivadas vienen de clientes mal configurados y no se cuentan.
 - El evento de login fallido indica ahora el método (`password` o `application_password`).
+
+### Versión
+
+- Versión actualizada a `0.4.2` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin.
 
 ## [0.4.1] — 2026-09-22
 
