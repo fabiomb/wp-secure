@@ -185,6 +185,9 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 			return add_filter( $hook, $callback, $priority, $args );
 		}
 	}
+	if ( ! function_exists( 'wp_salt' ) ) {
+		function wp_salt( $scheme = 'auth' ) { return 'sal-de-prueba-' . $scheme; }
+	}
 	if ( ! function_exists( 'wp_normalize_path' ) ) {
 		function wp_normalize_path( $path ) { return str_replace( '\\', '/', $path ); }
 	}

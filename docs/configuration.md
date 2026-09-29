@@ -75,6 +75,9 @@ Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, l
 | Rutas trampa | Bloquear de inmediato a quien pida una ruta trampa. | Activado |
 | Lista de rutas trampa | Una por línea (ver abajo). | `/.env`, copias de `wp-config.php`, `/.git/*`, … |
 | Duración del bloqueo por ruta trampa | En minutos. | 1440 (24 h) |
+| Protección de formularios | Campo trampa y tiempo mínimo en login y comentarios (ver abajo). | Activado |
+| Tiempo mínimo para comentar | Segundos entre la carga de la página y el envío. `0` desactiva el control. | 3 |
+| Tiempo mínimo para iniciar sesión | Igual, para `wp-login.php`. | 0 (desactivado) |
 
 ### Rutas trampa
 
@@ -84,6 +87,16 @@ Son rutas que ningún visitante legítimo pide pero que todo scanner automatizad
 - Un `*` al final abarca todo lo que haya debajo: `/.git/*` coincide con `/.git/config` y `/.git/HEAD`.
 - Podés agregar rutas propias, por ejemplo la URL de un panel de administración que no existe en tu sitio.
 - Nunca se bloquea a usuarios logueados con permisos de edición, a la whitelist ni al propio servidor.
+
+### Protección de formularios
+
+Frena bots en el login (`wp-login.php` y `wp_login_form()`) y en los comentarios, sin captcha ni servicios externos:
+
+- **Campo trampa**: un campo oculto a la vista y a los lectores de pantalla. Un humano no lo completa; los bots completan todo. Si viene completo, el envío se rechaza.
+- **Tiempo mínimo**: el formulario lleva la hora en que se cargó, firmada para que no se pueda falsificar. Un envío más rápido que el mínimo se rechaza.
+- **Envíos sin los campos del plugin**: un comentario que no los trae (un bot que postea directo, o una página cacheada desde antes de activar la función) **va a la cola de spam** en lugar de rechazarse, así no se pierde ningún comentario legítimo. En el login se deja pasar, porque los formularios de login de temas y plugins (por ejemplo, el de WooCommerce) no usan los hooks estándar; la fuerza bruta la frena el límite de intentos.
+- El tiempo mínimo del login viene desactivado: los gestores de contraseñas con envío automático completan el formulario en menos de un segundo.
+- No se bloquea la IP: sólo se rechaza el envío y se registra el evento «Bot en formulario». Los usuarios logueados, la whitelist y el propio servidor quedan exentos, y con el Modo Inseguro activo no se rechaza nada.
 
 ### Prefijo IPv6 por cliente
 

@@ -106,6 +106,11 @@ class WPS_Activator {
             'honeypot_paths'         => WPS_Honeypot::DEFAULT_PATHS,
             'honeypot_block_minutes' => WPS_Honeypot::DEFAULT_BLOCK_MINUTES,
 
+            // Protección de formularios.
+            'form_guard_enabled'             => true,
+            'form_guard_comment_min_seconds' => 3,
+            'form_guard_login_min_seconds'   => 0,
+
             // Firewall layers.
             'firewall_layer0_enabled' => false,
             'firewall_layer1_enabled' => true,

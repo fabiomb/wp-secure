@@ -11,6 +11,16 @@ Rutas que ningún visitante legítimo pide pero que todo scanner automatizado pr
 - **Nuevo tipo de evento** «Ruta trampa» (crítico) y tipo de bloqueo `auto_honeypot`. En IPv6 se bloquea la red del prefijo configurado, como el resto de los bloqueos automáticos.
 - **Bloqueos**: la lista muestra ahora etiquetas legibles también para los bloqueos por crawler falso, motor de riesgo y reglas personalizadas, que antes aparecían con su clave interna.
 
+### Nuevo: Campo trampa y tiempo mínimo en login y comentarios ([#9](https://github.com/fabiomb/wp-secure/issues/9))
+
+Frena bots en `wp-login.php`, `wp_login_form()` y los comentarios, sin captcha ni servicios externos.
+
+- **`WPS_Form_Guard`** (nuevo): agrega a los formularios un campo oculto (a la vista y a lectores de pantalla) que los bots completan y un humano no, y la hora de carga firmada con HMAC. Un envío con el campo trampa completo o más rápido que el mínimo se rechaza, y se registra el nuevo evento «Bot en formulario».
+- **Comentarios**: tiempo mínimo de 3 segundos por defecto. Un comentario sin los campos del plugin (un bot que postea directo, o una página cacheada desde antes de activar la función) va a la cola de spam en lugar de rechazarse, así no se pierde ningún comentario legítimo. Trackbacks y pingbacks no se revisan.
+- **Login**: el tiempo mínimo viene desactivado, porque los gestores de contraseñas con envío automático completan el formulario en menos de un segundo; el campo trampa sí está activo. Un login sin los campos del plugin se deja pasar, porque los formularios de login de temas y plugins (por ejemplo, el de WooCommerce) no usan los hooks estándar. El rechazo cuenta como login fallido para el límite de intentos.
+- **Exenciones**: usuarios logueados (en comentarios), whitelist, el propio servidor, y todo mientras el Modo Inseguro o `WPS_DISABLE_BLOCKING` estén activos. No se bloquea la IP, sólo el envío.
+- **Ajustes** en Configuración → Firewall Avanzado: activar o desactivar (activado por defecto) y los tiempos mínimos de comentarios y login.
+
 ## [0.4.3] — 2026-09-29
 
 ### Seguridad: La enumeración de usuarios seguía siendo posible ([#5](https://github.com/fabiomb/wp-secure/issues/5))

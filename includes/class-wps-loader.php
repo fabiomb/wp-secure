@@ -71,6 +71,9 @@ class WPS_Loader {
         $this->init_detectors();
         $perf->stop( 'detectors' );
 
+        // Campo trampa y tiempo mínimo en login y comentarios.
+        ( new WPS_Form_Guard( $this ) )->init();
+
         // Security hardener (headers, métodos HTTP, ocultar versión).
         $hardener = new WPS_Security_Hardener( $this );
         $hardener->init();
