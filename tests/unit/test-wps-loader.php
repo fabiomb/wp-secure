@@ -41,6 +41,24 @@ class Test_WPS_Loader extends \PHPUnit\Framework\TestCase {
 	}
 
 	/*──────────────────────────────────────────────
+	 * Rate limit de 404
+	 *──────────────────────────────────────────────*/
+
+	public function test_missing_static_assets_do_not_count_as_404_hits(): void {
+		$this->assertFalse(
+			$this->loader_with()->should_count_404( 'static' ),
+			'Una página con imágenes rotas no puede bloquear a quien la visita.'
+		);
+	}
+
+	public function test_missing_pages_count_as_404_hits(): void {
+		$loader = $this->loader_with();
+
+		$this->assertTrue( $loader->should_count_404( 'page' ) );
+		$this->assertTrue( $loader->should_count_404( 'restapi' ) );
+	}
+
+	/*──────────────────────────────────────────────
 	 * Capas del firewall
 	 *──────────────────────────────────────────────*/
 

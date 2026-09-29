@@ -1,5 +1,13 @@
 # Registro de Cambios
 
+## [0.4.2] — Sin publicar
+
+### Corrección: Las imágenes rotas bloqueaban a quien visitaba la página ([#1](https://github.com/fabiomb/wp-secure/issues/1))
+
+La `.htaccess` de WordPress manda a PHP todo archivo inexistente, así que una imagen o un CSS faltante también termina en un 404 de WordPress, y el rate limit de 404 (10 por minuto por defecto) los contaba igual que a una sonda de rutas. Una página con varios recursos rotos (típico tras una migración) o los `apple-touch-icon*.png` que pide iOS bastaban para bloquear al visitante durante 15 minutos.
+
+- **`WPS_Loader::should_count_404()`** (nuevo): los 404 de recursos estáticos (imágenes, CSS, JS, fuentes, source maps) ya no cuentan para el límite. Los de páginas, REST y demás rutas siguen contando.
+
 ## [0.4.1] — 2026-09-22
 
 ### Corrección: El aviso de login desde IP nueva nunca se enviaba

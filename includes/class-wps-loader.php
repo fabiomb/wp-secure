@@ -185,6 +185,10 @@ class WPS_Loader {
             $request = WPS_Request::get_instance();
             $ip      = $request->ip();
 
+            if ( ! $this->should_count_404( $request->visitor_type() ) ) {
+                return;
+            }
+
             if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
                 return;
             }
@@ -197,6 +201,21 @@ class WPS_Loader {
             $rate_limiter = WPS_Rate_Limiter::get_instance( $this );
             $rate_limiter->record_hit( $ip, '404' );
         } );
+    }
+
+    /**
+     * ¿Cuenta este 404 para el rate limit de errores 404?
+     *
+     * La `.htaccess` de WordPress manda a PHP todo archivo inexistente, así
+     * que una imagen o un CSS roto también termina en 404. Una página con
+     * varios recursos faltantes (típico tras una migración) o los
+     * `apple-touch-icon*.png` que pide iOS superaban el límite y bloqueaban
+     * al visitante. El límite apunta a quien sondea rutas, no a recursos rotos.
+     *
+     * @param string $visitor_type Tipo de visita clasificado por WPS_Request.
+     */
+    public function should_count_404( string $visitor_type ): bool {
+        return 'static' !== $visitor_type;
     }
 
     /**

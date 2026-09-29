@@ -92,6 +92,26 @@ class Test_WPS_Request extends \PHPUnit\Framework\TestCase {
 		$this->assertEquals( 'restapi', $this->fresh_request()->visitor_type() );
 	}
 
+	/**
+	 * @dataProvider missing_asset_paths
+	 */
+	public function test_classifies_typical_missing_assets_as_static( string $uri ): void {
+		$this->given_request( '45.33.32.156' );
+		$_SERVER['REQUEST_URI'] = $uri;
+
+		$this->assertEquals( 'static', $this->fresh_request()->visitor_type() );
+	}
+
+	public function missing_asset_paths(): array {
+		return array(
+			'imagen migrada'     => array( '/wp-content/uploads/2019/03/foto.jpg' ),
+			'icono de ios'       => array( '/apple-touch-icon-precomposed.png' ),
+			'favicon'            => array( '/favicon.ico' ),
+			'css con version'    => array( '/wp-content/themes/viejo/style.css?ver=1.2' ),
+			'source map'         => array( '/wp-includes/js/jquery/jquery.min.js.map' ),
+		);
+	}
+
 	public function test_classifies_plain_permalink_as_page(): void {
 		$this->given_request( '45.33.32.156' );
 		$_SERVER['REQUEST_URI'] = '/2026/mi-articulo/';
