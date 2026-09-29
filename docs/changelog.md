@@ -1,5 +1,17 @@
 # Registro de Cambios
 
+## [0.4.3] — Sin publicar
+
+### Seguridad: La enumeración de usuarios seguía siendo posible ([#5](https://github.com/fabiomb/wp-secure/issues/5))
+
+Con **Bloquear enumeración de usuarios** activo (el valor por defecto), un visitante anónimo todavía podía obtener los nombres de usuario del sitio, que son la mitad de lo que necesita un ataque de fuerza bruta.
+
+- **`?author=1` no se bloqueaba**: el bloqueo corría en `template_redirect` con la misma prioridad que `redirect_canonical`, que el núcleo registra antes y redirige `?author=1` a `/author/{usuario}/`. La redirección salía antes del bloqueo. Ahora el chequeo corre con prioridad 1.
+- **Variantes de `?author=`**: se exigía un valor numérico, pero WordPress también acepta `?author=1,`, `?author=1%20` o `?author[]=1`. Ahora cuenta cualquier uso del parámetro (`WPS_Restapi_Detector::is_author_enumeration()`, nuevo). El archivo de autor por su URL (`/author/{usuario}/`) sigue funcionando, porque para llegar a él ya hay que conocer el usuario.
+- **Ruta REST en mayúsculas**: WordPress resuelve las rutas REST sin distinguir mayúsculas y acepta barras de más, así que `/wp-json/wp/v2/USERS` o `/wp/v2/users/` devolvían el listado. `WPS_Restapi_Detector::is_users_route()` (nuevo) las reconoce todas.
+- **Sitemap de usuarios**: `/wp-sitemap-users-1.xml` listaba las URLs de autor con cada nombre de usuario. Se quita del sitemap mientras el ajuste esté activo.
+- **oEmbed**: las respuestas de `/wp-json/oembed/1.0/embed` incluían `author_name` y `author_url`. Se quitan mientras el ajuste esté activo.
+
 ## [0.4.2] — 2026-09-29
 
 ### Corrección: Las imágenes rotas bloqueaban a quien visitaba la página ([#1](https://github.com/fabiomb/wp-secure/issues/1))

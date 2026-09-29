@@ -163,6 +163,19 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	if ( ! function_exists( 'wp_date' ) ) {
 		function wp_date( $format, $timestamp = null ) { return gmdate( $format, $timestamp ?? time() ); }
 	}
+	// Hooks: se registran en $GLOBALS['wps_test_hooks'] para verificar
+	// prioridades; no se ejecutan.
+	if ( ! function_exists( 'add_filter' ) ) {
+		function add_filter( $hook, $callback, $priority = 10, $args = 1 ) {
+			$GLOBALS['wps_test_hooks'][] = array( 'hook' => $hook, 'callback' => $callback, 'priority' => $priority );
+			return true;
+		}
+	}
+	if ( ! function_exists( 'add_action' ) ) {
+		function add_action( $hook, $callback, $priority = 10, $args = 1 ) {
+			return add_filter( $hook, $callback, $priority, $args );
+		}
+	}
 	if ( ! function_exists( 'wp_normalize_path' ) ) {
 		function wp_normalize_path( $path ) { return str_replace( '\\', '/', $path ); }
 	}

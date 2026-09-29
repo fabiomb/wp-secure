@@ -30,8 +30,17 @@ class WPS_Restapi_Detector {
 		// Bloquear enumeración de usuarios.
 		add_filter( 'rest_pre_dispatch', array( $this, 'block_user_enumeration' ), 10, 3 );
 
-		// Bloquear ?author=N y feed de autores.
-		add_action( 'template_redirect', array( $this, 'block_author_enumeration' ) );
+		// Bloquear ?author=N y feed de autores. Prioridad 1: redirect_canonical
+		// corre en la 10 y, registrado antes por el núcleo, redirigía a
+		// /author/{usuario}/ antes de llegar al bloqueo.
+		add_action( 'template_redirect', array( $this, 'block_author_enumeration' ), 1 );
+
+		// Sitemap de usuarios y datos de autor en oEmbed: exponen nombres de
+		// usuario sin pasar por la REST API.
+		if ( $this->loader->get_setting( 'rest_block_user_enum', true ) ) {
+			add_filter( 'wp_sitemaps_add_provider', array( $this, 'remove_users_sitemap' ), 10, 2 );
+			add_filter( 'oembed_response_data', array( $this, 'remove_oembed_author' ) );
+		}
 	}
 
 	/**
@@ -106,7 +115,7 @@ class WPS_Restapi_Detector {
 		$route = $wp_request->get_route();
 
 		// /wp/v2/users o /wp/v2/users/{id}.
-		if ( preg_match( '#^/wp/v2/users(?:/\d+)?$#', $route ) ) {
+		if ( self::is_users_route( $route ) ) {
 			$request = WPS_Request::get_instance();
 			$this->log_block( $request, 'user_enumeration', $route );
 
@@ -132,7 +141,7 @@ class WPS_Restapi_Detector {
 			return;
 		}
 
-		if ( isset( $_GET['author'] ) && is_numeric( $_GET['author'] ) ) {
+		if ( self::is_author_enumeration( $_GET ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			$request = WPS_Request::get_instance();
 			$this->log_block( $request, 'author_enumeration', $request->uri() );
 			wp_die(
@@ -141,6 +150,65 @@ class WPS_Restapi_Detector {
 				array( 'response' => 403 )
 			);
 		}
+	}
+
+	/**
+	 * ¿La ruta REST es el listado o el detalle de usuarios?
+	 *
+	 * WordPress resuelve las rutas REST sin distinguir mayúsculas y acepta la
+	 * barra final: `/wp/v2/USERS` o `/wp/v2/users/` devuelven lo mismo que
+	 * `/wp/v2/users`, así que la comparación tiene que ser igual de amplia.
+	 *
+	 * @param string $route Ruta REST (sin el prefijo /wp-json).
+	 */
+	public static function is_users_route( string $route ): bool {
+		return (bool) preg_match( '#^/+wp/+v2/+users(?:/+\d+)?/*$#i', $route );
+	}
+
+	/**
+	 * ¿La petición pide un archivo de autor por ID (`?author=`)?
+	 *
+	 * Con `?author=N` WordPress redirige a `/author/{usuario}/` y revela el
+	 * nombre de usuario. Se exigía un valor numérico, pero WordPress también
+	 * acepta `?author=1,`, `?author=1%20` o `?author[]=1`: cualquier uso del
+	 * parámetro cuenta.
+	 *
+	 * @param array $query Parámetros GET de la petición.
+	 */
+	public static function is_author_enumeration( array $query ): bool {
+		if ( ! array_key_exists( 'author', $query ) ) {
+			return false;
+		}
+
+		$value = $query['author'];
+
+		return is_array( $value ) ? ! empty( $value ) : '' !== trim( (string) $value );
+	}
+
+	/**
+	 * Quitar el sitemap de usuarios (`/wp-sitemap-users-1.xml`), que lista las
+	 * URLs de autor con el nombre de usuario de cada uno.
+	 *
+	 * @param WP_Sitemaps_Provider|false $provider Proveedor.
+	 * @param string                     $name     Nombre del proveedor.
+	 * @return WP_Sitemaps_Provider|false
+	 */
+	public function remove_users_sitemap( $provider, $name ) {
+		return 'users' === $name ? false : $provider;
+	}
+
+	/**
+	 * Quitar los datos de autor de las respuestas oEmbed.
+	 *
+	 * @param array $data Datos de la respuesta oEmbed.
+	 * @return array
+	 */
+	public function remove_oembed_author( $data ) {
+		if ( is_array( $data ) ) {
+			unset( $data['author_name'], $data['author_url'] );
+		}
+
+		return $data;
 	}
 
 	/**
