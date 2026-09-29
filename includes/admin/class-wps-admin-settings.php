@@ -374,6 +374,15 @@ class WPS_Admin_Settings {
                         'description' => __( 'Contra una misma cuenta, desde cualquier IP. Al superarlo, la cuenta sólo acepta logins desde redes donde su dueño ya inició sesión, hasta que los fallos salgan de la ventana de una hora. Frena ataques distribuidos. 0 lo desactiva.', 'wp-secure' ),
                     ),
                     array(
+                        'key'         => 'admin_max_sessions',
+                        'label'       => __( 'Sesiones simultáneas por administrador', 'wp-secure' ),
+                        'type'        => 'number',
+                        'default'     => 0,
+                        'min'         => 0,
+                        'max'         => 20,
+                        'description' => __( 'Al iniciar una sesión nueva se cierran las más viejas que excedan el límite. Limita el daño de una cookie de sesión robada. 0 = sin límite.', 'wp-secure' ),
+                    ),
+                    array(
                         'key'         => 'login_block_minutes',
                         'label'       => __( 'Duración del bloqueo temporal (minutos)', 'wp-secure' ),
                         'type'        => 'number',

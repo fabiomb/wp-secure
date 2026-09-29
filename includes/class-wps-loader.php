@@ -80,6 +80,9 @@ class WPS_Loader {
         // Alertas de escalada de privilegios.
         ( new WPS_Privilege_Monitor( $this ) )->init();
 
+        // Límite de sesiones simultáneas de administradores.
+        add_action( 'wp_login', array( $this, 'limit_admin_sessions' ), 20, 2 );
+
         // Security hardener (headers, métodos HTTP, ocultar versión).
         $hardener = new WPS_Security_Hardener( $this );
         $hardener->init();
@@ -366,6 +369,25 @@ class WPS_Loader {
 
         // 2. Verificar bloqueo por país/ASN (solo si hay API key o MMDB).
         $this->check_geo_block( $ip, $request, $blocker, $logger );
+    }
+
+    /**
+     * Cerrar las sesiones más viejas de un administrador que exceden el límite.
+     *
+     * Corre después de que WordPress guardó la sesión nueva, que por ser la
+     * más reciente nunca se cierra.
+     *
+     * @param string  $user_login Usuario.
+     * @param WP_User $user       Usuario que inició sesión.
+     */
+    public function limit_admin_sessions( $user_login, $user ): void {
+        $max = (int) $this->get_setting( 'admin_max_sessions', 0 );
+
+        if ( $max <= 0 || empty( $user->ID ) || ! user_can( $user, 'manage_options' ) ) {
+            return;
+        }
+
+        WPS_Session_Manager::enforce_limit( (int) $user->ID, $max );
     }
 
     /**

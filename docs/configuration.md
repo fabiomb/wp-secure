@@ -19,6 +19,7 @@ Todos los ajustes de WP Seguro se gestionan desde **WP Seguro → Configuración
 |--------|-------------|-------------------|
 | Intentos máximos antes de bloqueo | Intentos fallidos desde un mismo cliente en la última hora antes de bloquearlo. | 5 |
 | Intentos fallidos por cuenta/hora | Contra una misma cuenta, desde cualquier IP (ver abajo). `0` lo desactiva. | 10 |
+| Sesiones simultáneas por administrador | Al iniciar una sesión nueva se cierran las más viejas que excedan el límite. `0` = sin límite. | 0 |
 | Duración del bloqueo temporal | Minutos. | 15 |
 | Escalar bloqueo tras N bloqueos temporales | Bloqueos previos en 48 h que llevan a un bloqueo largo. | 3 |
 | Duración del bloqueo escalado | Horas. | 24 |

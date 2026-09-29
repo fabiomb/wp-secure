@@ -77,6 +77,7 @@ class WPS_Activator {
             // Login.
             'login_max_attempts'   => 5,
             'login_user_max_attempts' => 10,
+            'admin_max_sessions'      => 0,
             'login_block_minutes'  => 15,
             'login_escalate_after' => 3,
             'login_escalate_hours' => 24,

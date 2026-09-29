@@ -26,6 +26,14 @@ Quien toma el control de un sitio suele dejar rastros en pocos lugares: crea un 
 - Corre en todas las peticiones, así que también detecta cambios hechos por la REST API, WP-CLI o un registro público.
 - **Nuevo ajuste** «Notificar cambios de privilegios» (Configuración → Notificaciones, activado por defecto). El evento se registra siempre, aunque el mail esté desactivado.
 
+### Nuevo: Gestión de sesiones activas ([#14](https://github.com/fabiomb/wp-secure/issues/14))
+
+WordPress sólo permite cerrar las sesiones propias («Cerrar sesión en todas partes» del perfil). Si alguien entró con una contraseña robada, un administrador no tenía forma de ver ni cortar esa sesión.
+
+- **WP Seguro → Sesiones** (nueva página): lista las sesiones vigentes de todos los usuarios, con IP, navegador, inicio y vencimiento, y permite cerrar una sesión puntual o todas las de un usuario. La sesión actual se marca y no se puede cerrar por separado. Cada cierre queda en el registro de eventos.
+- **Límite de sesiones simultáneas por administrador** (Configuración → Login, desactivado por defecto): al iniciar una sesión nueva se cierran las más viejas que excedan el límite. Limita el daño de una cookie de sesión robada.
+- **`WPS_Session_Manager`** (nuevo): lee y modifica las sesiones que WordPress guarda en el meta `session_tokens`. Si otro plugin reemplaza el gestor de sesiones de WordPress, el cierre individual puede no aplicar; el cierre de todas las sesiones usa la API de WordPress y funciona igual.
+
 ## [0.4.4] — 2026-09-29
 
 ### Nuevo: Rutas trampa ([#8](https://github.com/fabiomb/wp-secure/issues/8))

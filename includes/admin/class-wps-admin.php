@@ -197,6 +197,16 @@ class WPS_Admin {
             array( $this, 'render_whitelist' )
         );
 
+        // Sesiones activas.
+        $this->page_hooks[] = add_submenu_page(
+            $this->menu_slug,
+            __( 'Sesiones', 'wp-secure' ),
+            __( 'Sesiones', 'wp-secure' ),
+            $this->capability,
+            $this->menu_slug . '-sessions',
+            array( $this, 'render_sessions' )
+        );
+
         // Eventos.
         $this->page_hooks[] = add_submenu_page(
             $this->menu_slug,
@@ -479,6 +489,13 @@ class WPS_Admin {
     /**
      * Whitelist.
      */
+    public function render_sessions(): void {
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        ( new WPS_Admin_Sessions( $this->loader ) )->render();
+    }
+
     public function render_whitelist(): void {
         if ( ! current_user_can( $this->capability ) ) {
             return;
