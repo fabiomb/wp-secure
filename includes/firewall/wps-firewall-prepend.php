@@ -38,6 +38,18 @@ final class WPS_Firewall_Prepend {
 	 */
 	private static $data_file = '';
 
+	/** Nombre del log. Es .php para que, pedido por web, no muestre nada. */
+	const LOG_FILE = 'wps-firewall-log.php';
+
+	/** Copia rotada del log. */
+	const LOG_ROTATED = 'wps-firewall-log.1.php';
+
+	/** Primera línea del log: corta la ejecución si se lo pide por web. */
+	const LOG_GUARD = "<?php exit; ?>\n";
+
+	/** Tamaño a partir del cual se rota el log. */
+	const LOG_MAX_BYTES = 1048576;
+
 	/**
 	 * Ejecutar el firewall.
 	 */
@@ -251,24 +263,48 @@ final class WPS_Firewall_Prepend {
 	 * Log mínimo del bloqueo. Escribe en un archivo de texto simple.
 	 */
 	private static function log_block( string $ip ): void {
-		$log_file = dirname( self::$data_file ) . '/wps-firewall.log';
+		$dir = dirname( self::$data_file );
 
 		// No intentar crear el archivo si el directorio no es escribible.
-		$dir = dirname( $log_file );
 		if ( ! is_writable( $dir ) ) {
 			return;
+		}
+
+		$log_file = $dir . '/' . self::LOG_FILE;
+
+		// Rotar por tamaño: se conserva sólo la copia anterior.
+		if ( is_file( $log_file ) && filesize( $log_file ) > self::LOG_MAX_BYTES ) {
+			@rename( $log_file, $dir . '/' . self::LOG_ROTATED );
 		}
 
 		$line = sprintf(
 			"[%s] BLOCKED %s %s %s\n",
 			gmdate( 'Y-m-d H:i:s' ),
 			$ip,
-			isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '-',
-			isset( $_SERVER['REQUEST_URI'] ) ? substr( $_SERVER['REQUEST_URI'], 0, 200 ) : '-'
+			self::clean_log_value( isset( $_SERVER['REQUEST_METHOD'] ) ? (string) $_SERVER['REQUEST_METHOD'] : '-', 10 ),
+			self::clean_log_value( isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '-', 200 )
 		);
+
+		// El log es un archivo PHP: la primera línea corta la ejecución.
+		if ( ! is_file( $log_file ) ) {
+			$line = self::LOG_GUARD . $line;
+		}
 
 		// Append mode, suppress errors.
 		@file_put_contents( $log_file, $line, FILE_APPEND | LOCK_EX );
+	}
+
+	/**
+	 * Limpiar un valor que controla el visitante antes de escribirlo al log.
+	 *
+	 * Sin caracteres de control (un salto de línea inventaría entradas) ni
+	 * `<`/`>`: el log es un archivo PHP y no puede contener etiquetas.
+	 */
+	private static function clean_log_value( string $value, int $max_length ): string {
+		$value = substr( $value, 0, $max_length );
+		$value = str_replace( array( '<', '>' ), array( '%3C', '%3E' ), $value );
+
+		return (string) preg_replace( '/[\x00-\x20\x7F]/', '?', $value );
 	}
 }
 

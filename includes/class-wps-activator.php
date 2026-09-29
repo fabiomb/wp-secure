@@ -140,15 +140,47 @@ class WPS_Activator {
     }
 
     /**
-     * Proteger el directorio data/ con .htaccess.
+     * `.htaccess` del directorio de datos, válido en Apache 2.2 y 2.4.
+     *
+     * nginx no lee este archivo: ver docs/installation.md para la regla
+     * equivalente.
      */
-    private static function protect_data_dir(): void {
-        $htaccess = WPS_DATA_DIR . '.htaccess';
-        if ( ! file_exists( $htaccess ) ) {
-            if ( ! is_dir( WPS_DATA_DIR ) ) {
-                wp_mkdir_p( WPS_DATA_DIR );
-            }
-            file_put_contents( $htaccess, "Order deny,allow\nDeny from all\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+    const DATA_DIR_HTACCESS = "# WP Seguro: este directorio no debe servirse por web.\n"
+        . "<IfModule mod_authz_core.c>\n"
+        . "\tRequire all denied\n"
+        . "</IfModule>\n"
+        . "<IfModule !mod_authz_core.c>\n"
+        . "\tOrder deny,allow\n"
+        . "\tDeny from all\n"
+        . "</IfModule>\n";
+
+    /**
+     * Proteger el directorio de datos: .htaccess, index.php y sin el log de
+     * texto plano de versiones anteriores.
+     *
+     * @param string $dir Directorio, con barra final.
+     */
+    public static function protect_data_dir( string $dir = WPS_DATA_DIR ): void {
+        if ( ! is_dir( $dir ) ) {
+            wp_mkdir_p( $dir );
+        }
+
+        // Reescribir también el de versiones anteriores, que usaba sólo la
+        // sintaxis de Apache 2.2 (`Order`/`Deny`).
+        $htaccess = $dir . '.htaccess';
+        if ( ! is_file( $htaccess ) || file_get_contents( $htaccess ) !== self::DATA_DIR_HTACCESS ) { // phpcs:ignore WordPress.WP.AlternativeFunctions
+            @file_put_contents( $htaccess, self::DATA_DIR_HTACCESS ); // phpcs:ignore
+        }
+
+        // Sin listado del directorio donde el servidor lo permitiera.
+        if ( ! is_file( $dir . 'index.php' ) ) {
+            @file_put_contents( $dir . 'index.php', "<?php\n// Silence is golden.\n" ); // phpcs:ignore
+        }
+
+        // El log anterior a 0.4.3 era texto plano: en nginx, que no lee
+        // .htaccess, se podía descargar con las IPs y URIs de los visitantes.
+        if ( is_file( $dir . 'wps-firewall.log' ) ) {
+            @unlink( $dir . 'wps-firewall.log' ); // phpcs:ignore
         }
     }
 
@@ -329,7 +361,6 @@ class WPS_Activator {
         $files_to_migrate = array(
             'wps-blocked-ips.php',
             'country_asn.mmdb',
-            'wps-firewall.log',
         );
 
         foreach ( $files_to_migrate as $filename ) {

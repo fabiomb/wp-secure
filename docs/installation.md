@@ -76,6 +76,23 @@ Si actualizás desde una versión anterior a 0.3.1 con la directiva apuntando a 
 
 **Nota:** En hosting compartido, esta opción puede no estar disponible. La Capa 1 proporciona protección suficiente para la mayoría de sitios.
 
+## Directorio de datos (`wp-content/wps-data/`)
+
+WP Seguro guarda ahí el archivo de bloqueos de la Capa 0, su cargador, el log de la Capa 0 y la base de geolocalización. Ninguno debe servirse por web.
+
+- **Apache**: el plugin crea un `.htaccess` que niega el acceso (compatible con Apache 2.2 y 2.4) y un `index.php` vacío.
+- **nginx**: no lee `.htaccess`. Agregá esta regla al bloque `server` del sitio y recargá nginx:
+
+```nginx
+location ^~ /wp-content/wps-data/ {
+    deny all;
+}
+```
+
+Sin esa regla en nginx, la base de geolocalización (`.mmdb`) queda descargable. El log de la Capa 0 es un archivo `.php` que corta la ejecución en su primera línea, así que pedirlo por web no muestra su contenido; aun así conviene la regla.
+
+Para comprobarlo, abrí `https://tu-sitio/wp-content/wps-data/.htaccess` en el navegador: tiene que responder 403 o 404.
+
 ## Desinstalación
 
 Al desactivar el plugin, las tablas de datos se conservan por seguridad. Al **desinstalar** (eliminar) el plugin:

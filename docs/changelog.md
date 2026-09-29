@@ -12,6 +12,15 @@ Con **Bloquear enumeración de usuarios** activo (el valor por defecto), un visi
 - **Sitemap de usuarios**: `/wp-sitemap-users-1.xml` listaba las URLs de autor con cada nombre de usuario. Se quita del sitemap mientras el ajuste esté activo.
 - **oEmbed**: las respuestas de `/wp-json/oembed/1.0/embed` incluían `author_name` y `author_url`. Se quitan mientras el ajuste esté activo.
 
+### Seguridad: El directorio de datos quedaba expuesto en nginx y su log crecía sin límite ([#6](https://github.com/fabiomb/wp-secure/issues/6))
+
+`wp-content/wps-data/` se protegía sólo con un `.htaccess` en sintaxis de Apache 2.2 (`Order`/`Deny`). nginx no lee `.htaccess`, así que en esos servidores `wps-firewall.log` (IP, método y URI de cada petición bloqueada) y la base de geolocalización se podían descargar. Además, el log nunca se rotaba.
+
+- **Log de la Capa 0**: pasa a `wps-firewall-log.php`, cuya primera línea (`<?php exit; ?>`) corta la ejecución: pedido por web no muestra nada, en cualquier servidor. Se rota al superar 1 MB y se conserva sólo la copia anterior (`wps-firewall-log.1.php`).
+- **Datos del visitante en el log**: el método y la URI se escriben sin `<`, `>` ni caracteres de control. Un archivo PHP no puede contener etiquetas que vengan de una petición, y un salto de línea en la URI ya no puede inventar entradas en el log.
+- **`WPS_Activator::protect_data_dir()`** (ahora público): el `.htaccess` es válido en Apache 2.2 y 2.4 (`Require all denied`), se agrega un `index.php` vacío y se elimina el `wps-firewall.log` de versiones anteriores, que era justamente el archivo expuesto. Corre también en cada cambio de versión, así que las instalaciones existentes se actualizan solas.
+- **nginx**: `installation.md` documenta la regla `location ^~ /wp-content/wps-data/ { deny all; }` y cómo comprobar que el directorio no se sirve.
+
 ## [0.4.2] — 2026-09-29
 
 ### Corrección: Las imágenes rotas bloqueaban a quien visitaba la página ([#1](https://github.com/fabiomb/wp-secure/issues/1))

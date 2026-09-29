@@ -512,6 +512,7 @@ class WPS_Loader {
             WPS_Db_Migrations::run();
             WPS_Activator::install_muplugin();
             WPS_Activator::install_prepend_loader();
+            WPS_Activator::protect_data_dir();
             update_option( 'wps_version', WPS_VERSION );
         }
     }
