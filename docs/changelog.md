@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.4.3] — Sin publicar
+## [0.4.3] — 2026-09-29
 
 ### Seguridad: La enumeración de usuarios seguía siendo posible ([#5](https://github.com/fabiomb/wp-secure/issues/5))
 
@@ -29,6 +29,10 @@ El archivo de configuración exportado llevaba el token de ipinfo.io en texto pl
 - **Importación validada**: sólo se importan los ajustes que existen en el panel, con las mismas reglas que el formulario (`WPS_Admin_Settings::validate_value()`, nuevo): números dentro de su rango, opciones existentes, checkbox booleanos, email válido. Lo que no cumple se ignora en lugar de guardarse, y el mensaje de resultado lista las claves ignoradas.
 - Los secretos y las claves internas (`db_version`, etc.) no se importan aunque vengan en el archivo.
 - **A tener en cuenta**: al importar un archivo exportado con una versión anterior, el token de ipinfo que traiga se ignora; hay que cargarlo a mano en **Configuración**.
+
+### Versión
+
+- Versión actualizada a `0.4.3` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin.
 
 ## [0.4.2] — 2026-09-29
 
