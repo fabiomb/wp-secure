@@ -47,6 +47,7 @@ class WPS_Rate_Limiter {
 		'rate_xmlrpc_per_hour'  => 0,
 		'rate_lostpassword_per_hour' => 5,
 		'rate_register_per_hour'     => 3,
+		'rate_search_per_min'        => 20,
 		'rate_block_minutes'    => 15,
 	);
 
@@ -204,6 +205,7 @@ class WPS_Rate_Limiter {
 			'xmlrpc' => 'rate_xmlrpc_per_hour',
 			'lostpassword' => 'rate_lostpassword_per_hour',
 			'register'     => 'rate_register_per_hour',
+			'search'       => 'rate_search_per_min',
 		);
 
 		$key     = $setting_map[ $type ] ?? 'rate_total_per_min';

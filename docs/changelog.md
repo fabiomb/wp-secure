@@ -31,6 +31,14 @@ El formulario de recuperación de contraseña y el de registro no tenían límit
   - Recuperación de contraseña: si la cuenta no existe, se responde igual que si existiera, con la redirección a «revisá tu correo».
 - **Alcance**: aplica a `wp-login.php` y al registro de WordPress. Los formularios propios de otros plugins (por ejemplo, la cuenta de WooCommerce) muestran sus propios mensajes.
 
+### Nuevo: Límite de búsquedas ([#11](https://github.com/fabiomb/wp-secure/issues/11))
+
+Cada búsqueda del sitio es una consulta cara a la base de datos que ninguna cache de páginas absorbe, porque cada término es distinto: un script que busca términos al azar satura el servidor con muy pocas peticiones.
+
+- **`WPS_Search_Guard`** (nuevo): cuenta las búsquedas por cliente, en el buscador del sitio (`?s=`) y en la REST API (`/wp/v2/search` y cualquier ruta con el parámetro `search`). El control corre antes de que WordPress ejecute la consulta (`parse_request` y `rest_pre_dispatch`), así que una búsqueda rechazada no llega a la base de datos.
+- **Límite** de 20 búsquedas por minuto (Configuración → Rate Limiting, `0` lo desactiva). Al superarlo se responde **429** con `Retry-After: 60`, sin bloquear la IP: el visitante puede seguir navegando.
+- Quedan exentos quienes editan el sitio, la whitelist, el propio servidor, y todo mientras el bloqueo esté suspendido.
+
 ## [0.4.3] — 2026-09-29
 
 ### Seguridad: La enumeración de usuarios seguía siendo posible ([#5](https://github.com/fabiomb/wp-secure/issues/5))

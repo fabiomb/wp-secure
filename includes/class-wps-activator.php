@@ -100,6 +100,7 @@ class WPS_Activator {
             'rate_xmlrpc_per_hour' => 0,
             'rate_lostpassword_per_hour' => 5,
             'rate_register_per_hour'     => 3,
+            'rate_search_per_min'        => 20,
             'rate_block_minutes'   => 15,
             'ipv6_block_prefix'    => 64,
 

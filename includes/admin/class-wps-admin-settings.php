@@ -508,6 +508,15 @@ class WPS_Admin_Settings {
                         'description' => __( '0 = deshabilitado. Si XML-RPC está bloqueado globalmente, este límite no aplica.', 'wp-secure' ),
                     ),
                     array(
+                        'key'         => 'rate_search_per_min',
+                        'label'       => __( 'Búsquedas/minuto', 'wp-secure' ),
+                        'type'        => 'number',
+                        'default'     => 20,
+                        'min'         => 0,
+                        'max'         => 500,
+                        'description' => __( 'Por cliente, en el buscador del sitio y en la REST API. Al superarlo se responde 429, sin bloquear la IP. 0 desactiva el límite.', 'wp-secure' ),
+                    ),
+                    array(
                         'key'         => 'rate_lostpassword_per_hour',
                         'label'       => __( 'Recuperaciones de contraseña/hora', 'wp-secure' ),
                         'type'        => 'number',

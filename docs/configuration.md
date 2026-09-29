@@ -55,6 +55,7 @@ Para permitir un servicio que necesita XML-RPC (Jetpack, la app móvil), creá u
 | Errores 404 por minuto | Útil contra la enumeración de rutas. | 10 |
 | Intentos de login por hora | | 5 |
 | Peticiones XML-RPC por hora | `0` desactiva el límite. | 0 |
+| Búsquedas por minuto | En el buscador del sitio (`?s=`) y en las búsquedas de la REST API. Al superarlo se responde 429, sin bloquear la IP. `0` desactiva el límite. | 20 |
 | Recuperaciones de contraseña por hora | Al superarlo se rechaza el pedido, sin bloquear la IP. `0` desactiva el límite. | 5 |
 | Registros de usuario por hora | En el registro de WordPress. Al superarlo se rechaza el registro, sin bloquear la IP. `0` desactiva el límite. | 3 |
 | Duración del bloqueo (minutos) | Cuánto dura el bloqueo al superar un límite. | 15 |

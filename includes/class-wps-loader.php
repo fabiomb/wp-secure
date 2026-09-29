@@ -74,6 +74,9 @@ class WPS_Loader {
         // Campo trampa y tiempo mínimo en login y comentarios.
         ( new WPS_Form_Guard( $this ) )->init();
 
+        // Límite de búsquedas por cliente.
+        ( new WPS_Search_Guard( $this ) )->init();
+
         // Security hardener (headers, métodos HTTP, ocultar versión).
         $hardener = new WPS_Security_Hardener( $this );
         $hardener->init();
