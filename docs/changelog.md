@@ -1,5 +1,20 @@
 # Registro de Cambios
 
+## [0.6.0] — Sin publicar
+
+### Nuevo: Monitor de integridad de archivos ([#16](https://github.com/fabiomb/wp-secure/issues/16))
+
+Casi toda intrusión deja un archivo de código modificado o agregado: un backdoor en un plugin, un drop-in falso en `wp-content`, una línea inyectada en `wp-config.php` o en `.htaccess`. Hasta ahora nada lo detectaba.
+
+- **`WPS_File_Integrity`** (nuevo): toma una **referencia** (hash por archivo) de los archivos de código (`.php`, `.phtml`, `.phar`, `.inc`, `.htaccess`, `.user.ini`) del núcleo, de `wp-content` (drop-ins), de `mu-plugins`, de cada plugin y de cada tema, y en cada escaneo informa los archivos **modificados**, **nuevos** o **eliminados**. Compara contenido, no fechas: el malware suele restaurar la fecha de modificación.
+- **Sin falsas alarmas por actualizaciones**: al actualizar un plugin, un tema o el núcleo, la referencia de esa área se vuelve a tomar automáticamente.
+- **Escaneo diario** con el mantenimiento. Cada pasada tiene un límite de tiempo (20 s) y guarda el progreso antes de cada área: si no termina o el hosting corta la ejecución, sigue un minuto después desde donde quedó.
+- **WP Seguro → Integridad** (nueva página): resumen, archivos con cambios agrupados por área, «Escanear ahora» y aceptar los cambios de un área o de todas (pasan a ser la nueva referencia).
+- **Aviso**: evento «Archivos modificados» (crítico) y mail con la lista, con su propio ajuste («Notificar archivos modificados», activado por defecto).
+- **WP-CLI**: `wp wps integrity scan|status|accept [<área>]`.
+- **Nueva tabla** `wps_file_integrity` y ajuste «Monitor de integridad» (Configuración → Firewall Avanzado, activado por defecto).
+- **Rendimiento medido** en un sitio con 54 áreas y 15.247 archivos vigilados: un escaneo completo tarda unos 10 segundos. El primero, que lee todos los archivos por primera vez, puede tardar varios minutos (en el equipo de prueba, con antivirus en tiempo real, casi tres); se reparte en varias pasadas.
+
 ## [0.5.0] — 2026-09-29
 
 ### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))

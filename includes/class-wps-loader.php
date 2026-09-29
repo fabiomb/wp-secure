@@ -80,6 +80,9 @@ class WPS_Loader {
         // Alertas de escalada de privilegios.
         ( new WPS_Privilege_Monitor( $this ) )->init();
 
+        // Monitor de integridad de archivos.
+        ( new WPS_File_Integrity( $this ) )->init();
+
         // Límite de sesiones simultáneas de administradores.
         add_action( 'wp_login', array( $this, 'limit_admin_sessions' ), 20, 2 );
 

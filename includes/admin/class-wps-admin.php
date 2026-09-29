@@ -197,6 +197,16 @@ class WPS_Admin {
             array( $this, 'render_whitelist' )
         );
 
+        // Integridad de archivos.
+        $this->page_hooks[] = add_submenu_page(
+            $this->menu_slug,
+            __( 'Integridad', 'wp-secure' ),
+            __( 'Integridad', 'wp-secure' ),
+            $this->capability,
+            $this->menu_slug . '-integrity',
+            array( $this, 'render_integrity' )
+        );
+
         // Sesiones activas.
         $this->page_hooks[] = add_submenu_page(
             $this->menu_slug,
@@ -489,6 +499,13 @@ class WPS_Admin {
     /**
      * Whitelist.
      */
+    public function render_integrity(): void {
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        ( new WPS_Admin_Integrity( $this->loader ) )->render();
+    }
+
     public function render_sessions(): void {
         if ( ! current_user_can( $this->capability ) ) {
             return;

@@ -144,6 +144,10 @@ class WPS_Activator {
             'notify_new_login_ip'      => true,
             'notify_settings_change'   => true,
             'notify_privilege_changes' => true,
+            'notify_file_changes'      => true,
+
+            // Integridad de archivos.
+            'integrity_enabled'        => true,
             'notify_daily_summary'     => true,
         );
 

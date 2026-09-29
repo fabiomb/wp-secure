@@ -88,12 +88,24 @@ Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, l
 | Bloquear User-Agent vacío | Bloquear peticiones sin cabecera User-Agent. | Desactivado |
 | Bloquear peticiones sin Host | Bloquear peticiones sin cabecera Host válida. | Activado |
 | Prefijo IPv6 por cliente | Tamaño de la red IPv6 que se trata como un solo cliente (48–128). `128` = dirección exacta. | 64 |
+| Monitor de integridad | Vigila los archivos de código del núcleo, plugins, temas y `wp-content` (ver abajo). | Activado |
 | Rutas trampa | Bloquear de inmediato a quien pida una ruta trampa. | Activado |
 | Lista de rutas trampa | Una por línea (ver abajo). | `/.env`, copias de `wp-config.php`, `/.git/*`, … |
 | Duración del bloqueo por ruta trampa | En minutos. | 1440 (24 h) |
 | Protección de formularios | Campo trampa y tiempo mínimo en login y comentarios (ver abajo). | Activado |
 | Tiempo mínimo para comentar | Segundos entre la carga de la página y el envío. `0` desactiva el control. | 3 |
 | Tiempo mínimo para iniciar sesión | Igual, para `wp-login.php`. | 0 (desactivado) |
+
+### Monitor de integridad
+
+Compara los archivos de código (`.php`, `.phtml`, `.phar`, `.inc`, `.htaccess`, `.user.ini`) del núcleo, de `wp-content`, de `mu-plugins`, de cada plugin y de cada tema contra una **referencia** tomada en el primer escaneo, y marca los archivos **modificados**, **nuevos** o **eliminados**. Es la forma más directa de detectar una intrusión: casi todas dejan un archivo alterado o agregado.
+
+- Compara el **contenido** (hash), no la fecha: el malware suele restaurar la fecha de modificación del archivo que infecta.
+- Las **actualizaciones** de plugins, temas y núcleo toman una referencia nueva del área afectada, así que no generan alarmas. Un cambio que aparece en la lista no vino de una actualización.
+- Corre una vez por día con el mantenimiento. Cada pasada tiene un límite de tiempo y, si no termina, sigue un minuto después, para no superar el tiempo máximo de ejecución del hosting.
+- Los cambios se revisan en **WP Seguro → Integridad**, donde se aceptan por área o todos juntos (pasan a ser la nueva referencia). También con `wp wps integrity scan|status|accept`.
+- Guardar los enlaces permanentes regenera `.htaccess`, y editar `wp-config.php` también cuenta como cambio: son archivos que un atacante suele tocar, así que conviene revisarlos y aceptarlos.
+- El primer escaneo de un sitio grande puede tardar varios minutos, porque lee todos los archivos por primera vez. Los siguientes son mucho más rápidos.
 
 ### Rutas trampa
 

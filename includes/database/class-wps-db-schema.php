@@ -37,6 +37,7 @@ class WPS_Db_Schema {
             'login_attempts',
             'rate_limits',
             'custom_rules',
+            'file_integrity',
         );
     }
 
@@ -213,6 +214,24 @@ class WPS_Db_Schema {
             updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
             KEY idx_active_priority (is_active,priority)
+        ) {$charset};";
+
+        // ── Integridad de archivos ──
+        // La clave es el MD5 de la ruta: una ruta completa supera el largo
+        // máximo de un índice en utf8mb4 (191 caracteres).
+        $table = self::table( 'file_integrity' );
+        $sql[] = "CREATE TABLE {$table} (
+            path_hash char(32) NOT NULL,
+            path varchar(1024) NOT NULL,
+            area varchar(191) NOT NULL,
+            file_hash char(32) NOT NULL DEFAULT '',
+            size bigint(20) unsigned NOT NULL DEFAULT 0,
+            status varchar(10) NOT NULL DEFAULT 'ok',
+            detected_at datetime DEFAULT NULL,
+            checked_at datetime NOT NULL,
+            PRIMARY KEY  (path_hash),
+            KEY idx_area (area),
+            KEY idx_status (status)
         ) {$charset};";
 
         foreach ( $sql as $query ) {

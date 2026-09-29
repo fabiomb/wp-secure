@@ -18,6 +18,8 @@ delete_option( 'wps_version' );
 delete_option( 'wps_activated' );
 delete_option( 'wps_unsafe_mode' );
 delete_option( 'wps_block_digest' );
+delete_option( 'wps_integrity_state' );
+delete_option( 'wps_integrity_last_scan' );
 
 // Eliminar transients propios (cache de geolocalización y de verificación
 // de crawlers): uno por IP, pueden ser miles de filas en wp_options.
@@ -58,3 +60,4 @@ foreach ( array( WP_CONTENT_DIR . '/wps-data/', __DIR__ . '/data/' ) as $wps_dat
 // Limpiar crons.
 wp_clear_scheduled_hook( 'wps_daily_maintenance' );
 wp_clear_scheduled_hook( 'wps_hourly_maintenance' );
+wp_clear_scheduled_hook( 'wps_integrity_continue' );

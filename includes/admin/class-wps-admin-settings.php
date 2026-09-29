@@ -581,6 +581,14 @@ class WPS_Admin_Settings {
                         ),
                     ),
                     array(
+                        'key'            => 'integrity_enabled',
+                        'label'          => __( 'Monitor de integridad', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Vigilar los archivos de código del núcleo, plugins y temas', 'wp-secure' ),
+                        'description'    => __( 'Una vez por día se comparan contra la referencia tomada. Las actualizaciones toman una referencia nueva automáticamente. Los cambios se revisan en WP Seguro → Integridad.', 'wp-secure' ),
+                    ),
+                    array(
                         'key'            => 'honeypot_enabled',
                         'label'          => __( 'Rutas trampa', 'wp-secure' ),
                         'type'           => 'checkbox',
@@ -942,6 +950,13 @@ class WPS_Admin_Settings {
                         'type'           => 'checkbox',
                         'default'        => true,
                         'checkbox_label' => __( 'Enviar email cuando un administrador inicia sesión desde una IP no registrada', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'            => 'notify_file_changes',
+                        'label'          => __( 'Notificar archivos modificados', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Enviar email cuando el monitor de integridad encuentre archivos de código modificados, nuevos o eliminados', 'wp-secure' ),
                     ),
                     array(
                         'key'            => 'notify_privilege_changes',

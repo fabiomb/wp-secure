@@ -222,6 +222,49 @@ class WPS_Admin_Notifier {
 	}
 
 	/**
+	 * Avisar de archivos modificados, agregados o eliminados.
+	 *
+	 * @param array[] $changes Cambios: path, area, status.
+	 * @return bool Si se envió el aviso.
+	 */
+	public function notify_file_changes( array $changes ): bool {
+		if ( ! $changes || ! $this->loader->get_setting( 'notify_file_changes', true ) ) {
+			return false;
+		}
+
+		$labels = array(
+			'modified' => __( 'modificado', 'wp-secure' ),
+			'added'    => __( 'nuevo', 'wp-secure' ),
+			'deleted'  => __( 'eliminado', 'wp-secure' ),
+		);
+
+		$lines = array();
+		foreach ( array_slice( $changes, 0, 50 ) as $change ) {
+			$lines[] = sprintf( '[%s] %s', $labels[ $change['status'] ] ?? $change['status'], $change['path'] );
+		}
+		if ( count( $changes ) > 50 ) {
+			/* translators: %d: number of changes not listed */
+			$lines[] = sprintf( __( '… y %d más.', 'wp-secure' ), count( $changes ) - 50 );
+		}
+
+		$subject = sprintf(
+			/* translators: 1: number of files, 2: site name */
+			_n( '[WP Seguro] %1$d archivo cambió en %2$s', '[WP Seguro] %1$d archivos cambiaron en %2$s', count( $changes ), 'wp-secure' ),
+			count( $changes ),
+			get_bloginfo( 'name' )
+		);
+
+		$body = sprintf(
+			/* translators: 1: list of files, 2: site name */
+			__( "El monitor de integridad encontró cambios en archivos de código de %2\$s que no vinieron de una actualización:\n\n%1\$s\n\nSi no los hiciste vos (o alguien de tu equipo), revisalos: es la forma más común de detectar una intrusión. Si son legítimos, aceptalos en WP Seguro → Integridad.", 'wp-secure' ),
+			implode( "\n", $lines ),
+			get_bloginfo( 'name' )
+		);
+
+		return $this->send( $subject, $body );
+	}
+
+	/**
 	 * Notificar cambios de configuración.
 	 *
 	 * Un cambio no autorizado en el firewall (apagar detectores, activar el

@@ -26,6 +26,7 @@ class WPS_Db_Maintenance {
     public static function unschedule(): void {
         wp_clear_scheduled_hook( 'wps_daily_maintenance' );
         wp_clear_scheduled_hook( 'wps_hourly_maintenance' );
+        wp_clear_scheduled_hook( 'wps_integrity_continue' );
     }
 
     /**

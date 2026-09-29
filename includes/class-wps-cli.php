@@ -234,6 +234,72 @@ class WPS_CLI {
 	}
 
 	/**
+	 * Monitor de integridad de archivos.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <action>
+	 * : scan, status o accept.
+	 *
+	 * [<area>]
+	 * : Área a aceptar (p. ej. core, plugin:akismet). Sin área, accept acepta todo.
+	 *
+	 * [--format=<format>]
+	 * : table, json, csv o yaml (para status).
+	 * ---
+	 * default: table
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp wps integrity scan
+	 *     wp wps integrity status
+	 *     wp wps integrity accept plugin:akismet
+	 */
+	public function integrity( $args, $assoc_args ): void {
+		$action    = (string) ( $args[0] ?? '' );
+		$integrity = new WPS_File_Integrity( WPS_Loader::get_instance() );
+
+		switch ( $action ) {
+			case 'scan':
+				// Sin límite de tiempo: en la consola no hay timeout de PHP.
+				$result = $integrity->run( 0 );
+				if ( $result['changes'] ) {
+					\WP_CLI::warning( sprintf( 'Escaneo completo: %d cambios nuevos.', count( $result['changes'] ) ) );
+				} else {
+					\WP_CLI::success( 'Escaneo completo: sin cambios nuevos.' );
+				}
+				return;
+
+			case 'status':
+				$items = array_map( function ( $row ) {
+					return array( 'area' => $row['area'], 'status' => $row['status'], 'path' => $row['path'], 'detected' => $row['detected_at'] );
+				}, $integrity->changes() );
+
+				$summary = $integrity->summary();
+				\WP_CLI::line( sprintf(
+					'Archivos vigilados: %d · Cambios sin revisar: %d · Último escaneo: %s',
+					$summary['files'],
+					$summary['changes'],
+					$summary['last_scan'] ? gmdate( 'Y-m-d H:i', $summary['last_scan'] ) . ' UTC' : 'nunca'
+				) );
+
+				if ( $items ) {
+					\WP_CLI\Utils\format_items( $assoc_args['format'] ?? 'table', $items, array( 'area', 'status', 'path', 'detected' ) );
+				}
+				return;
+
+			case 'accept':
+				$area     = isset( $args[1] ) ? (string) $args[1] : null;
+				$accepted = $integrity->accept( $area );
+				\WP_CLI::success( sprintf( 'Se aceptaron %d cambios como la nueva referencia.', $accepted ) );
+				return;
+		}
+
+		\WP_CLI::error( 'Acción desconocida. Usá scan, status o accept.' );
+	}
+
+	/**
 	 * Regenerar el archivo de la Capa 0 desde la base de datos.
 	 *
 	 * @subcommand sync-layer0
