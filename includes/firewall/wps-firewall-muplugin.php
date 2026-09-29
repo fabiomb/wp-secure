@@ -138,6 +138,12 @@ final class WPS_Firewall_MuPlugin {
 		// wp-cron no se limita: lo dispara el propio sitio, no un visitante.
 		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
 
+		// Rutas trampa, antes de que WordPress procese la ruta. Con cookie de
+		// sesión se deja para la Capa 2, que verifica los permisos reales.
+		if ( ! $has_wp_session && ! $doing_cron && class_exists( 'WPS_Honeypot', false ) ) {
+			( new WPS_Honeypot( $loader ) )->check( $request );
+		}
+
 		// Rate limiting para la petición actual (si el rate limiter está cargado y no hay sesión activa).
 		// El loader vuelve a registrar estos hits en `init`; WPS_Rate_Limiter
 		// cuenta cada tipo una sola vez por petición.
@@ -190,6 +196,7 @@ final class WPS_Firewall_MuPlugin {
 			'core/class-wps-whitelist.php',
 			'core/class-wps-blocker.php',
 			'core/class-wps-rate-limiter.php',
+			'core/class-wps-honeypot.php',
 		);
 
 		foreach ( $classes as $class_file ) {

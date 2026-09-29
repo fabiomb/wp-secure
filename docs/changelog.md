@@ -1,5 +1,16 @@
 # Registro de Cambios
 
+## [0.4.4] — Sin publicar
+
+### Nuevo: Rutas trampa ([#8](https://github.com/fabiomb/wp-secure/issues/8))
+
+Rutas que ningún visitante legítimo pide pero que todo scanner automatizado prueba (`/.env`, copias de `wp-config.php`, `/.git/`, `/.aws/`, `/phpinfo.php`, `/vendor/phpunit/`). Quien pide una queda bloqueado de inmediato y por 24 horas, sin pasar por la puntuación de riesgo: la señal es inequívoca.
+
+- **`WPS_Honeypot`** (nuevo): corre en la Capa 1, antes de que WordPress procese la ruta, para las peticiones sin cookie de sesión. En la Capa 2 se vuelve a revisar con los permisos reales del usuario: un usuario con permisos de edición nunca se bloquea a sí mismo, y una cookie de sesión falsa no alcanza para esquivar la trampa. La whitelist y el propio servidor también quedan exentos.
+- **Ajustes** en Configuración → Firewall Avanzado: activar o desactivar (activado por defecto), la lista de rutas (una por línea; se compara el final de la ruta sin distinguir mayúsculas, y un `*` final abarca todo lo que haya debajo) y la duración del bloqueo.
+- **Nuevo tipo de evento** «Ruta trampa» (crítico) y tipo de bloqueo `auto_honeypot`. En IPv6 se bloquea la red del prefijo configurado, como el resto de los bloqueos automáticos.
+- **Bloqueos**: la lista muestra ahora etiquetas legibles también para los bloqueos por crawler falso, motor de riesgo y reglas personalizadas, que antes aparecían con su clave interna.
+
 ## [0.4.3] — 2026-09-29
 
 ### Seguridad: La enumeración de usuarios seguía siendo posible ([#5](https://github.com/fabiomb/wp-secure/issues/5))

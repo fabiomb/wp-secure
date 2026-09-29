@@ -72,6 +72,18 @@ Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, l
 | Bloquear User-Agent vacío | Bloquear peticiones sin cabecera User-Agent. | Desactivado |
 | Bloquear peticiones sin Host | Bloquear peticiones sin cabecera Host válida. | Activado |
 | Prefijo IPv6 por cliente | Tamaño de la red IPv6 que se trata como un solo cliente (48–128). `128` = dirección exacta. | 64 |
+| Rutas trampa | Bloquear de inmediato a quien pida una ruta trampa. | Activado |
+| Lista de rutas trampa | Una por línea (ver abajo). | `/.env`, copias de `wp-config.php`, `/.git/*`, … |
+| Duración del bloqueo por ruta trampa | En minutos. | 1440 (24 h) |
+
+### Rutas trampa
+
+Son rutas que ningún visitante legítimo pide pero que todo scanner automatizado prueba: `/.env`, copias de `wp-config.php` (`.bak`, `.old`, `~`…), `/.git/`, `/.aws/`, `/phpinfo.php`, `/vendor/phpunit/`. Quien pide una queda bloqueado de inmediato y por más tiempo que un bloqueo común, porque la señal es inequívoca.
+
+- Se compara el **final** de la ruta, sin distinguir mayúsculas, así que funciona con WordPress en un subdirectorio.
+- Un `*` al final abarca todo lo que haya debajo: `/.git/*` coincide con `/.git/config` y `/.git/HEAD`.
+- Podés agregar rutas propias, por ejemplo la URL de un panel de administración que no existe en tu sitio.
+- Nunca se bloquea a usuarios logueados con permisos de edición, a la whitelist ni al propio servidor.
 
 ### Prefijo IPv6 por cliente
 

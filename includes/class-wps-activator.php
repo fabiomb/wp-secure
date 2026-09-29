@@ -101,6 +101,11 @@ class WPS_Activator {
             'rate_block_minutes'   => 15,
             'ipv6_block_prefix'    => 64,
 
+            // Rutas trampa.
+            'honeypot_enabled'       => true,
+            'honeypot_paths'         => WPS_Honeypot::DEFAULT_PATHS,
+            'honeypot_block_minutes' => WPS_Honeypot::DEFAULT_BLOCK_MINUTES,
+
             // Firewall layers.
             'firewall_layer0_enabled' => false,
             'firewall_layer1_enabled' => true,

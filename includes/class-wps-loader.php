@@ -78,6 +78,9 @@ class WPS_Loader {
         // Verificar bloqueo de IP actual en cada petición.
         $this->check_current_ip();
 
+        // Rutas trampa (también cubre el caso de la Capa 1 desactivada).
+        $this->check_honeypot();
+
         // Evaluar reglas personalizadas del usuario.
         $this->check_custom_rules();
 
@@ -354,6 +357,26 @@ class WPS_Loader {
 
         // 2. Verificar bloqueo por país/ASN (solo si hay API key o MMDB).
         $this->check_geo_block( $ip, $request, $blocker, $logger );
+    }
+
+    /**
+     * Revisar rutas trampa con los permisos reales del usuario.
+     */
+    private function check_honeypot(): void {
+        if ( defined( 'DOING_CRON' ) && DOING_CRON ) {
+            return;
+        }
+
+        $request = WPS_Request::get_instance();
+        $ip      = $request->ip();
+
+        if ( WPS_Request::is_trusted_user()
+            || WPS_Ip_Utils::is_server_ip( $ip )
+            || WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+            return;
+        }
+
+        ( new WPS_Honeypot( $this ) )->check( $request );
     }
 
     /**
