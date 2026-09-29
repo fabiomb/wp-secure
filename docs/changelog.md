@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.5.0] — Sin publicar
+## [0.5.0] — 2026-09-29
 
 ### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))
 
@@ -43,6 +43,10 @@ Recuperar el acceso requería editar `wp-config.php` o la base de datos. Ahora, 
 - **`wp wps unsafe-mode`** registra el evento y envía el aviso de cambio de configuración, igual que desde el panel.
 - **`WPS_Whitelist::remove_value()`** (nuevo): quitar de la whitelist por IP o CIDR.
 - **Documentación**: nueva guía `docs/wp-cli.md`, enlazada desde el índice, el README y las guías de recuperación de acceso.
+
+### Versión
+
+- Versión actualizada a `0.5.0` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin. Al actualizar, la migración completa los ajustes nuevos (intentos fallidos por cuenta, sesiones simultáneas por administrador y aviso de cambios de privilegios) con sus valores por defecto.
 
 ## [0.4.4] — 2026-09-29
 
