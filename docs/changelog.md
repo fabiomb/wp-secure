@@ -21,6 +21,16 @@ Frena bots en `wp-login.php`, `wp_login_form()` y los comentarios, sin captcha n
 - **Exenciones**: usuarios logueados (en comentarios), whitelist, el propio servidor, y todo mientras el Modo Inseguro o `WPS_DISABLE_BLOCKING` estén activos. No se bloquea la IP, sólo el envío.
 - **Ajustes** en Configuración → Firewall Avanzado: activar o desactivar (activado por defecto) y los tiempos mínimos de comentarios y login.
 
+### Seguridad: Recuperación de contraseña y registro sin límite, y mensajes que revelaban cuentas ([#10](https://github.com/fabiomb/wp-secure/issues/10))
+
+El formulario de recuperación de contraseña y el de registro no tenían límite: servían para inundar de mails a los usuarios y para crear cuentas basura en masa. Además, los propios mensajes de WordPress permitían saber qué cuentas existen: el login respondía «The username X is not registered on this site» o «The password you entered for the username X is incorrect», y la recuperación, «There is no account with that username or email address».
+
+- **Límites por cliente** (Configuración → Rate Limiting): 5 recuperaciones de contraseña y 3 registros por hora. Al superarlos se rechaza el pedido, pero **no se bloquea la IP**: quien olvidó su contraseña y apretó el botón varias veces sigue pudiendo usar el sitio. `WPS_Rate_Limiter::exceeds()` (nuevo) cuenta sin bloquear.
+- **Mensajes uniformes** (con «Bloquear enumeración de usuarios» activo, el valor por defecto):
+  - Login: los errores de usuario inexistente, email inexistente y contraseña incorrecta se reemplazan por un único mensaje (filtro `wp_login_errors`). Los demás errores, como un campo vacío, se mantienen.
+  - Recuperación de contraseña: si la cuenta no existe, se responde igual que si existiera, con la redirección a «revisá tu correo».
+- **Alcance**: aplica a `wp-login.php` y al registro de WordPress. Los formularios propios de otros plugins (por ejemplo, la cuenta de WooCommerce) muestran sus propios mensajes.
+
 ## [0.4.3] — 2026-09-29
 
 ### Seguridad: La enumeración de usuarios seguía siendo posible ([#5](https://github.com/fabiomb/wp-secure/issues/5))

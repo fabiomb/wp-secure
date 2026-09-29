@@ -107,9 +107,17 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	}
 	if ( ! class_exists( 'WP_Error' ) ) {
 		class WP_Error {
-			private $code;
-			public function __construct( $code = '', $message = '' ) { $this->code = $code; }
-			public function get_error_code() { return $this->code; }
+			private $errors = array();
+			public function __construct( $code = '', $message = '' ) {
+				if ( '' !== $code ) {
+					$this->add( $code, $message );
+				}
+			}
+			public function add( $code, $message ) { $this->errors[ $code ][] = $message; }
+			public function get_error_code() { $codes = $this->get_error_codes(); return $codes[0] ?? ''; }
+			public function get_error_codes() { return array_keys( $this->errors ); }
+			public function get_error_messages( $code = '' ) { return $this->errors[ $code ] ?? array(); }
+			public function has_errors() { return ! empty( $this->errors ); }
 		}
 	}
 	if ( ! function_exists( 'wp_remote_retrieve_response_code' ) ) {

@@ -39,7 +39,7 @@ Para permitir un servicio que necesita XML-RPC (Jetpack, la app móvil), creá u
 | Opción | Descripción | Valor por defecto |
 |--------|-------------|-------------------|
 | Bloquear acceso público | Requiere autenticación para acceder a la API REST. | Desactivado |
-| Bloquear enumeración de usuarios | Impide acceso a `/wp/v2/users` y `?author=N`. | Activado |
+| Bloquear enumeración de usuarios | Impide averiguar qué usuarios existen: bloquea `/wp/v2/users` y `?author=`, quita el sitemap de usuarios y el autor de oEmbed, unifica los errores de login y responde igual en la recuperación de contraseña exista o no la cuenta. | Activado |
 | Namespaces permitidos | Lista de namespaces excluidos del bloqueo (uno por línea). `oembed/1.0` siempre se permite. | contact-form-7, woocommerce |
 
 **Nota:** Si usas plugins que dependen de la API REST pública (WooCommerce, Contact Form 7, etc.), añade sus namespaces a la lista de permitidos.
@@ -55,6 +55,8 @@ Para permitir un servicio que necesita XML-RPC (Jetpack, la app móvil), creá u
 | Errores 404 por minuto | Útil contra la enumeración de rutas. | 10 |
 | Intentos de login por hora | | 5 |
 | Peticiones XML-RPC por hora | `0` desactiva el límite. | 0 |
+| Recuperaciones de contraseña por hora | Al superarlo se rechaza el pedido, sin bloquear la IP. `0` desactiva el límite. | 5 |
+| Registros de usuario por hora | En el registro de WordPress. Al superarlo se rechaza el registro, sin bloquear la IP. `0` desactiva el límite. | 3 |
 | Duración del bloqueo (minutos) | Cuánto dura el bloqueo al superar un límite. | 15 |
 
 Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, la red del prefijo configurado en **Firewall → Prefijo IPv6 por cliente** (ver abajo). El propio servidor (wp-cron, loopbacks) nunca se limita.

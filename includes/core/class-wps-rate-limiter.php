@@ -45,6 +45,8 @@ class WPS_Rate_Limiter {
 		'rate_404_per_min'      => 10,
 		'rate_login_per_hour'   => 5,
 		'rate_xmlrpc_per_hour'  => 0,
+		'rate_lostpassword_per_hour' => 5,
+		'rate_register_per_hour'     => 3,
 		'rate_block_minutes'    => 15,
 	);
 
@@ -108,6 +110,31 @@ class WPS_Rate_Limiter {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Contar un envío y decir si superó el límite, sin bloquear la IP.
+	 *
+	 * Para formularios donde pasarse del límite no es un ataque evidente
+	 * (quien olvidó su contraseña y apretó el botón varias veces): se rechaza
+	 * el envío, pero el visitante sigue pudiendo usar el sitio.
+	 *
+	 * @return bool true si el envío supera el límite.
+	 */
+	public function exceeds( string $ip, string $type ): bool {
+		if ( WPS_Ip_Utils::is_server_ip( $ip ) ) {
+			return false;
+		}
+
+		$limit = $this->get_limit( $type );
+		if ( 0 === $limit ) {
+			return false;
+		}
+
+		$window_start = $this->get_window_start( $this->get_window_seconds( $type ) );
+		$count        = $this->increment( $this->blocker->client_key( $ip ), $type, $window_start );
+
+		return $count > $limit;
 	}
 
 	/**
@@ -175,6 +202,8 @@ class WPS_Rate_Limiter {
 			'404'    => 'rate_404_per_min',
 			'login'  => 'rate_login_per_hour',
 			'xmlrpc' => 'rate_xmlrpc_per_hour',
+			'lostpassword' => 'rate_lostpassword_per_hour',
+			'register'     => 'rate_register_per_hour',
 		);
 
 		$key     = $setting_map[ $type ] ?? 'rate_total_per_min';
@@ -187,8 +216,9 @@ class WPS_Rate_Limiter {
 	 * Obtener la duración de la ventana de tiempo en segundos.
 	 */
 	private function get_window_seconds( string $type ): int {
-		// Login y xmlrpc usan ventana de 1 hora, el resto 1 minuto.
-		if ( in_array( $type, array( 'login', 'xmlrpc' ), true ) ) {
+		// Login, xmlrpc y los formularios de cuenta usan ventana de 1 hora,
+		// el resto 1 minuto.
+		if ( in_array( $type, array( 'login', 'xmlrpc', 'lostpassword', 'register' ), true ) ) {
 			return 3600;
 		}
 		return 60;

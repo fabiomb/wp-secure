@@ -52,6 +52,149 @@ class WPS_Login_Detector {
         // Application passwords (Basic auth en REST): sus fallos no pasan
         // por wp_login_failed.
         add_action( 'application_password_failed_authentication', array( $this, 'on_application_password_failed' ) );
+
+        // Recuperación de contraseña y registro: límite por cliente.
+        add_action( 'lostpassword_post', array( $this, 'on_lost_password' ), 10, 2 );
+        add_filter( 'registration_errors', array( $this, 'limit_registration' ), 10, 3 );
+
+        // Mensajes de WordPress que revelan si una cuenta existe.
+        if ( $this->loader->get_setting( 'rest_block_user_enum', true ) ) {
+            add_filter( 'wp_login_errors', array( $this, 'uniform_login_errors' ) );
+        }
+    }
+
+    /**
+     * Unificar los errores de login que revelan si la cuenta existe.
+     *
+     * WordPress responde «The username X is not registered on this site» o
+     * «The password you entered for the username X is incorrect»: probando
+     * nombres se sabe cuáles existen. Se reemplazan por un único mensaje.
+     *
+     * @param WP_Error $errors Errores del formulario de login.
+     * @return WP_Error
+     */
+    public function uniform_login_errors( $errors ) {
+        if ( ! is_wp_error( $errors ) ) {
+            return $errors;
+        }
+
+        $revealing = array( 'invalid_username', 'invalid_email', 'incorrect_password' );
+        if ( ! array_intersect( $revealing, $errors->get_error_codes() ) ) {
+            return $errors;
+        }
+
+        $uniform = new \WP_Error();
+        foreach ( $errors->get_error_codes() as $code ) {
+            if ( ! in_array( $code, $revealing, true ) ) {
+                foreach ( $errors->get_error_messages( $code ) as $message ) {
+                    $uniform->add( $code, $message );
+                }
+            }
+        }
+        $uniform->add( 'wps_login_failed', self::denied_message() );
+
+        return $uniform;
+    }
+
+    /**
+     * Recuperación de contraseña: límite por cliente y respuesta uniforme.
+     *
+     * - Superado el límite (`rate_lostpassword_per_hour`) se rechaza el
+     *   envío, sin bloquear la IP: frena el envío masivo de mails.
+     * - Con «Bloquear enumeración de usuarios» activo, si la cuenta no existe
+     *   se responde igual que si existiera (redirección a «revisá tu correo»),
+     *   en lugar de «There is no account with that username or email».
+     *
+     * @param WP_Error      $errors    Errores acumulados.
+     * @param WP_User|false $user_data Usuario encontrado, o false.
+     */
+    public function on_lost_password( $errors, $user_data = false ): void {
+        if ( ! is_wp_error( $errors ) || WPS_Blocker::blocking_disabled() ) {
+            return;
+        }
+
+        $request = WPS_Request::get_instance();
+        $ip      = $request->ip();
+
+        if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+            return;
+        }
+
+        if ( WPS_Rate_Limiter::get_instance( $this->loader )->exceeds( $ip, 'lostpassword' ) ) {
+            $this->logger->event( WPS_Event_Types::RATE_LIMITED, array(
+                'ip_address'  => $ip,
+                'request_uri' => $request->uri(),
+                'user_agent'  => $request->user_agent(),
+                'details'     => array( 'type' => 'lostpassword' ),
+            ) );
+            $errors->add( 'wps_rate_limited', __( 'Demasiadas solicitudes. Intentá de nuevo más tarde.', 'wp-secure' ) );
+            return;
+        }
+
+        if ( ! $user_data && $this->should_hide_missing_account( $errors ) ) {
+            $this->redirect_as_sent();
+        }
+    }
+
+    /**
+     * ¿Corresponde responder como si la cuenta existiera?
+     *
+     * Sólo si el ajuste está activo y el único problema es que la cuenta no
+     * existe: un campo vacío se sigue informando.
+     */
+    public function should_hide_missing_account( $errors ): bool {
+        if ( ! $this->loader->get_setting( 'rest_block_user_enum', true ) ) {
+            return false;
+        }
+
+        $codes = is_wp_error( $errors ) ? $errors->get_error_codes() : array();
+
+        return ! array_diff( $codes, array( 'invalid_email', 'invalidcombo' ) );
+    }
+
+    /**
+     * Redirigir como lo hace WordPress tras enviar el mail de recuperación.
+     */
+    protected function redirect_as_sent(): void {
+        $redirect_to = ! empty( $_REQUEST['redirect_to'] ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            ? wp_unslash( $_REQUEST['redirect_to'] ) // phpcs:ignore
+            : 'wp-login.php?checkemail=confirm';
+
+        wp_safe_redirect( $redirect_to );
+        exit;
+    }
+
+    /**
+     * Registro de usuarios: límite por cliente.
+     *
+     * @param WP_Error $errors               Errores del registro.
+     * @param string   $sanitized_user_login Usuario.
+     * @param string   $user_email           Email.
+     * @return WP_Error
+     */
+    public function limit_registration( $errors, $sanitized_user_login = '', $user_email = '' ) {
+        if ( ! is_wp_error( $errors ) || WPS_Blocker::blocking_disabled() ) {
+            return $errors;
+        }
+
+        $request = WPS_Request::get_instance();
+        $ip      = $request->ip();
+
+        if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+            return $errors;
+        }
+
+        if ( WPS_Rate_Limiter::get_instance( $this->loader )->exceeds( $ip, 'register' ) ) {
+            $this->logger->event( WPS_Event_Types::RATE_LIMITED, array(
+                'ip_address'  => $ip,
+                'request_uri' => $request->uri(),
+                'user_agent'  => $request->user_agent(),
+                'details'     => array( 'type' => 'register' ),
+            ) );
+            $errors->add( 'wps_rate_limited', __( 'Demasiados registros desde tu conexión. Intentá de nuevo más tarde.', 'wp-secure' ) );
+        }
+
+        return $errors;
     }
 
     /**
