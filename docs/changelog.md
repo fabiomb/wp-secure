@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.4.4] — Sin publicar
+## [0.4.4] — 2026-09-29
 
 ### Nuevo: Rutas trampa ([#8](https://github.com/fabiomb/wp-secure/issues/8))
 
@@ -38,6 +38,10 @@ Cada búsqueda del sitio es una consulta cara a la base de datos que ninguna cac
 - **`WPS_Search_Guard`** (nuevo): cuenta las búsquedas por cliente, en el buscador del sitio (`?s=`) y en la REST API (`/wp/v2/search` y cualquier ruta con el parámetro `search`). El control corre antes de que WordPress ejecute la consulta (`parse_request` y `rest_pre_dispatch`), así que una búsqueda rechazada no llega a la base de datos.
 - **Límite** de 20 búsquedas por minuto (Configuración → Rate Limiting, `0` lo desactiva). Al superarlo se responde **429** con `Retry-After: 60`, sin bloquear la IP: el visitante puede seguir navegando.
 - Quedan exentos quienes editan el sitio, la whitelist, el propio servidor, y todo mientras el bloqueo esté suspendido.
+
+### Versión
+
+- Versión actualizada a `0.4.4` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin. Al actualizar, la migración completa los ajustes nuevos (rutas trampa, protección de formularios y los límites de búsqueda, recuperación de contraseña y registro) con sus valores por defecto.
 
 ## [0.4.3] — 2026-09-29
 
