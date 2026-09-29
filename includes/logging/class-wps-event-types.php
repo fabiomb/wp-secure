@@ -20,6 +20,7 @@ class WPS_Event_Types {
     const SCANNER_DETECTED   = 'scanner_detected';
     const HONEYPOT_TRIGGERED = 'honeypot_triggered';
     const FORM_BOT_BLOCKED   = 'form_bot_blocked';
+    const PRIVILEGE_CHANGE   = 'privilege_change';
     const COUNTRY_BLOCKED    = 'country_blocked';
     const ASN_BLOCKED        = 'asn_blocked';
     const IP_BLOCKED         = 'ip_blocked';
@@ -110,6 +111,7 @@ class WPS_Event_Types {
             self::SCANNER_DETECTED   => self::SEVERITY_CRITICAL,
             self::HONEYPOT_TRIGGERED => self::SEVERITY_CRITICAL,
             self::FORM_BOT_BLOCKED   => self::SEVERITY_WARNING,
+            self::PRIVILEGE_CHANGE   => self::SEVERITY_WARNING,
 
             self::RISK_LOW           => self::SEVERITY_INFO,
             self::RISK_MEDIUM        => self::SEVERITY_WARNING,
@@ -135,6 +137,7 @@ class WPS_Event_Types {
             self::SCANNER_DETECTED   => __( 'Scanner detectado', 'wp-secure' ),
             self::HONEYPOT_TRIGGERED => __( 'Ruta trampa', 'wp-secure' ),
             self::FORM_BOT_BLOCKED   => __( 'Bot en formulario', 'wp-secure' ),
+            self::PRIVILEGE_CHANGE   => __( 'Cambio de privilegios', 'wp-secure' ),
             self::COUNTRY_BLOCKED    => __( 'País bloqueado', 'wp-secure' ),
             self::ASN_BLOCKED        => __( 'ASN bloqueado', 'wp-secure' ),
             self::IP_BLOCKED         => __( 'IP bloqueada', 'wp-secure' ),

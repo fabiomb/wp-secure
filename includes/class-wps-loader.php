@@ -77,6 +77,9 @@ class WPS_Loader {
         // Límite de búsquedas por cliente.
         ( new WPS_Search_Guard( $this ) )->init();
 
+        // Alertas de escalada de privilegios.
+        ( new WPS_Privilege_Monitor( $this ) )->init();
+
         // Security hardener (headers, métodos HTTP, ocultar versión).
         $hardener = new WPS_Security_Hardener( $this );
         $hardener->init();

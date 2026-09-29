@@ -142,6 +142,7 @@ class WPS_Activator {
             'notify_auto_blocks'       => false,
             'notify_new_login_ip'      => true,
             'notify_settings_change'   => true,
+            'notify_privilege_changes' => true,
             'notify_daily_summary'     => true,
         );
 

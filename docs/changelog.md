@@ -12,6 +12,20 @@ Los intentos fallidos se contaban sólo por IP (o por red, en IPv6). Una botnet 
 - Los límites por IP siguen funcionando igual, y los intentos rechazados también cuentan para ellos. Se registra el evento «Login bloqueado» con el motivo `account_throttled`.
 - **`configuration.md`**: la sección de login describía ajustes que no existen («Ventana de tiempo», un bloqueo de 30 minutos); ahora lista los reales.
 
+### Nuevo: Alertas de escalada de privilegios ([#13](https://github.com/fabiomb/wp-secure/issues/13))
+
+Quien toma el control de un sitio suele dejar rastros en pocos lugares: crea un administrador o asciende una cuenta, instala o activa un plugin (a menudo un backdoor), cambia el tema, edita un archivo desde el panel o desactiva el firewall. Ninguno de esos cambios quedaba registrado.
+
+- **`WPS_Privilege_Monitor`** (nuevo) registra el evento «Cambio de privilegios» y avisa por mail, con quién lo hizo y desde qué IP, cuando:
+  - se crea un usuario con permisos de administración;
+  - un usuario pasa a tener un rol de administración. Cuenta cualquier rol con `manage_options`, no sólo `administrator`, porque un rol propio con esa capacidad da el mismo control;
+  - se instala un plugin o un tema (las actualizaciones no avisan);
+  - se activa o desactiva un plugin. Desactivar WP Seguro se destaca en el asunto;
+  - se cambia el tema;
+  - se guarda un archivo desde el editor de plugins o temas del panel. Se registra el intento antes de que WordPress guarde; definir `DISALLOW_FILE_EDIT` en `wp-config.php` elimina ese vector.
+- Corre en todas las peticiones, así que también detecta cambios hechos por la REST API, WP-CLI o un registro público.
+- **Nuevo ajuste** «Notificar cambios de privilegios» (Configuración → Notificaciones, activado por defecto). El evento se registra siempre, aunque el mail esté desactivado.
+
 ## [0.4.4] — 2026-09-29
 
 ### Nuevo: Rutas trampa ([#8](https://github.com/fabiomb/wp-secure/issues/8))

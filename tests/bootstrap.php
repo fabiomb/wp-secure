@@ -172,7 +172,18 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 		function _n( $single, $plural, $number, $domain = 'default' ) { return 1 === (int) $number ? $single : $plural; }
 	}
 	if ( ! function_exists( 'get_userdata' ) ) {
-		function get_userdata( $user_id ) { return (object) array( 'ID' => $user_id, 'display_name' => 'Admin de prueba' ); }
+		function get_userdata( $user_id ) {
+			return $GLOBALS['wps_test_userdata'][ $user_id ] ?? (object) array( 'ID' => $user_id, 'display_name' => 'Admin de prueba' );
+		}
+	}
+	// Roles en $GLOBALS['wps_test_roles'][ rol ] = objeto con `capabilities`.
+	if ( ! function_exists( 'get_role' ) ) {
+		function get_role( $role ) { return $GLOBALS['wps_test_roles'][ $role ] ?? null; }
+	}
+	if ( ! function_exists( 'wp_get_current_user' ) ) {
+		function wp_get_current_user() {
+			return $GLOBALS['wps_test_current_user'] ?? (object) array( 'ID' => 0, 'user_login' => '' );
+		}
 	}
 	if ( ! function_exists( 'get_bloginfo' ) ) {
 		function get_bloginfo( $show = '' ) { return 'Sitio de prueba'; }

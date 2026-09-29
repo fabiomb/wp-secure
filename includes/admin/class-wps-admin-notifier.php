@@ -184,6 +184,44 @@ class WPS_Admin_Notifier {
 	}
 
 	/**
+	 * Avisar de un cambio de privilegios: administrador nuevo, ascenso de
+	 * rol, plugin o tema instalado o activado, archivo editado.
+	 *
+	 * @param string $summary Qué pasó.
+	 * @param array  $details Datos del cambio (incluye `by`, quién lo hizo).
+	 * @param string $ip      IP desde la que se hizo.
+	 * @return bool Si se envió el aviso.
+	 */
+	public function notify_privilege_change( string $summary, array $details, string $ip ): bool {
+		if ( ! $this->loader->get_setting( 'notify_privilege_changes', true ) ) {
+			return false;
+		}
+
+		$lines = array();
+		foreach ( $details as $key => $value ) {
+			$lines[] = sprintf( '%s: %s', $key, is_scalar( $value ) ? $value : wp_json_encode( $value ) );
+		}
+
+		$subject = sprintf(
+			/* translators: 1: summary, 2: site name */
+			__( '[WP Seguro] %1$s en %2$s', 'wp-secure' ),
+			$summary,
+			get_bloginfo( 'name' )
+		);
+
+		$body = sprintf(
+			/* translators: 1: summary, 2: details, 3: IP, 4: date */
+			__( "%1\$s.\n\n%2\$s\nIP: %3\$s\nFecha: %4\$s\n\nSi no reconoces este cambio, alguien más podría tener acceso de administración a tu sitio.", 'wp-secure' ),
+			$summary,
+			implode( "\n", $lines ),
+			$ip,
+			wp_date( 'Y-m-d H:i:s' )
+		);
+
+		return $this->send( $subject, $body );
+	}
+
+	/**
 	 * Notificar cambios de configuración.
 	 *
 	 * Un cambio no autorizado en el firewall (apagar detectores, activar el

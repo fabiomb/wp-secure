@@ -198,6 +198,7 @@ Consulta [Configuración de CDN/Proxy](cdn-proxy-setup.md) para instrucciones de
 | Email de destino | Dirección de correo para recibir alertas. | Email del administrador |
 | Notificar bloqueos automáticos | Un resumen por hora con los bloqueos automáticos aplicados (sólo si hubo alguno). Los bloqueos manuales no se notifican. | Desactivado |
 | Notificar login desde IP nueva | Aviso cuando un administrador inicia sesión desde una red que no usó antes. En IPv6 se considera la red del prefijo configurado. El primer login sin historial no avisa. | Activado |
+| Notificar cambios de privilegios | Aviso al crear un administrador, dar permisos de administración a un usuario (cualquier rol con `manage_options`), instalar o activar un plugin o tema, desactivar un plugin (incluido WP Seguro), cambiar el tema o editar un archivo desde el panel. Incluye quién lo hizo y desde qué IP. | Activado |
 | Notificar cambios de configuración | Aviso al guardar la configuración, activar o desactivar el Modo Inseguro o importar una configuración, con usuario e IP. | Activado |
 | Resumen diario | Resumen de las últimas 24 horas: peticiones, eventos y bloqueos. | Activado |
 

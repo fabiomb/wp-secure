@@ -935,6 +935,13 @@ class WPS_Admin_Settings {
                         'checkbox_label' => __( 'Enviar email cuando un administrador inicia sesión desde una IP no registrada', 'wp-secure' ),
                     ),
                     array(
+                        'key'            => 'notify_privilege_changes',
+                        'label'          => __( 'Notificar cambios de privilegios', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Enviar email al crear un administrador, ascender un rol, instalar o activar un plugin o tema, desactivar un plugin o editar un archivo desde el panel', 'wp-secure' ),
+                    ),
+                    array(
                         'key'            => 'notify_settings_change',
                         'label'          => __( 'Notificar cambios de configuración', 'wp-secure' ),
                         'type'           => 'checkbox',
