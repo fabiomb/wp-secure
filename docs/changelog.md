@@ -21,6 +21,15 @@ Con **Bloquear enumeración de usuarios** activo (el valor por defecto), un visi
 - **`WPS_Activator::protect_data_dir()`** (ahora público): el `.htaccess` es válido en Apache 2.2 y 2.4 (`Require all denied`), se agrega un `index.php` vacío y se elimina el `wps-firewall.log` de versiones anteriores, que era justamente el archivo expuesto. Corre también en cada cambio de versión, así que las instalaciones existentes se actualizan solas.
 - **nginx**: `installation.md` documenta la regla `location ^~ /wp-content/wps-data/ { deny all; }` y cómo comprobar que el directorio no se sirve.
 
+### Seguridad: La exportación incluía el token de ipinfo y la importación no validaba nada ([#7](https://github.com/fabiomb/wp-secure/issues/7))
+
+El archivo de configuración exportado llevaba el token de ipinfo.io en texto plano, y es un archivo que suele terminar en correos, tickets o repositorios. La importación, en cambio, aceptaba cualquier clave con cualquier valor: un archivo modificado podía dejar límites en cero, opciones inexistentes o claves internas del plugin.
+
+- **`WPS_Admin_Export::build_config_export()`** (nuevo): se exportan sólo los ajustes del panel y ninguno de tipo contraseña (hoy, el token de ipinfo). Separado de la descarga para poder testearlo.
+- **Importación validada**: sólo se importan los ajustes que existen en el panel, con las mismas reglas que el formulario (`WPS_Admin_Settings::validate_value()`, nuevo): números dentro de su rango, opciones existentes, checkbox booleanos, email válido. Lo que no cumple se ignora en lugar de guardarse, y el mensaje de resultado lista las claves ignoradas.
+- Los secretos y las claves internas (`db_version`, etc.) no se importan aunque vengan en el archivo.
+- **A tener en cuenta**: al importar un archivo exportado con una versión anterior, el token de ipinfo que traiga se ignora; hay que cargarlo a mano en **Configuración**.
+
 ## [0.4.2] — 2026-09-29
 
 ### Corrección: Las imágenes rotas bloqueaban a quien visitaba la página ([#1](https://github.com/fabiomb/wp-secure/issues/1))

@@ -14,13 +14,36 @@ class WPS_Admin_Export {
 	 * Exportar la configuración completa del plugin como JSON.
 	 */
 	public static function export_config(): void {
-		$loader   = WPS_Loader::get_instance();
-		$settings = $loader->get_all_settings();
+		$export   = self::build_config_export();
+		$filename = 'wp-seguro-config-' . gmdate( 'Y-m-d-His' ) . '.json';
 
-		// Excluir datos sensibles que no deben exportarse.
-		$exclude_keys = array( 'db_version', 'wizard_completed' );
-		foreach ( $exclude_keys as $key ) {
-			unset( $settings[ $key ] );
+		header( 'Content-Type: application/json; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+		header( 'Pragma: no-cache' );
+		header( 'Expires: 0' );
+
+		echo wp_json_encode( $export, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+		exit;
+	}
+
+	/**
+	 * Armar el contenido de la exportación de configuración.
+	 *
+	 * Se exportan sólo los ajustes del panel, sin los secretos (campos de tipo
+	 * contraseña, como el token de ipinfo): el archivo suele terminar en
+	 * correos, tickets o repositorios.
+	 */
+	public static function build_config_export(): array {
+		$loader   = WPS_Loader::get_instance();
+		$fields   = ( new WPS_Admin_Settings( $loader ) )->fields();
+		$settings = array();
+
+		foreach ( $fields as $key => $field ) {
+			if ( 'password' === $field['type'] ) {
+				continue;
+			}
+			$settings[ $key ] = $loader->get_setting( $key, $field['default'] );
 		}
 
 		// Obtener reglas personalizadas.
@@ -32,24 +55,13 @@ class WPS_Admin_Export {
 			$rules[] = $rule;
 		}
 
-		$export = array(
+		return array(
 			'plugin'    => 'wp-secure',
 			'version'   => WPS_VERSION,
 			'exported'  => gmdate( 'Y-m-d\TH:i:s\Z' ),
 			'settings'  => $settings,
 			'rules'     => $rules,
 		);
-
-		$filename = 'wp-seguro-config-' . gmdate( 'Y-m-d-His' ) . '.json';
-
-		header( 'Content-Type: application/json; charset=utf-8' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
-		header( 'Cache-Control: no-cache, no-store, must-revalidate' );
-		header( 'Pragma: no-cache' );
-		header( 'Expires: 0' );
-
-		echo wp_json_encode( $export, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
-		exit;
 	}
 
 	/**
@@ -72,19 +84,29 @@ class WPS_Admin_Export {
 		$loader            = WPS_Loader::get_instance();
 		$imported_settings = 0;
 		$imported_rules    = 0;
+		$skipped           = array();
 
-		// Importar settings.
+		// Importar settings: sólo los del panel, validados como en el
+		// formulario. Los secretos no se importan (tampoco se exportan).
 		if ( ! empty( $data['settings'] ) && is_array( $data['settings'] ) ) {
-			$exclude_keys = array( 'db_version', 'wizard_completed' );
+			$fields = ( new WPS_Admin_Settings( $loader ) )->fields();
+
 			foreach ( $data['settings'] as $key => $value ) {
-				$key = sanitize_text_field( $key );
-				if ( in_array( $key, $exclude_keys, true ) || '' === $key ) {
+				$key   = (string) $key;
+				$field = $fields[ $key ] ?? null;
+
+				if ( null === $field || 'password' === $field['type'] ) {
+					$skipped[] = $key;
 					continue;
 				}
-				if ( is_string( $value ) ) {
-					$value = sanitize_text_field( $value );
+
+				list( $valid, $clean ) = WPS_Admin_Settings::validate_value( $field, $value );
+				if ( ! $valid ) {
+					$skipped[] = $key;
+					continue;
 				}
-				$loader->set_setting( $key, $value );
+
+				$loader->set_setting( $key, $clean );
 				$imported_settings++;
 			}
 		}
@@ -103,15 +125,27 @@ class WPS_Admin_Export {
 			}
 		}
 
+		$message = sprintf(
+			/* translators: 1: settings imported, 2: rules imported */
+			__( 'Importación completada: %1$d ajustes y %2$d reglas importadas.', 'wp-secure' ),
+			$imported_settings,
+			$imported_rules
+		);
+
+		if ( $skipped ) {
+			$message .= ' ' . sprintf(
+				/* translators: %s: comma-separated setting keys */
+				__( 'Se ignoraron por desconocidos o inválidos: %s.', 'wp-secure' ),
+				implode( ', ', array_map( 'sanitize_key', $skipped ) )
+			);
+		}
+
 		return array(
 			'success'           => true,
-			'message'           => sprintf(
-				__( 'Importación completada: %1$d ajustes y %2$d reglas importadas.', 'wp-secure' ),
-				$imported_settings,
-				$imported_rules
-			),
+			'message'           => $message,
 			'imported_settings' => $imported_settings,
 			'imported_rules'    => $imported_rules,
+			'skipped_settings'  => $skipped,
 		);
 	}
 

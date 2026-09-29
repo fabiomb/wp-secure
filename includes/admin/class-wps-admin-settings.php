@@ -21,6 +21,69 @@ class WPS_Admin_Settings {
     }
 
     /**
+     * Campos de configuración indexados por clave.
+     *
+     * @return array<string, array>
+     */
+    public function fields(): array {
+        $fields = array();
+        foreach ( $this->sections as $section ) {
+            foreach ( $section['fields'] as $field ) {
+                $fields[ $field['key'] ] = $field;
+            }
+        }
+        return $fields;
+    }
+
+    /**
+     * Validar un valor que no viene del formulario (p. ej. importado).
+     *
+     * Aplica las mismas reglas que el formulario, pero en lugar de caer al
+     * valor por defecto rechaza lo que no cumple: un archivo importado no
+     * puede dejar un ajuste fuera de rango ni con una opción inexistente.
+     *
+     * @param array $field Definición del campo.
+     * @param mixed $value Valor a validar.
+     * @return array{0: bool, 1: mixed} [es válido, valor saneado].
+     */
+    public static function validate_value( array $field, $value ): array {
+        switch ( $field['type'] ) {
+            case 'checkbox':
+                if ( is_bool( $value ) || in_array( $value, array( 0, 1, '0', '1' ), true ) ) {
+                    return array( true, (bool) $value );
+                }
+                return array( false, null );
+
+            case 'number':
+                if ( ! is_int( $value ) && ! ( is_string( $value ) && ctype_digit( $value ) ) ) {
+                    return array( false, null );
+                }
+                $value = (int) $value;
+                if ( ( isset( $field['min'] ) && $value < $field['min'] ) || ( isset( $field['max'] ) && $value > $field['max'] ) ) {
+                    return array( false, null );
+                }
+                return array( true, $value );
+
+            case 'select':
+                $value = is_scalar( $value ) ? (string) $value : '';
+                return array_key_exists( $value, $field['options'] ) ? array( true, $value ) : array( false, null );
+
+            case 'email':
+                $value = is_string( $value ) ? sanitize_email( $value ) : '';
+                return '' !== $value ? array( true, $value ) : array( false, null );
+
+            case 'text':
+            case 'password':
+                return is_scalar( $value ) ? array( true, sanitize_text_field( (string) $value ) ) : array( false, null );
+
+            case 'textarea':
+                return is_scalar( $value ) ? array( true, sanitize_textarea_field( (string) $value ) ) : array( false, null );
+        }
+
+        return array( false, null );
+    }
+
+    /**
      * Renderizar la página de configuración.
      */
     public function render(): void {

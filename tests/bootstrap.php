@@ -36,6 +36,15 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	if ( ! function_exists( 'sanitize_text_field' ) ) {
 		function sanitize_text_field( $str ) { return trim( strip_tags( $str ) ); }
 	}
+	if ( ! function_exists( 'sanitize_textarea_field' ) ) {
+		function sanitize_textarea_field( $str ) { return trim( strip_tags( $str ) ); }
+	}
+	if ( ! function_exists( 'sanitize_key' ) ) {
+		function sanitize_key( $key ) { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) ); }
+	}
+	if ( ! function_exists( 'sanitize_email' ) ) {
+		function sanitize_email( $email ) { return filter_var( $email, FILTER_VALIDATE_EMAIL ) ? $email : ''; }
+	}
 	if ( ! function_exists( '__' ) ) {
 		function __( $text, $domain = 'default' ) { return $text; }
 	}
