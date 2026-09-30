@@ -6,14 +6,15 @@ Plugin de seguridad para WordPress orientado a rendimiento y claridad. Detecta, 
 
 1. [Instalación](installation.md)
 2. [Configuración](configuration.md)
-3. [Capas del Firewall](firewall-layers.md)
-4. [Referencia de Reglas](rules-reference.md)
-5. [Reglas Personalizadas](custom-rules.md)
-6. [Configuración de CDN/Proxy](cdn-proxy-setup.md)
-7. [Comandos WP-CLI](wp-cli.md)
-8. [Solución de Problemas](troubleshooting.md)
-9. [Preguntas Frecuentes](faq.md)
-10. [Registro de Cambios](changelog.md)
+3. [Endurecimiento del sitio](hardening.md)
+4. [Capas del Firewall](firewall-layers.md)
+5. [Referencia de Reglas](rules-reference.md)
+6. [Reglas Personalizadas](custom-rules.md)
+7. [Configuración de CDN/Proxy](cdn-proxy-setup.md)
+8. [Comandos WP-CLI](wp-cli.md)
+9. [Solución de Problemas](troubleshooting.md)
+10. [Preguntas Frecuentes](faq.md)
+11. [Registro de Cambios](changelog.md)
 
 ## Inicio Rápido
 

@@ -236,6 +236,16 @@ class WPS_Admin {
             array( $this, 'render_integrity' )
         );
 
+        // Chequeo de endurecimiento.
+        $this->page_hooks[] = add_submenu_page(
+            $this->menu_slug,
+            __( 'Endurecimiento', 'wp-secure' ),
+            __( 'Endurecimiento', 'wp-secure' ),
+            $this->capability,
+            $this->menu_slug . '-hardening',
+            array( $this, 'render_hardening' )
+        );
+
         // Sesiones activas.
         $this->page_hooks[] = add_submenu_page(
             $this->menu_slug,
@@ -536,6 +546,13 @@ class WPS_Admin {
             return;
         }
         ( new WPS_Admin_Integrity( $this->loader ) )->render();
+    }
+
+    public function render_hardening(): void {
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        ( new WPS_Admin_Hardening( $this->loader ) )->render();
     }
 
     public function render_sessions(): void {

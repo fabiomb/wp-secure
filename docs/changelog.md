@@ -25,6 +25,16 @@ La carpeta de subidas sólo debería tener medios. Un archivo PHP ahí es casi s
 - **Bloqueo de ejecución** (nuevo ajuste «PHP en uploads», Configuración → Firewall Avanzado, desactivado por defecto): escribe reglas en `uploads/.htaccess` (Apache 2.2/2.4 y LiteSpeed) conservando las de otros plugins, y con la Capa 0 activa también rechaza ahí los scripts de la carpeta de subidas, lo que lo hace efectivo en nginx. `configuration.md` documenta la regla para nginx sin Capa 0.
 - La Capa 0 registra esos rechazos en su log como `DENIED_PHP`. Las reglas se quitan al desactivar o desinstalar el plugin.
 
+### Nuevo: Chequeo de endurecimiento del sitio ([#18](https://github.com/fabiomb/wp-secure/issues/18))
+
+El firewall no cubre la configuración del sitio y del servidor: un `display_errors` activo, un `debug.log` descargable o un servidor que lista carpetas exponen información sin que ninguna petición parezca un ataque.
+
+- **`WPS_Hardening_Check`** (nuevo) y página **WP Seguro → Endurecimiento**: diez verificaciones con estado (problema, mejorable, correcto, informativo), detalle y cómo corregir. Sólo informa: no modifica `wp-config.php` ni el servidor.
+- **Verificaciones**: editor de archivos del panel (`DISALLOW_FILE_EDIT`), errores de PHP visibles (el valor efectivo de `display_errors`, que con `WP_DEBUG` apagado depende de `php.ini`), `wp-content/debug.log` descargable, listado de directorios, fin del soporte de seguridad de la versión de PHP (avisa seis meses antes), permisos de `wp-config.php`, administrador llamado `admin`, HTTPS, bloqueo de PHP en uploads (#17) y prefijo de tablas `wp_` (informativo).
+- **Listado de directorios y debug.log** se comprueban de verdad, con peticiones del sitio a sí mismo (sin servicios externos): para el listado se crea una carpeta temporal sin índice en uploads y se borra enseguida. El resultado se guarda 12 horas.
+- **WP-CLI**: `wp wps hardening [--format=…]`.
+- Documentación nueva: `docs/hardening.md`.
+
 ## [0.5.0] — 2026-09-29
 
 ### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))

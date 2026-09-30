@@ -15,6 +15,7 @@ WP Seguro agrega el comando `wp wps` a [WP-CLI](https://wp-cli.org/). Sirve para
 | `wp wps integrity scan` | Escaneo completo de integridad, sin límite de tiempo. |
 | `wp wps integrity status [--format=…]` | Resumen y lista de archivos con cambios sin revisar. |
 | `wp wps integrity accept [<área>]` | Acepta los cambios de un área (p. ej. `core`, `plugin:akismet`) o de todas. |
+| `wp wps hardening [--format=…]` | Chequeo de endurecimiento del sitio ([ver](hardening.md)). «Errores de PHP visibles» refleja el PHP de la consola, que puede diferir del de la web. |
 | `wp wps unsafe-mode on\|off` | Activa o desactiva el Modo Inseguro: el firewall detecta y registra, pero no bloquea. Envía el aviso de cambio de configuración. |
 
 ## Recuperar el acceso

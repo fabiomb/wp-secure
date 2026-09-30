@@ -300,6 +300,31 @@ class WPS_CLI {
 	}
 
 	/**
+	 * Chequeo de endurecimiento del sitio.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--format=<format>]
+	 * : table, json, csv o yaml.
+	 * ---
+	 * default: table
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp wps hardening
+	 */
+	public function hardening( $args, $assoc_args ): void {
+		$results = ( new WPS_Hardening_Check( WPS_Loader::get_instance() ) )->run( true );
+
+		\WP_CLI\Utils\format_items( $assoc_args['format'] ?? 'table', $results, array( 'status', 'label', 'message' ) );
+
+		$counts = WPS_Hardening_Check::counts( $results );
+		\WP_CLI::line( sprintf( 'Problemas: %d · Mejorables: %d · Correctos: %d', $counts['fail'], $counts['warn'], $counts['pass'] ) );
+		\WP_CLI::line( 'Nota: «Errores de PHP visibles» refleja la configuración de PHP de la consola, que puede diferir de la web.' );
+	}
+
+	/**
 	 * Regenerar el archivo de la Capa 0 desde la base de datos.
 	 *
 	 * @subcommand sync-layer0
