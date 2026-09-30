@@ -6,6 +6,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * Aplica reglas de seguridad adicionales:
  * - Security headers (X-Frame-Options, X-Content-Type-Options, etc.)
+ * - HSTS y Content-Security-Policy (en modo reporte o aplicada)
  * - Bloqueo de métodos HTTP no estándar
  * - Bloqueo de peticiones sin User-Agent
  * - Bloqueo de peticiones sin header Host
@@ -28,9 +29,14 @@ class WPS_Security_Hardener {
 	 * Registrar hooks.
 	 */
 	public function init(): void {
-		// Security headers (prioridad alta para que se envíen antes).
-		if ( $this->loader->get_setting( 'security_headers_enabled', true ) ) {
-			add_action( 'send_headers', array( $this, 'add_security_headers' ) );
+		// Security headers, HSTS y CSP (sólo en el sitio público: send_headers
+		// no corre en el panel ni en wp-login.php).
+		add_action( 'send_headers', array( $this, 'add_security_headers' ) );
+
+		// Reportes de violaciones de la CSP, antes de los detectores (init 2).
+		$csp = new WPS_Csp( $this->loader );
+		if ( 'off' !== $csp->mode() ) {
+			add_action( 'init', array( $csp, 'maybe_handle_report' ), 1 );
 		}
 
 		// Ocultar versión de WordPress.
@@ -50,9 +56,53 @@ class WPS_Security_Hardener {
 			return;
 		}
 
-		foreach ( self::headers_to_send( headers_list() ) as $name => $value ) {
+		$extra = array();
+
+		if ( $this->loader->get_setting( 'security_headers_enabled', true ) ) {
+			$extra += self::default_headers();
+		}
+
+		$hsts = self::hsts_value(
+			(int) $this->loader->get_setting( 'hsts_max_age', 0 ),
+			(bool) $this->loader->get_setting( 'hsts_include_subdomains', false )
+		);
+		if ( '' !== $hsts && is_ssl() ) {
+			$extra['Strict-Transport-Security'] = $hsts;
+		}
+
+		$extra += ( new WPS_Csp( $this->loader ) )->headers();
+
+		foreach ( self::headers_to_send( headers_list(), $extra ) as $name => $value ) {
 			header( "{$name}: {$value}" );
 		}
+	}
+
+	/**
+	 * Valor de Strict-Transport-Security; '' si está desactivado.
+	 *
+	 * Sin `preload` a propósito: entrar en la lista de precarga de los
+	 * navegadores es difícil de revertir y conviene hacerlo a mano.
+	 */
+	public static function hsts_value( int $max_age, bool $include_subdomains ): string {
+		if ( $max_age <= 0 ) {
+			return '';
+		}
+		return 'max-age=' . $max_age . ( $include_subdomains ? '; includeSubDomains' : '' );
+	}
+
+	/**
+	 * Headers de seguridad básicos.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function default_headers(): array {
+		return array(
+			'X-Content-Type-Options' => 'nosniff',
+			'X-Frame-Options'        => 'SAMEORIGIN',
+			'Referrer-Policy'        => 'strict-origin-when-cross-origin',
+			'Permissions-Policy'     => 'geolocation=(), camera=(), microphone=()',
+			'X-XSS-Protection'       => '0',
+		);
 	}
 
 	/**
@@ -65,17 +115,15 @@ class WPS_Security_Hardener {
 	 * retirado de los navegadores y en los que lo conservan permite ataques de
 	 * filtrado selectivo; la recomendación actual es desactivarlo.
 	 *
-	 * @param string[] $already_sent Líneas de headers ya definidas (headers_list()).
+	 * Lo mismo vale para HSTS y la CSP: si el servidor, el hosting o otro
+	 * plugin ya envían una, se respeta la suya.
+	 *
+	 * @param string[]              $already_sent Líneas de headers ya definidas (headers_list()).
+	 * @param array<string, string> $headers      Headers a enviar; por defecto, los básicos.
 	 * @return array<string, string>
 	 */
-	public static function headers_to_send( array $already_sent ): array {
-		$headers = array(
-			'X-Content-Type-Options' => 'nosniff',
-			'X-Frame-Options'        => 'SAMEORIGIN',
-			'Referrer-Policy'        => 'strict-origin-when-cross-origin',
-			'Permissions-Policy'     => 'geolocation=(), camera=(), microphone=()',
-			'X-XSS-Protection'       => '0',
-		);
+	public static function headers_to_send( array $already_sent, ?array $headers = null ): array {
+		$headers = $headers ?? self::default_headers();
 
 		$present = array();
 		foreach ( $already_sent as $line ) {

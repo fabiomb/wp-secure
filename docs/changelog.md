@@ -35,6 +35,14 @@ El firewall no cubre la configuración del sitio y del servidor: un `display_err
 - **WP-CLI**: `wp wps hardening [--format=…]`.
 - Documentación nueva: `docs/hardening.md`.
 
+### Nuevo: HSTS y Content-Security-Policy en modo reporte ([#19](https://github.com/fabiomb/wp-secure/issues/19))
+
+- **HSTS** (nuevo ajuste, desactivado por defecto): `Strict-Transport-Security` con duración a elegir (5 minutos para probar, 1 día, 30 días, 1 año) e `includeSubDomains` opcional. Sólo se envía por HTTPS. Sin `preload`, a propósito.
+- **Content-Security-Policy** (nuevo ajuste: desactivada, sólo reportar o aplicar; desactivada por defecto) con una política base para WordPress y una política propia opcional.
+- **`WPS_Csp`** (nuevo): recibe los reportes de violaciones en `/?wps_csp_report=1` (formatos `report-uri` y Reporting API), sin servicios externos. Se atienden antes de los detectores, porque el cuerpo de un reporte repite la URL de la página y lo bloqueado y podría hacer bloquear a un visitante legítimo; sólo se guardan la directiva, el origen y la ruta, validados. Un reporte repetido se escribe como mucho cada 10 minutos, con hasta 200 combinaciones guardadas.
+- **Armador** en **WP Seguro → Endurecimiento**: lista de lo que la política bloquearía, **política sugerida** (la actual más los orígenes reportados) y «Usar la política sugerida».
+- **No se pisan headers existentes**: si el servidor, el hosting u otro plugin ya envían HSTS o una CSP, se respeta la suya (igual que con los demás headers de seguridad). `WPS_Security_Hardener::headers_to_send()` recibe ahora la lista de headers a enviar.
+
 ## [0.5.0] — 2026-09-29
 
 ### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))

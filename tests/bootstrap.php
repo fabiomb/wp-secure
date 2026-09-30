@@ -71,6 +71,14 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	if ( ! function_exists( 'wp_parse_url' ) ) {
 		function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
 	}
+	if ( ! function_exists( 'home_url' ) ) {
+		function home_url( $path = '' ) { return 'https://example.com' . $path; }
+	}
+	if ( ! function_exists( 'add_query_arg' ) ) {
+		function add_query_arg( $key, $value, $url ) {
+			return $url . ( false === strpos( $url, '?' ) ? '?' : '&' ) . rawurlencode( $key ) . '=' . rawurlencode( $value );
+		}
+	}
 	if ( ! function_exists( 'get_transient' ) ) {
 		function get_transient( $key ) { return $GLOBALS['wps_test_transients'][ $key ] ?? false; }
 	}

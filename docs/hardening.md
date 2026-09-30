@@ -28,4 +28,6 @@ También desde la consola: `wp wps hardening`.
 | PHP en la carpeta de subidas | El ajuste «PHP en uploads» ([ver Configuración](configuration.md#php-en-la-carpeta-de-subidas)). | Activarlo en Configuración → Firewall Avanzado. |
 | Prefijo de tablas | Si se usa el prefijo por defecto `wp_`. Es informativo: sólo dificulta algunas inyecciones automatizadas y cambiarlo en un sitio existente es delicado. | En instalaciones nuevas, elegir otro prefijo. |
 
+La misma página tiene la sección **Content-Security-Policy**, con los reportes de violaciones y la política sugerida ([ver Configuración](configuration.md#hsts-y-content-security-policy)).
+
 El listado de directorios y el debug.log se comprueban con peticiones del sitio a sí mismo (sin servicios externos) y el resultado se guarda 12 horas; «Volver a comprobar» las repite. Si el sitio no responde a peticiones desde el propio servidor, esas verificaciones quedan como «Informativo».

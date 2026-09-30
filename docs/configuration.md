@@ -83,6 +83,10 @@ Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, l
 |--------|-------------|-------------------|
 | Verificación rDNS de crawlers | Verificar la legitimidad de bots conocidos mediante DNS inverso. | Activado |
 | Headers de seguridad | Enviar cabeceras HTTP de seguridad (X-Content-Type-Options, X-Frame-Options, etc.). | Activado |
+| HSTS | Duración de `Strict-Transport-Security` (ver abajo). | Desactivado |
+| HSTS en subdominios | Agregar `includeSubDomains`. | Desactivado |
+| Content-Security-Policy | Desactivada, sólo reportar o aplicar (ver abajo). | Desactivada |
+| Política CSP | Una directiva por línea o separadas por `;`. Vacío usa la política base. | (vacío) |
 | Ocultar versión de WP | Eliminar meta tags y parámetros `?ver=` que revelan la versión de WordPress. | Activado |
 | Bloquear métodos HTTP peligrosos | Bloquear TRACE, TRACK, DEBUG, CONNECT. | Activado |
 | Bloquear User-Agent vacío | Bloquear peticiones sin cabecera User-Agent. | Desactivado |
@@ -96,6 +100,24 @@ Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, l
 | Protección de formularios | Campo trampa y tiempo mínimo en login y comentarios (ver abajo). | Activado |
 | Tiempo mínimo para comentar | Segundos entre la carga de la página y el envío. `0` desactiva el control. | 3 |
 | Tiempo mínimo para iniciar sesión | Igual, para `wp-login.php`. | 0 (desactivado) |
+
+### HSTS y Content-Security-Policy
+
+Ninguno de los dos pisa un header que ya envíe el servidor, el hosting u otro plugin: si ya hay uno, se respeta. Se envían sólo en el sitio público (no en el panel ni en `wp-login.php`).
+
+**HSTS** (`Strict-Transport-Security`) obliga a los navegadores a usar siempre HTTPS durante el tiempo configurado, lo que evita que un atacante en la misma red intercepte la primera visita por HTTP. Sólo se envía en peticiones HTTPS.
+
+- Mientras dure, el sitio **no se puede volver a servir por HTTP** para quien ya lo visitó. Empezá con «5 minutos», confirmá que todo carga bien por HTTPS y recién entonces subilo a 30 días o un año.
+- «HSTS en subdominios» agrega `includeSubDomains`: activalo sólo si **todos** los subdominios tienen HTTPS.
+- `preload` no se ofrece a propósito: entrar en la lista de precarga de los navegadores es difícil de revertir y conviene hacerlo a mano.
+
+**Content-Security-Policy** le dice al navegador de qué orígenes puede cargar scripts, estilos, imágenes, fuentes y marcos: un script inyectado desde otro dominio no se ejecuta. Aplicada de entrada rompe casi cualquier sitio, así que el camino es:
+
+1. **Sólo reportar** (`Content-Security-Policy-Report-Only`): no bloquea nada. Los navegadores de los visitantes informan lo que la política habría bloqueado a `/?wps_csp_report=1`, en el propio sitio. Se guardan sólo la directiva, el origen (`https://cdn.example.com`) y la ruta de la página; un reporte repetido se cuenta como mucho una vez cada 10 minutos y se guardan hasta 200 combinaciones.
+2. **Revisar** en **WP Seguro → Endurecimiento**, sección «Content-Security-Policy»: lista de lo que se bloquearía y **política sugerida** (la actual más los orígenes reportados). Revisá cada origen: uno que no reconocés puede ser justamente un script inyectado.
+3. **Usar la política sugerida** y seguir en «Sólo reportar» unos días. Cuando no aparezcan reportes nuevos, pasar a **Aplicar**.
+
+La política base para WordPress permite scripts y estilos en línea (que WordPress y la mayoría de los temas necesitan) y restringe lo que casi ningún sitio usa: plugins de objeto (`object-src 'none'`), `<base>`, formularios hacia otros dominios y ser embebido en otros sitios (`frame-ancestors 'self'`).
 
 ### Monitor de integridad
 

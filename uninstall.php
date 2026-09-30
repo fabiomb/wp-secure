@@ -22,6 +22,7 @@ delete_option( 'wps_block_digest' );
 delete_option( 'wps_integrity_state' );
 delete_option( 'wps_integrity_last_scan' );
 delete_option( 'wps_uploads_php' );
+delete_option( 'wps_csp_reports' );
 
 // Reglas propias en uploads/.htaccess (se conservan las de otros plugins).
 WPS_Uploads_Guard::sync_rules( false );
