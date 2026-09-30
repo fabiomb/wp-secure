@@ -517,6 +517,7 @@ class WPS_Admin_Blocks {
             'auto_honeypot'  => __( 'Ruta trampa', 'wp-secure' ),
             'auto_crawler_spoof' => __( 'Crawler falso', 'wp-secure' ),
             'auto_risk'      => __( 'Riesgo', 'wp-secure' ),
+            'auto_range'     => __( 'Rango', 'wp-secure' ),
             'custom_rule'    => __( 'Regla', 'wp-secure' ),
         );
         return $labels[ $type ] ?? $type;

@@ -56,6 +56,15 @@ El log de seguridad registra ataques, pero no qué hicieron los usuarios del sit
 - **Nueva tabla** `wps_activity_log`, ajuste «Registro de actividad» (activado por defecto) y retención propia (180 días). **WP-CLI**: `wp wps activity`.
 - `configuration.md`: la tabla de Retención de Datos estaba desactualizada; ahora refleja los ajustes reales.
 
+### Nuevo: Escalada de bloqueos de IP a rango ([#21](https://github.com/fabiomb/wp-secure/issues/21))
+
+Un atacante con un rango de un proveedor de hosting rota de IP en cada bloqueo, y cada IP nueva empezaba de cero.
+
+- **`WPS_Range_Escalation`** (nuevo): después de cada bloqueo automático nuevo, si el mismo /24 (IPv4) o /48 (IPv6) acumula **3** clientes distintos bloqueados en **60 minutos**, se bloquea el rango durante **24 horas** (tipo «Rango», `auto_range`). Umbral, ventana y duración configurables en Configuración → Firewall Avanzado; se puede desactivar.
+- **Salvaguardas**: nunca un rango que contenga al servidor, una entrada de la whitelist o una red desde la que algún usuario ya inició sesión. No cuentan los bloqueos manuales ni los que un administrador levantó a mano.
+- En IPv6 el cliente es la red del prefijo configurado (por defecto /64); con un prefijo de /48 no hay escalada.
+- Funciona también en la Capa 1 (el MU-plugin carga las clases nuevas) y el rango se escribe en el archivo de la Capa 0.
+
 ## [0.5.0] — 2026-09-29
 
 ### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))

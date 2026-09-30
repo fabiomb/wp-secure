@@ -195,6 +195,8 @@ final class WPS_Firewall_MuPlugin {
 			'core/class-wps-request.php',
 			'core/class-wps-whitelist.php',
 			'core/class-wps-blocker.php',
+			'core/class-wps-known-clients.php',
+			'core/class-wps-range-escalation.php',
 			'core/class-wps-rate-limiter.php',
 			'core/class-wps-honeypot.php',
 		);

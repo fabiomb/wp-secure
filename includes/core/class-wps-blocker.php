@@ -24,6 +24,9 @@ class WPS_Blocker {
     /** Bloqueos detallados por resumen; el resto sólo se cuenta. */
     const DIGEST_MAX_ITEMS = 100;
 
+    /** @var bool Si la última llamada creó un bloqueo nuevo (para la escalada a rango). */
+    private $created = false;
+
     private function __construct() {
         $this->db     = WPS_Db::get_instance();
         $this->loader = WPS_Loader::get_instance();
@@ -133,6 +136,7 @@ class WPS_Blocker {
         $id = $this->db->insert( 'blocked_ips', $data );
 
         if ( $id ) {
+            $this->created = true;
             self::schedule_layer0_sync();
             $this->queue_block_notice( $ip, $block_type, $reason, $minutes );
 
@@ -190,9 +194,29 @@ class WPS_Blocker {
      * @param string   $block_type Tipo de bloqueo automático (auto_rate, auto_sqli, …).
      * @param string   $reason     Razón del bloqueo.
      * @param int|null $minutes    Minutos de bloqueo temporal. Null = permanente.
+     * Si el bloqueo es nuevo, se revisa si su rango (/24 o /48) acumula
+     * bloqueos suficientes para escalar (WPS_Range_Escalation).
+     *
      * @return int|false ID del bloqueo o false si no se bloqueó.
      */
     public function block_offender( string $ip, string $block_type, string $reason, ?int $minutes = null ) {
+        $this->created = false;
+        $id            = $this->block_client( $ip, $block_type, $reason, $minutes );
+
+        // En la Capa 1 sólo están las clases que carga el MU-plugin.
+        if ( $id && $this->created && class_exists( 'WPS_Range_Escalation' ) ) {
+            ( new WPS_Range_Escalation( $this->loader, $this ) )->maybe_escalate( $ip );
+        }
+
+        return $id;
+    }
+
+    /**
+     * Bloquear la IP o la red del cliente (ver block_offender()).
+     *
+     * @return int|false
+     */
+    private function block_client( string $ip, string $block_type, string $reason, ?int $minutes ) {
         if ( ! WPS_Ip_Utils::is_valid_ip( $ip ) ) {
             return false;
         }
@@ -232,7 +256,7 @@ class WPS_Blocker {
     /**
      * ¿La red incluye alguna de las IPs del propio servidor?
      */
-    private function network_contains_server( string $cidr ): bool {
+    public function network_contains_server( string $cidr ): bool {
         foreach ( array( 'SERVER_ADDR', 'LOCAL_ADDR' ) as $key ) {
             $server_ip = WPS_Ip_Utils::strip_port( (string) ( $_SERVER[ $key ] ?? '' ) );
             if ( WPS_Ip_Utils::is_valid_ip( $server_ip ) && WPS_Ip_Utils::ip_in_cidr( $server_ip, $cidr ) ) {
@@ -273,6 +297,7 @@ class WPS_Blocker {
         $id = $this->db->insert( 'blocked_ips', $data );
 
         if ( $id ) {
+            $this->created = true;
             self::schedule_layer0_sync();
             $this->queue_block_notice( $cidr, $block_type, $reason, $minutes );
         }

@@ -92,6 +92,10 @@ Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, l
 | Bloquear User-Agent vacío | Bloquear peticiones sin cabecera User-Agent. | Desactivado |
 | Bloquear peticiones sin Host | Bloquear peticiones sin cabecera Host válida. | Activado |
 | Prefijo IPv6 por cliente | Tamaño de la red IPv6 que se trata como un solo cliente (48–128). `128` = dirección exacta. | 64 |
+| Escalada a rango | Bloquear el /24 (IPv4) o /48 (IPv6) cuando varias de sus IPs reciben bloqueos automáticos en poco tiempo (ver abajo). | Activado |
+| Clientes bloqueados para escalar | IPs (o redes IPv6 por cliente) distintas del rango con bloqueo automático dentro de la ventana. | 3 |
+| Ventana de la escalada | En minutos. | 60 |
+| Duración del bloqueo de rango | En minutos. | 1440 (24 h) |
 | Monitor de integridad | Vigila los archivos de código del núcleo, plugins, temas y `wp-content`, y busca PHP en la carpeta de subidas (ver abajo). | Activado |
 | PHP en uploads | Impedir la ejecución de archivos PHP en la carpeta de subidas (ver abajo). | Desactivado |
 | Registro de actividad | Registrar las acciones de quienes editan el sitio (ver abajo). | Activado |
@@ -195,6 +199,15 @@ Por eso, con el valor por defecto (`64`):
 - Los **bloqueos manuales**, las **reglas personalizadas** y la **whitelist** siguen usando la dirección exacta.
 
 Algunos proveedores de hosting comparten un `/64` entre varios servidores de clientes distintos. Si ves bloqueos de red que alcanzan a terceros legítimos, podés subir el valor (p. ej. `128`) o agregar esas direcciones a la whitelist.
+
+### Escalada a rango
+
+Un atacante con un rango de un proveedor de hosting rota de IP en cada bloqueo: cada una cae, pero la siguiente del mismo /24 ya está atacando. Cuando **3** IPs distintas del mismo /24 (en IPv6, 3 redes del prefijo por cliente dentro del mismo /48) reciben un **bloqueo automático** en **60 minutos**, se bloquea el rango completo durante **24 horas**. Los tres valores se configuran.
+
+- Cuentan sólo los bloqueos automáticos (detectores, rate limiting, rutas trampa, login, motor de riesgo). No cuentan los bloqueos manuales ni los que un administrador levantó a mano, que se consideran falsos positivos.
+- **Nunca** se bloquea un rango que contenga al propio servidor, una entrada de la whitelist o una red desde la que algún usuario ya inició sesión: el bloqueo de rango no puede dejar afuera al administrador.
+- Con un prefijo IPv6 por cliente de /48, cada cliente ya es el rango entero y no hay escalada.
+- El bloqueo aparece en **Bloqueos** con el tipo «Rango» y el motivo (cuántos clientes y en qué ventana), y se aplica también en la Capa 0. Se levanta como cualquier otro.
 
 ### Verificación rDNS de Crawlers
 

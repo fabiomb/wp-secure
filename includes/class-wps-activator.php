@@ -106,6 +106,10 @@ class WPS_Activator {
             'rate_search_per_min'        => 20,
             'rate_block_minutes'   => 15,
             'ipv6_block_prefix'    => 64,
+            'range_escalation_enabled'   => true,
+            'range_escalation_threshold' => 3,
+            'range_escalation_window'    => 60,
+            'range_escalation_minutes'   => 1440,
 
             // Rutas trampa.
             'honeypot_enabled'       => true,
