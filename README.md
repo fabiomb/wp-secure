@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fabiomb/wp-secure/releases/latest"><img alt="Última versión" src="https://img.shields.io/github/v/release/fabiomb/wp-secure?label=v0.6.0&color=34d399"></a>
+  <a href="https://github.com/fabiomb/wp-secure/releases/latest"><img alt="Última versión" src="https://img.shields.io/github/v/release/fabiomb/wp-secure?label=versi%C3%B3n&color=34d399"></a>
   <a href="LICENSE"><img alt="Licencia GPL-2.0" src="https://img.shields.io/badge/licencia-GPL--2.0--or--later-blue"></a>
   <img alt="WordPress 6.0+" src="https://img.shields.io/badge/WordPress-6.0%2B-21759b">
   <img alt="PHP 7.4+" src="https://img.shields.io/badge/PHP-7.4%2B-777bb4">
@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://wpsecure.fabio.com.ar">Sitio oficial</a> ·
-  <a href="https://github.com/fabiomb/wp-secure/releases/latest/download/wp-secure.zip">Descargar</a> ·
+  <a href="https://github.com/fabiomb/wp-secure/releases/latest">Descargar</a> ·
   <a href="docs/README.md">Documentación</a> ·
   <a href="docs/changelog.md">Cambios</a>
 </p>
@@ -44,21 +44,23 @@
 | **1** | MU-plugin | Después del núcleo, antes de plugins y temas | Detecta patrones, aplica rate limiting, calcula el riesgo y registra. |
 | **2** | Plugin | Carga normal | Asistente, dashboard, eventos, reglas, whitelist y configuración. |
 
-Cada petición recibe una puntuación de riesgo:
+Además de los detectores, que bloquean por sí solos ante un patrón claro, el **motor de riesgo** suma puntos por señales débiles de una misma petición y actúa según el total:
 
 | Puntaje | Acción |
 |---------|--------|
 | 0–30 | Permitir |
-| 31–50 | Registrar |
-| 51–80 | Limitar |
-| 81–99 | Bloqueo temporal |
-| 100+ | Bloqueo inmediato |
+| 31–50 | Registrar como riesgo bajo |
+| 51 hasta el umbral de bloqueo | Registrar como riesgo medio |
+| Desde el umbral de bloqueo (81 por defecto) | Bloqueo temporal |
+| Desde el umbral permanente (101 por defecto) | Bloqueo permanente (`0` = nunca) |
+
+Los dos umbrales se configuran. El motor viene desactivado: el **modo sombra** puntúa sin bloquear y, en **WP Seguro → Motor de riesgo**, sugiere el umbral adecuado para el tráfico de tu sitio.
 
 El detalle está en [Capas del firewall](docs/firewall-layers.md) y en la [Referencia de reglas](docs/rules-reference.md).
 
 ## Instalación
 
-1. Descargá [`wp-secure.zip`](https://github.com/fabiomb/wp-secure/releases/latest/download/wp-secure.zip) desde la última release.
+1. Descargá el `.zip` de la [última release](https://github.com/fabiomb/wp-secure/releases/latest).
 2. En WordPress, andá a **Plugins → Añadir nuevo → Subir plugin**.
 3. Subí el archivo, instalalo y activá **WP Seguro**.
 4. Completá el asistente de configuración inicial y revisá **WP Seguro → Dashboard**.
