@@ -39,6 +39,7 @@ class WPS_Db_Maintenance {
         $events_days   = (int) $db->get_setting( 'retention_events_days', 90 );
         $login_days    = (int) $db->get_setting( 'retention_login_days', 7 );
         $blocks_days   = (int) $db->get_setting( 'retention_blocks_days', 30 );
+        $activity_days = (int) $db->get_setting( 'retention_activity_days', 180 );
 
         $traffic_table = WPS_Db_Schema::table( 'traffic_log' );
         $events_table  = WPS_Db_Schema::table( 'security_events' );
@@ -71,6 +72,9 @@ class WPS_Db_Maintenance {
              AND expires_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
             $blocks_days
         );
+
+        // Purgar el registro de actividad.
+        WPS_Activity_Log::purge( $activity_days );
     }
 
     /**

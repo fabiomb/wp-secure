@@ -212,6 +212,12 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 			return add_filter( $hook, $callback, $priority, $args );
 		}
 	}
+	// Acciones disparadas: $GLOBALS['wps_test_actions'][] = [ hook, args ].
+	if ( ! function_exists( 'do_action' ) ) {
+		function do_action( $hook, ...$args ) {
+			$GLOBALS['wps_test_actions'][] = array( $hook, $args );
+		}
+	}
 	if ( ! function_exists( 'get_current_user_id' ) ) {
 		function get_current_user_id() { return (int) ( $GLOBALS['wps_test_current_user']->ID ?? 0 ); }
 	}

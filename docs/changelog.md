@@ -43,6 +43,19 @@ El firewall no cubre la configuración del sitio y del servidor: un `display_err
 - **Armador** en **WP Seguro → Endurecimiento**: lista de lo que la política bloquearía, **política sugerida** (la actual más los orígenes reportados) y «Usar la política sugerida».
 - **No se pisan headers existentes**: si el servidor, el hosting u otro plugin ya envían HSTS o una CSP, se respeta la suya (igual que con los demás headers de seguridad). `WPS_Security_Hardener::headers_to_send()` recibe ahora la lista de headers a enviar.
 
+### Nuevo: Registro de actividad ([#20](https://github.com/fabiomb/wp-secure/issues/20))
+
+El log de seguridad registra ataques, pero no qué hicieron los usuarios del sitio. Después de un incidente (o de un cambio que nadie recuerda haber hecho) no había forma de saber quién publicó, borró, instaló o cambió qué.
+
+- **`WPS_Activity_Log`** (nuevo) y página **WP Seguro → Actividad**, con filtros por grupo y por usuario: quién, desde qué IP, qué acción, sobre qué objeto y con qué detalle.
+- **Usuarios**: inicio y cierre de sesión, alta, baja, cambio de rol (antes → después), cambio de email, contraseña, nombre o web (sin guardar nunca el hash), restablecimiento de contraseña.
+- **Contenido**: creación, publicación, cambios en contenido publicado (qué campos), despublicación, papelera, restauración y borrado definitivo; subida y borrado de medios; exportación del contenido. Se ignoran las revisiones, los autoguardados y los tipos internos.
+- **Plugins, temas y núcleo**: activación, desactivación, instalación, actualización y borrado; cambio de tema; actualización de WordPress; edición de archivos desde el panel.
+- **Ajustes**: ajustes principales de WordPress con el valor anterior y el nuevo, y la configuración de WP Seguro (nueva acción `wps_settings_changed`, disparada por todo cambio de configuración aunque el aviso por mail esté apagado).
+- Sólo usuarios que pueden editar contenido y WP-CLI: los clientes de una tienda no generan entradas.
+- **Nueva tabla** `wps_activity_log`, ajuste «Registro de actividad» (activado por defecto) y retención propia (180 días). **WP-CLI**: `wp wps activity`.
+- `configuration.md`: la tabla de Retención de Datos estaba desactualizada; ahora refleja los ajustes reales.
+
 ## [0.5.0] — 2026-09-29
 
 ### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))

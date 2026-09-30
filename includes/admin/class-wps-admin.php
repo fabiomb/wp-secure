@@ -236,6 +236,16 @@ class WPS_Admin {
             array( $this, 'render_integrity' )
         );
 
+        // Registro de actividad.
+        $this->page_hooks[] = add_submenu_page(
+            $this->menu_slug,
+            __( 'Actividad', 'wp-secure' ),
+            __( 'Actividad', 'wp-secure' ),
+            $this->capability,
+            $this->menu_slug . '-activity',
+            array( $this, 'render_activity' )
+        );
+
         // Chequeo de endurecimiento.
         $this->page_hooks[] = add_submenu_page(
             $this->menu_slug,
@@ -546,6 +556,13 @@ class WPS_Admin {
             return;
         }
         ( new WPS_Admin_Integrity( $this->loader ) )->render();
+    }
+
+    public function render_activity(): void {
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        ( new WPS_Admin_Activity( $this->loader ) )->render();
     }
 
     public function render_hardening(): void {

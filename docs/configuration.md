@@ -94,6 +94,7 @@ Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, l
 | Prefijo IPv6 por cliente | Tamaño de la red IPv6 que se trata como un solo cliente (48–128). `128` = dirección exacta. | 64 |
 | Monitor de integridad | Vigila los archivos de código del núcleo, plugins, temas y `wp-content`, y busca PHP en la carpeta de subidas (ver abajo). | Activado |
 | PHP en uploads | Impedir la ejecución de archivos PHP en la carpeta de subidas (ver abajo). | Desactivado |
+| Registro de actividad | Registrar las acciones de quienes editan el sitio (ver abajo). | Activado |
 | Rutas trampa | Bloquear de inmediato a quien pida una ruta trampa. | Activado |
 | Lista de rutas trampa | Una por línea (ver abajo). | `/.env`, copias de `wp-config.php`, `/.git/*`, … |
 | Duración del bloqueo por ruta trampa | En minutos. | 1440 (24 h) |
@@ -129,6 +130,22 @@ Compara los archivos de código (`.php`, `.phtml`, `.phar`, `.inc`, `.htaccess`,
 - Los cambios se revisan en **WP Seguro → Integridad**, donde se aceptan por área o todos juntos (pasan a ser la nueva referencia). También con `wp wps integrity scan|status|accept`.
 - Guardar los enlaces permanentes regenera `.htaccess`, y editar `wp-config.php` también cuenta como cambio: son archivos que un atacante suele tocar, así que conviene revisarlos y aceptarlos.
 - El primer escaneo de un sitio grande puede tardar varios minutos, porque lee todos los archivos por primera vez. Los siguientes son mucho más rápidos.
+
+### Registro de actividad
+
+**WP Seguro → Actividad** muestra quién hizo qué y cuándo, separado del log de seguridad: sirve para reconstruir qué pasó después de un incidente o de un cambio inesperado. Se filtra por tipo de acción y por usuario; también con `wp wps activity`.
+
+| Grupo | Acciones |
+|-------|----------|
+| Usuarios | Inicio y cierre de sesión, alta, baja, cambio de rol (antes → después), cambio de email, contraseña, nombre o web, restablecimiento de contraseña. |
+| Contenido | Creación, publicación, cambios en contenido publicado (qué campos), despublicación, papelera, restauración y borrado definitivo de entradas, páginas y tipos propios; subida y borrado de medios; exportación del contenido. |
+| Plugins, temas y núcleo | Activación, desactivación, instalación, actualización y borrado de plugins y temas; cambio de tema; actualización de WordPress; edición de archivos desde el panel. |
+| Ajustes | Ajustes principales de WordPress (título, dirección, email de administración, registro de usuarios y rol por defecto, enlaces permanentes, visibilidad, portada, comentarios, idioma y zona horaria), con el valor anterior y el nuevo; cambios en la configuración de WP Seguro. |
+
+- Sólo se registran las acciones de usuarios que pueden editar contenido (`edit_posts`) y las de WP-CLI: los clientes de una tienda o los suscriptores no generan entradas.
+- Cada entrada guarda la fecha (UTC), el usuario, la IP, la acción, el objeto y el detalle. Nunca se guardan contraseñas ni sus hashes: sólo que la contraseña cambió.
+- Los borradores que se guardan sin publicar no generan entradas; los cambios en contenido publicado sí.
+- Se conserva según «Registro de actividad (días)» en Retención de Datos (180 días por defecto).
 
 ### PHP en la carpeta de subidas
 
@@ -239,9 +256,13 @@ Consulta [Configuración de CDN/Proxy](cdn-proxy-setup.md) para instrucciones de
 
 | Opción | Descripción | Valor por defecto |
 |--------|-------------|-------------------|
-| Retención de eventos | Días que se conservan los registros de eventos. | 30 |
-| Retención de sesiones | Días que se conservan los datos de sesión/tráfico. | 7 |
-| Limpieza automática | Ejecutar purga de datos antiguos automáticamente. | Activado |
+| Logs de tráfico (días) | Días que se conservan los registros de tráfico. | 30 |
+| Eventos de seguridad (días) | Días que se conservan los eventos de seguridad. | 90 |
+| Intentos de login (días) | Días que se conservan los intentos de login. | 7 |
+| Bloqueos expirados (días) | Días que se conservan los bloqueos temporales ya cumplidos. | 30 |
+| Registro de actividad (días) | Días que se conserva el registro de actividad. | 180 |
+
+La purga corre una vez por día con el mantenimiento.
 
 ---
 

@@ -38,6 +38,7 @@ class WPS_Db_Schema {
             'rate_limits',
             'custom_rules',
             'file_integrity',
+            'activity_log',
         );
     }
 
@@ -232,6 +233,25 @@ class WPS_Db_Schema {
             PRIMARY KEY  (path_hash),
             KEY idx_area (area),
             KEY idx_status (status)
+        ) {$charset};";
+
+        // ── Registro de actividad ──
+        $table = self::table( 'activity_log' );
+        $sql[] = "CREATE TABLE {$table} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            created_at datetime NOT NULL,
+            user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+            user_login varchar(60) NOT NULL DEFAULT '',
+            ip_address varchar(45) NOT NULL DEFAULT '',
+            action varchar(50) NOT NULL,
+            object_type varchar(50) NOT NULL DEFAULT '',
+            object_id bigint(20) unsigned NOT NULL DEFAULT 0,
+            object_name varchar(255) NOT NULL DEFAULT '',
+            details text,
+            PRIMARY KEY  (id),
+            KEY idx_created (created_at),
+            KEY idx_user (user_id,created_at),
+            KEY idx_action (action,created_at)
         ) {$charset};";
 
         foreach ( $sql as $query ) {

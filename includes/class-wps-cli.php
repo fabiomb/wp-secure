@@ -300,6 +300,61 @@ class WPS_CLI {
 	}
 
 	/**
+	 * Registro de actividad: quién hizo qué y cuándo.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--user=<login>]
+	 * : Sólo las acciones de este usuario.
+	 *
+	 * [--group=<group>]
+	 * : users, content, plugins o settings.
+	 *
+	 * [--limit=<limit>]
+	 * : Cantidad de entradas.
+	 * ---
+	 * default: 50
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : table, json, csv o yaml.
+	 * ---
+	 * default: table
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp wps activity
+	 *     wp wps activity --user=admin --group=plugins
+	 */
+	public function activity( $args, $assoc_args ): void {
+		$filters = array( 'group' => (string) ( $assoc_args['group'] ?? '' ) );
+
+		if ( ! empty( $assoc_args['user'] ) ) {
+			$user = get_user_by( 'login', (string) $assoc_args['user'] );
+			if ( ! $user ) {
+				\WP_CLI::error( 'No existe ese usuario.' );
+			}
+			$filters['user_id'] = (int) $user->ID;
+		}
+
+		$result = ( new WPS_Activity_Log( WPS_Loader::get_instance() ) )->query( $filters, 1, max( 1, (int) ( $assoc_args['limit'] ?? 50 ) ) );
+
+		$items = array_map( function ( $row ) {
+			return array(
+				'date'    => $row['created_at'] . ' UTC',
+				'user'    => $row['user_login'],
+				'ip'      => $row['ip_address'],
+				'action'  => WPS_Activity_Log::label( $row['action'] ),
+				'object'  => $row['object_name'],
+				'details' => $row['details'],
+			);
+		}, $result['rows'] );
+
+		\WP_CLI\Utils\format_items( $assoc_args['format'] ?? 'table', $items, array( 'date', 'user', 'ip', 'action', 'object', 'details' ) );
+	}
+
+	/**
 	 * Chequeo de endurecimiento del sitio.
 	 *
 	 * ## OPTIONS

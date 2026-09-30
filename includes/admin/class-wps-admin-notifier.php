@@ -318,16 +318,20 @@ class WPS_Admin_Notifier {
 	 * @return bool Si se envió el aviso.
 	 */
 	public function notify_settings_change( int $user_id, string $change = '' ): bool {
+		if ( '' === $change ) {
+			$change = __( 'Configuración guardada', 'wp-secure' );
+		}
+
+		// Todo cambio de configuración pasa por acá: lo toma el registro de
+		// actividad aunque el aviso por mail esté apagado.
+		do_action( 'wps_settings_changed', $user_id, $change );
+
 		if ( ! $this->loader->get_setting( 'notify_settings_change', true ) ) {
 			return false;
 		}
 
 		$user = get_userdata( $user_id );
 		$name = $user ? $user->display_name : __( 'Desconocido', 'wp-secure' );
-
-		if ( '' === $change ) {
-			$change = __( 'Configuración guardada', 'wp-secure' );
-		}
 
 		$subject = sprintf(
 			/* translators: %s: description of the change */
