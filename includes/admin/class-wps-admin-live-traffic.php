@@ -48,6 +48,10 @@ class WPS_Admin_Live_Traffic {
 					<?php esc_html_e( 'En vivo', 'wp-secure' ); ?>
 				</span>
 			</h1>
+			<?php $traffic_note = WPS_Traffic_Sampler::note( $this->loader ); ?>
+			<?php if ( '' !== $traffic_note ) : ?>
+				<div class="notice notice-info inline"><p><?php echo esc_html( $traffic_note ); ?></p></div>
+			<?php endif; ?>
 
 			<!-- Filtros -->
 			<div class="wps-section">
@@ -135,11 +139,11 @@ class WPS_Admin_Live_Traffic {
 
 		// Conteos.
 		$total_hits = (int) $db->get_var(
-			"SELECT COUNT(*) FROM {$traffic_tbl} WHERE ip_address = %s",
+			"SELECT COALESCE(SUM(sample_weight), 0) FROM {$traffic_tbl} WHERE ip_address = %s",
 			$ip
 		);
 		$hits_24h = (int) $db->get_var(
-			"SELECT COUNT(*) FROM {$traffic_tbl} WHERE ip_address = %s AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)",
+			"SELECT COALESCE(SUM(sample_weight), 0) FROM {$traffic_tbl} WHERE ip_address = %s AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)",
 			$ip
 		);
 		$event_count = (int) $db->get_var(

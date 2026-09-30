@@ -968,6 +968,27 @@ class WPS_Admin_Settings {
                 'description' => '',
                 'fields'      => array(
                     array(
+                        'key'         => 'traffic_log_mode',
+                        'label'       => __( 'Registro de tráfico', 'wp-secure' ),
+                        'type'        => 'select',
+                        'default'     => 'full',
+                        'options'     => array(
+                            'full'     => __( 'Todas las peticiones', 'wp-secure' ),
+                            'sampled'  => __( 'Muestreo (para sitios con mucho tráfico)', 'wp-secure' ),
+                            'relevant' => __( 'Sólo errores y peticiones que no son GET', 'wp-secure' ),
+                            'off'      => __( 'Desactivado', 'wp-secure' ),
+                        ),
+                        'description' => __( 'Cada petición registrada es una escritura en la base de datos. Con muestreo se guarda una de cada N con su peso, así los totales del dashboard siguen siendo estimaciones correctas; los errores (4xx, 5xx) y las peticiones POST se guardan siempre. No afecta la detección ni los bloqueos.', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'         => 'traffic_sample_rate',
+                        'label'       => __( 'Tasa de muestreo (1 de cada N)', 'wp-secure' ),
+                        'type'        => 'number',
+                        'default'     => 10,
+                        'min'         => 2,
+                        'max'         => 1000,
+                    ),
+                    array(
                         'key'            => 'exclude_static_from_log',
                         'label'          => __( 'Excluir estáticos del log', 'wp-secure' ),
                         'type'           => 'checkbox',

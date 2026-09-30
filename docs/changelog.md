@@ -75,6 +75,15 @@ El modo sombra registraba en Eventos el puntaje y los factores de cada petición
 - **Umbrales configurables** (nuevos ajustes): «Umbral de bloqueo por riesgo» (81 por defecto, bloqueo temporal) y «Umbral de bloqueo permanente» (101 por defecto; 0 = nunca permanente).
 - `rules-reference.md`: la sección de puntuación describía niveles y puntos que no existen en el código; ahora documenta el motor real, sus factores, umbrales y la calibración.
 
+### Nuevo: Registro de tráfico con muestreo ([#23](https://github.com/fabiomb/wp-secure/issues/23))
+
+El log de tráfico hacía un INSERT por cada petición no estática: en un sitio con mucho tráfico era la escritura más frecuente del plugin, y la tabla que más crecía.
+
+- **`WPS_Traffic_Sampler`** (nuevo) y ajuste «Registro de tráfico» (Configuración → Rendimiento): todas las peticiones (por defecto, como hasta ahora), **muestreo**, sólo errores y no-GET, o desactivado.
+- **Muestreo con peso**: se guarda 1 de cada N peticiones (10 por defecto, configurable) con peso N en la columna nueva `sample_weight`, y el dashboard, el resumen diario y el detalle de una IP suman el peso en lugar de contar filas, así los totales siguen siendo estimaciones sin sesgo. Las peticiones relevantes para seguridad (errores 4xx/5xx y métodos distintos de GET/HEAD) se guardan siempre, con peso 1.
+- La decisión se toma antes de la geolocalización, que también se ahorra en las peticiones que no se guardan.
+- No afecta la detección, el rate limiting ni el motor de riesgo. El dashboard y Tráfico en Vivo avisan cuando los totales son estimaciones.
+
 ## [0.5.0] — 2026-09-29
 
 ### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))

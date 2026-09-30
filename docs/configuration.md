@@ -296,7 +296,24 @@ La purga corre una vez por día con el mantenimiento.
 
 | Opción | Descripción | Valor por defecto |
 |--------|-------------|-------------------|
+| Registro de tráfico | Todas las peticiones, muestreo, sólo errores y no-GET, o desactivado (ver abajo). | Todas las peticiones |
+| Tasa de muestreo | Con muestreo, se guarda 1 de cada N peticiones (2–1000). | 10 |
+| Excluir estáticos del log | No registrar CSS, JS e imágenes. | Activado |
 | Modo debug de rendimiento | Mostrar tiempos de ejecución del plugin en la barra de admin y error_log. | Desactivado |
+
+### Registro de tráfico en sitios con mucho tráfico
+
+Cada petición registrada en Tráfico en Vivo es una escritura en la base de datos: en un sitio con mucho tráfico es la escritura más frecuente del plugin. «Registro de tráfico» ofrece:
+
+| Modo | Qué se guarda | Totales del dashboard |
+|------|---------------|-----------------------|
+| Todas las peticiones | Todas. | Exactos. |
+| Muestreo | 1 de cada N peticiones normales, con peso N, **más todas** las relevantes (errores 4xx/5xx y métodos distintos de GET/HEAD, como un POST a `wp-login.php`), con peso 1. | Estimaciones sin sesgo (se suma el peso de cada fila); las IPs únicas son un mínimo. |
+| Sólo errores y no-GET | Sólo las peticiones relevantes. | Cuentan sólo esas peticiones. |
+| Desactivado | Nada. | Sin datos de tráfico. |
+
+Con un muestreo de 1 de cada 10, un sitio con 100.000 visitas a páginas por día pasa de 100.000 a unas 10.000 escrituras (más las relevantes). El modo **no afecta la detección ni los bloqueos**: el rate limiting, los detectores y el motor de riesgo cuentan cada petición igual. Mientras no sea «Todas las peticiones», el dashboard y Tráfico en Vivo lo aclaran.
+
 
 Cuando está activo, muestra en la barra de administración:
 - Tiempo total de overhead del plugin.

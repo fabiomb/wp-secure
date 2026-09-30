@@ -76,6 +76,7 @@ class WPS_Logger {
             'visitor_type'   => $data['visitor_type'] ?? 'unknown',
             'session_hash'   => $data['session_hash'] ?? null,
             'response_time_ms' => $data['response_time_ms'] ?? null,
+            'sample_weight'  => max( 1, (int) ( $data['sample_weight'] ?? 1 ) ),
             'created_at'     => current_time( 'mysql', true ),
         );
 

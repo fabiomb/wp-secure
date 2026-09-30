@@ -63,6 +63,10 @@ class WPS_Admin_Dashboard {
 					'dashicons-lock'
 				); ?>
 			</div>
+			<?php $traffic_note = WPS_Traffic_Sampler::note( $this->loader ); ?>
+			<?php if ( '' !== $traffic_note ) : ?>
+				<p class="description"><?php echo esc_html( $traffic_note ); ?></p>
+			<?php endif; ?>
 
 			<!-- Gráficas -->
 			<div class="wps-cards-row">
@@ -219,8 +223,9 @@ class WPS_Admin_Dashboard {
 		$events_table  = WPS_Db_Schema::table( 'security_events' );
 		$blocked_table = WPS_Db_Schema::table( 'blocked_ips' );
 
+		// Con muestreo cada fila vale por sample_weight peticiones.
 		$total_requests = (int) $db->get_var(
-			"SELECT COUNT(*) FROM {$traffic_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)"
+			"SELECT COALESCE(SUM(sample_weight), 0) FROM {$traffic_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)"
 		);
 
 		$unique_ips = (int) $db->get_var(
@@ -259,7 +264,7 @@ class WPS_Admin_Dashboard {
 
 		// Peticiones por hora.
 		$requests_raw = $db->get_results(
-			"SELECT DATE_FORMAT(created_at, '%Y-%m-%d %H:00') AS hour_slot, COUNT(*) AS cnt
+			"SELECT DATE_FORMAT(created_at, '%Y-%m-%d %H:00') AS hour_slot, SUM(sample_weight) AS cnt
 			 FROM {$traffic_table}
 			 WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)
 			 GROUP BY hour_slot ORDER BY hour_slot ASC"
@@ -320,7 +325,7 @@ class WPS_Admin_Dashboard {
 		$table = WPS_Db_Schema::table( 'traffic_log' );
 
 		$raw = $db->get_results(
-			"SELECT country_code, COUNT(*) AS cnt FROM {$table}
+			"SELECT country_code, SUM(sample_weight) AS cnt FROM {$table}
 			 WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)
 			 AND country_code IS NOT NULL AND country_code != ''
 			 GROUP BY country_code ORDER BY cnt DESC LIMIT 10"

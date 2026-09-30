@@ -143,6 +143,7 @@ class WPS_Db_Schema {
             visitor_type varchar(20) NOT NULL DEFAULT 'unknown',
             session_hash varchar(64) DEFAULT NULL,
             response_time_ms int(10) unsigned DEFAULT NULL,
+            sample_weight smallint(5) unsigned NOT NULL DEFAULT 1,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
             KEY idx_ip_time (ip_address,created_at),

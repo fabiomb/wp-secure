@@ -369,7 +369,7 @@ class WPS_Admin_Notifier {
 		$blocked_table = WPS_Db_Schema::table( 'blocked_ips' );
 
 		$total_requests = (int) $db->get_var(
-			"SELECT COUNT(*) FROM {$traffic_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)"
+			"SELECT COALESCE(SUM(sample_weight), 0) FROM {$traffic_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)"
 		);
 		$unique_ips = (int) $db->get_var(
 			"SELECT COUNT(DISTINCT ip_address) FROM {$traffic_table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)"

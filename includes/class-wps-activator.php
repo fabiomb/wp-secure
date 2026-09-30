@@ -144,6 +144,8 @@ class WPS_Activator {
 
             // Rendimiento.
             'exclude_static_from_log' => true,
+            'traffic_log_mode'        => 'full',
+            'traffic_sample_rate'     => 10,
 
             // Notificaciones.
             'notify_email'             => get_option( 'admin_email' ),

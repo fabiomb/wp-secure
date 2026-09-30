@@ -282,6 +282,10 @@ class WPS_Loader {
             return;
         }
 
+        if ( WPS_Traffic_Sampler::MODE_OFF === WPS_Traffic_Sampler::mode( $this ) ) {
+            return;
+        }
+
         $request = WPS_Request::get_instance();
 
         if ( ! $this->should_log_traffic( $request->visitor_type() ) ) {
@@ -302,6 +306,14 @@ class WPS_Loader {
     public function log_current_request(): void {
         $request = WPS_Request::get_instance();
         $ip      = $request->ip();
+        $status  = http_response_code();
+        $status  = is_int( $status ) ? $status : null;
+
+        // Muestreo: se decide antes de la geolocalización, que también cuesta.
+        $weight = WPS_Traffic_Sampler::weight_for( $this, $request->method(), $status );
+        if ( 0 === $weight ) {
+            return;
+        }
 
         // Geo data (si está disponible).
         $country = null;
@@ -315,8 +327,6 @@ class WPS_Loader {
             }
         }
 
-        $status = http_response_code();
-
         $logger = WPS_Logger::get_instance();
         $logger->traffic( array(
             'ip_address'     => $ip,
@@ -328,8 +338,9 @@ class WPS_Loader {
             'referer'        => $request->referer(),
             'visitor_type'   => $request->visitor_type(),
             'session_hash'   => $request->session_hash(),
-            'http_status'    => is_int( $status ) ? $status : null,
+            'http_status'    => $status,
             'response_time_ms' => $request->elapsed_ms(),
+            'sample_weight'  => $weight,
         ) );
     }
 
