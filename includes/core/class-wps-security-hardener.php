@@ -151,7 +151,7 @@ class WPS_Security_Hardener {
 		$request = WPS_Request::get_instance();
 		$ip      = $request->ip();
 
-		if ( WPS_Whitelist::get_instance()->is_whitelisted( $ip ) ) {
+		if ( self::is_exempt( $ip ) ) {
 			return;
 		}
 
@@ -169,6 +169,19 @@ class WPS_Security_Hardener {
 		if ( $this->loader->get_setting( 'block_no_host', true ) ) {
 			$this->check_missing_host( $request );
 		}
+	}
+
+	/**
+	 * ¿La petición queda fuera de las reglas de métodos, User-Agent y Host?
+	 *
+	 * Como el resto de las verificaciones: la consola (WP-CLI no envía Host
+	 * ni User-Agent), el propio servidor (loopbacks, precargadores de caché)
+	 * y la whitelist.
+	 */
+	public static function is_exempt( string $ip ): bool {
+		return WPS_Request::is_cli()
+			|| WPS_Ip_Utils::is_server_ip( $ip )
+			|| WPS_Whitelist::get_instance()->is_whitelisted( $ip );
 	}
 
 	/**

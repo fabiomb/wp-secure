@@ -277,8 +277,8 @@ class WPS_Loader {
      * medirlos acá daba siempre http_status vacío y response_time_ms ≈ 0.
      */
     private function init_traffic_logging(): void {
-        // No registrar cron.
-        if ( defined( 'DOING_CRON' ) && DOING_CRON ) {
+        // No registrar cron ni la consola (WP-CLI): no son visitas.
+        if ( ( defined( 'DOING_CRON' ) && DOING_CRON ) || WPS_Request::is_cli() ) {
             return;
         }
 

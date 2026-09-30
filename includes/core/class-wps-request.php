@@ -54,6 +54,9 @@ class WPS_Request {
     /** @var string|null Cuerpo crudo inyectado (tests); null = php://input. */
     private static $raw_body = null;
 
+    /** @var bool|null Ejecución por consola fijada (tests); null = detectar. */
+    private static $cli = null;
+
     private function __construct() {
         $this->start_time   = microtime( true );
         $this->ip           = $this->resolve_ip();
@@ -124,6 +127,22 @@ class WPS_Request {
      */
     public function elapsed_ms(): int {
         return (int) round( ( microtime( true ) - $this->start_time ) * 1000 );
+    }
+
+    /**
+     * ¿Se está ejecutando por consola (WP-CLI, un script PHP del servidor)?
+     *
+     * Por consola no hay visitante: faltan el Host, el User-Agent y la IP
+     * real (WP-CLI usa 127.0.0.1), y las verificaciones de una petición HTTP
+     * no tienen sentido. Sin --url, WP-CLI no define HTTP_HOST y «Bloquear
+     * peticiones sin Host header» cortaba cualquier comando con el 403.
+     */
+    public static function is_cli(): bool {
+        if ( null !== self::$cli ) {
+            return self::$cli;
+        }
+
+        return 'cli' === PHP_SAPI || ( defined( 'WP_CLI' ) && WP_CLI );
     }
 
     /**

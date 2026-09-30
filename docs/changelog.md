@@ -1,5 +1,16 @@
 # Registro de Cambios
 
+## [0.6.1] — Sin publicar
+
+### Corrección: WP-CLI bloqueado por «Host ausente» ([#24](https://github.com/fabiomb/wp-secure/issues/24))
+
+Cualquier comando de WP-CLI sin `--url` (por ejemplo `wp media regenerate`, pero también los `wp wps …` de recuperación de acceso) terminaba con la página de 403 y el evento «Host ausente bloqueado» desde 127.0.0.1: WP-CLI no define `HTTP_HOST` y la regla «Bloquear peticiones sin Host header» lo trataba como una petición anómala. No se bloqueaba la IP, pero el comando se cortaba.
+
+- **`WPS_Request::is_cli()`** (nuevo): detecta la ejecución por consola (`PHP_SAPI` o la constante `WP_CLI`).
+- **`WPS_Security_Hardener::is_exempt()`** (nuevo): las reglas de métodos HTTP, User-Agent vacío y Host ausente ya no se aplican por consola ni al propio servidor, igual que el resto de las verificaciones (Capa 1, bloqueo de IP, rutas trampa, rate limiting). Antes sólo eximían la whitelist, el cron y al administrador en el panel.
+- **Log de tráfico**: las ejecuciones por consola dejan de registrarse como visitas.
+- Mientras tanto, con la versión anterior, pasar `--url=https://tu-sitio` a WP-CLI evita el bloqueo.
+
 ## [0.6.0] — 2026-09-29
 
 ### Nuevo: Monitor de integridad de archivos ([#16](https://github.com/fabiomb/wp-secure/issues/16))
