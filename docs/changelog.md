@@ -65,6 +65,16 @@ Un atacante con un rango de un proveedor de hosting rota de IP en cada bloqueo, 
 - En IPv6 el cliente es la red del prefijo configurado (por defecto /64); con un prefijo de /48 no hay escalada.
 - Funciona también en la Capa 1 (el MU-plugin carga las clases nuevas) y el rango se escribe en el archivo de la Capa 0.
 
+### Nuevo: Modo sombra guiado del motor de riesgo ([#22](https://github.com/fabiomb/wp-secure/issues/22))
+
+El modo sombra registraba en Eventos el puntaje y los factores de cada petición, pero sacar de ahí a quién habría bloqueado el motor, con qué umbral y por qué quedaba a cargo de quien administra el sitio. Además, los umbrales eran fijos.
+
+- **`WPS_Risk_Report`** (nuevo) y página **WP Seguro → Motor de riesgo**: para las últimas 24 horas, 7 o 30 días, simula los umbrales de 51 a 201 (y el actual) sobre los puntajes registrados y separa, en cada uno, los clientes que otra regla ya bloqueó (atacantes confirmados) de los **bloqueos nuevos** que sólo haría el motor.
+- **Umbral sugerido**: el más bajo con el que el motor sólo habría bloqueado atacantes confirmados. La página guía el paso siguiente según el modo y los datos (activar el modo sombra, juntar al menos 3 días, fijar el umbral, pasar a Activo).
+- **Factores que más pesan** entre los clientes que se bloquearían, primero los de bloqueos nuevos, y lista de esos clientes con su peor puntaje y sus factores.
+- **Umbrales configurables** (nuevos ajustes): «Umbral de bloqueo por riesgo» (81 por defecto, bloqueo temporal) y «Umbral de bloqueo permanente» (101 por defecto; 0 = nunca permanente).
+- `rules-reference.md`: la sección de puntuación describía niveles y puntos que no existen en el código; ahora documenta el motor real, sus factores, umbrales y la calibración.
+
 ## [0.5.0] — 2026-09-29
 
 ### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))

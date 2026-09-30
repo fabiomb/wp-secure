@@ -129,6 +129,8 @@ class WPS_Activator {
             // se calibraron contra tráfico real, así que se enciende primero en
             // modo sombra y se pasa a 'enforce' con datos del propio sitio.
             'risk_engine_mode'     => 'off',
+            'risk_block_threshold'      => 81,
+            'risk_hard_block_threshold' => 101,
             'risky_countries'      => '',
 
             // Respuesta de bloqueo.

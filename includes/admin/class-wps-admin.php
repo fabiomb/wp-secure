@@ -266,6 +266,16 @@ class WPS_Admin {
             array( $this, 'render_sessions' )
         );
 
+        // Reporte del motor de riesgo.
+        $this->page_hooks[] = add_submenu_page(
+            $this->menu_slug,
+            __( 'Motor de riesgo', 'wp-secure' ),
+            __( 'Motor de riesgo', 'wp-secure' ),
+            $this->capability,
+            $this->menu_slug . '-risk',
+            array( $this, 'render_risk' )
+        );
+
         // Eventos.
         $this->page_hooks[] = add_submenu_page(
             $this->menu_slug,
@@ -556,6 +566,13 @@ class WPS_Admin {
             return;
         }
         ( new WPS_Admin_Integrity( $this->loader ) )->render();
+    }
+
+    public function render_risk(): void {
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+        ( new WPS_Admin_Risk( $this->loader ) )->render();
     }
 
     public function render_activity(): void {

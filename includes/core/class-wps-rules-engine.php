@@ -168,16 +168,18 @@ class WPS_Rules_Engine {
 	 * @return string none|log|strict_rate|temp_block|hard_block
 	 */
 	public function action_for_score( int $score ): string {
-		if ( $score >= self::$thresholds['hard_block'] ) {
+		$thresholds = $this->get_thresholds();
+
+		if ( $score >= $thresholds['hard_block'] ) {
 			return 'hard_block';
 		}
-		if ( $score >= self::$thresholds['temp_block'] ) {
+		if ( $score >= $thresholds['temp_block'] ) {
 			return 'temp_block';
 		}
-		if ( $score >= self::$thresholds['strict_rate'] ) {
+		if ( $score >= $thresholds['strict_rate'] ) {
 			return 'strict_rate';
 		}
-		if ( $score >= self::$thresholds['log'] ) {
+		if ( $score >= $thresholds['log'] ) {
 			return 'log';
 		}
 
@@ -380,12 +382,27 @@ class WPS_Rules_Engine {
 	}
 
 	/**
-	 * Obtener los umbrales actuales.
+	 * Umbrales actuales, con los de bloqueo configurables.
 	 *
-	 * @return array
+	 * `risk_block_threshold` fija desde qué puntaje se bloquea temporalmente
+	 * (el que se calibra con el reporte del modo sombra). El bloqueo permanente
+	 * (`risk_hard_block_threshold`) se puede desactivar con 0; si queda por
+	 * debajo del temporal, se sube al temporal + 1.
+	 *
+	 * @return array{log:int, strict_rate:int, temp_block:int, hard_block:int}
 	 */
 	public function get_thresholds(): array {
-		return self::$thresholds;
+		$thresholds = self::$thresholds;
+
+		$block = (int) $this->loader->get_setting( 'risk_block_threshold', self::$thresholds['temp_block'] );
+		if ( $block >= self::$thresholds['strict_rate'] ) {
+			$thresholds['temp_block'] = $block;
+		}
+
+		$hard = (int) $this->loader->get_setting( 'risk_hard_block_threshold', self::$thresholds['hard_block'] );
+		$thresholds['hard_block'] = $hard <= 0 ? PHP_INT_MAX : max( $hard, $thresholds['temp_block'] + 1 );
+
+		return $thresholds;
 	}
 
 	/**

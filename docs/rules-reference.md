@@ -150,32 +150,55 @@ Consulta la [documentación de Reglas Personalizadas](custom-rules.md) para más
 
 ---
 
-## Puntuación de Riesgo
+## Motor de Puntuación de Riesgo
 
-Cada regla activada suma puntos al score acumulado de la IP. Los umbrales dependen del nivel de protección configurado:
+Además de los detectores, que bloquean por sí solos cuando encuentran un patrón claro, el **motor de riesgo** suma puntos por señales débiles de una misma petición y actúa según el total. Se configura en **Configuración → Firewall Avanzado** («Motor de puntuación de riesgo») y tiene tres modos:
 
-| Nivel | Umbral de log | Umbral de bloqueo temporal | Umbral de bloqueo permanente |
-|-------|---------------|---------------------------|------------------------------|
-| Bajo | 30 | 60 | 100 |
-| Medio | 20 | 40 | 80 |
-| Alto | 10 | 25 | 50 |
+| Modo | Qué hace |
+|------|----------|
+| Desactivado (por defecto) | No evalúa nada. |
+| Modo sombra | Puntúa y registra qué habría hecho, sin bloquear nunca. |
+| Activo | Puntúa y aplica la acción. |
 
-### Puntuación por Regla (valores por defecto)
+### Puntos por factor
 
-| Regla | Puntos |
-|-------|--------|
-| SQLi | 25 |
-| XSS | 25 |
-| Path Traversal | 25 |
-| Login fallido | 5 |
-| XML-RPC | 15 |
-| Scanner UA | 10 |
-| Scanner path | 10 |
-| Rate limit excedido | 5 |
-| Crawler spoofed | 30 |
-| Método HTTP bloqueado | 15 |
-| UA vacío | 5 |
-| Host faltante | 10 |
+| Factor | Puntos |
+|--------|--------|
+| Patrón de SQLi (desde el detector) | 50 |
+| Patrón de XSS (desde el detector) | 40 |
+| Path traversal (desde el detector) | 40 |
+| Ruta sospechosa (`install.php`, `setup-config.php`, `xmlrpc.php`, `wp-trackback.php`, `wp-cron.php` con parámetros) | 30 |
+| User-Agent de herramienta (curl, wget, python-requests, Go, axios, …) | 25 |
+| Usuario inexistente en un intento de login | 25 |
+| User-Agent vacío | 20 |
+| Acceso a `xmlrpc.php` | 20 |
+| Tasa de peticiones por encima del 70 % del límite de páginas | 20 |
+| País de la lista «Países de alto riesgo» | 15 |
+| Cada login fallido acumulado | 15 |
+| Cada error 404 acumulado | 5 |
+
+### Umbrales
+
+| Puntaje | Acción |
+|---------|--------|
+| 31–50 | Se registra como riesgo bajo. |
+| 51 hasta el umbral de bloqueo | Se registra como riesgo medio. |
+| Desde el **umbral de bloqueo** (81 por defecto) | Bloqueo temporal (la duración de «Duración del bloqueo» de Rate Limiting). |
+| Desde el **umbral de bloqueo permanente** (101 por defecto) | Bloqueo permanente. Con `0`, nunca es permanente. |
+
+Los dos umbrales de bloqueo se configuran («Umbral de bloqueo por riesgo» y «Umbral de bloqueo permanente»). Los usuarios con sesión iniciada y las IPs de la whitelist no se evalúan.
+
+### Calibración con el modo sombra
+
+Los puntajes por defecto no se calibraron contra el tráfico de tu sitio: activarlos de golpe puede bloquear visitantes legítimos (un monitor de disponibilidad con curl, una integración). El camino es:
+
+1. Activar el **modo sombra** y dejarlo unos días (al menos 3).
+2. Revisar **WP Seguro → Motor de riesgo**, que para el período elegido (24 h, 7 o 30 días) muestra:
+   - **Qué pasaría con cada umbral** (51 a 201 y el actual): cuántos clientes se bloquearían, cuántos ya había bloqueado otra regla (detectores, rutas trampa, bloqueos manuales: atacantes confirmados) y cuántos serían **bloqueos nuevos**.
+   - **Umbral sugerido**: el más bajo con el que el motor sólo habría bloqueado atacantes confirmados.
+   - **Factores que más pesan** en los clientes que se bloquearían, primero los que aparecen en bloqueos nuevos: si un factor empuja falsos positivos, se ve ahí.
+   - **Clientes que sólo bloquearía el motor**, con su peor puntaje y sus factores, para revisarlos uno por uno.
+3. Fijar el umbral sugerido (o whitelistear el tráfico legítimo) y pasar a **Activo**.
 
 ---
 
