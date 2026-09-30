@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fabiomb/wp-secure/releases/latest"><img alt="Última versión" src="https://img.shields.io/github/v/release/fabiomb/wp-secure?label=v0.5.0&color=34d399"></a>
+  <a href="https://github.com/fabiomb/wp-secure/releases/latest"><img alt="Última versión" src="https://img.shields.io/github/v/release/fabiomb/wp-secure?label=v0.6.0&color=34d399"></a>
   <a href="LICENSE"><img alt="Licencia GPL-2.0" src="https://img.shields.io/badge/licencia-GPL--2.0--or--later-blue"></a>
   <img alt="WordPress 6.0+" src="https://img.shields.io/badge/WordPress-6.0%2B-21759b">
   <img alt="PHP 7.4+" src="https://img.shields.io/badge/PHP-7.4%2B-777bb4">
@@ -26,8 +26,11 @@
 - **Firewall de tres capas**: bloqueo previo a PHP, análisis en un MU-plugin y panel de administración.
 - **Detectores de ataques**: SQLi, XSS, path traversal, escáneres, abuso de XML-RPC y de la REST API, con patrones afinados para no bloquear texto legítimo.
 - **Login blindado**: freno a la fuerza bruta y sin enumeración de usuarios.
-- **Puntuación de riesgo**: cada petición suma puntos y la acción depende del umbral alcanzado.
-- **Rate limiting** por IP.
+- **Puntuación de riesgo**: cada petición suma puntos y la acción depende del umbral alcanzado, con un modo sombra que sugiere el umbral para tu tráfico.
+- **Monitor de integridad**: detecta archivos de código modificados, nuevos o eliminados en el núcleo, plugins y temas, y PHP en la carpeta de subidas.
+- **Chequeo de endurecimiento**: `wp-config.php`, errores visibles, listado de directorios, versión de PHP y más, con cómo corregirlo; HSTS y Content-Security-Policy en modo reporte.
+- **Registro de actividad**: quién hizo qué y cuándo en usuarios, contenido, plugins y ajustes.
+- **Rate limiting** por IP, con escalada del bloqueo al rango cuando varias IPs del mismo /24 atacan.
 - **IP real detrás de CDN**: Cloudflare (IPv4 e IPv6), Sucuri y proxies propios, sin que la IP pueda falsificarse con un header.
 - **Crawlers verificados por rDNS**: Googlebot pasa, quien se hace pasar por Googlebot no.
 - **Tráfico en vivo y geolocalización** con una base MMDB local.
@@ -78,6 +81,7 @@ Extensiones PHP: `mbstring`, `json`, `mysqli`.
 
 - [Instalación](docs/installation.md)
 - [Configuración](docs/configuration.md)
+- [Endurecimiento del sitio](docs/hardening.md)
 - [Capas del firewall](docs/firewall-layers.md)
 - [Referencia de reglas](docs/rules-reference.md)
 - [Reglas personalizadas](docs/custom-rules.md)

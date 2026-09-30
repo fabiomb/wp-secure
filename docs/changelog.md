@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.6.0] — Sin publicar
+## [0.6.0] — 2026-09-29
 
 ### Nuevo: Monitor de integridad de archivos ([#16](https://github.com/fabiomb/wp-secure/issues/16))
 
@@ -83,6 +83,10 @@ El log de tráfico hacía un INSERT por cada petición no estática: en un sitio
 - **Muestreo con peso**: se guarda 1 de cada N peticiones (10 por defecto, configurable) con peso N en la columna nueva `sample_weight`, y el dashboard, el resumen diario y el detalle de una IP suman el peso en lugar de contar filas, así los totales siguen siendo estimaciones sin sesgo. Las peticiones relevantes para seguridad (errores 4xx/5xx y métodos distintos de GET/HEAD) se guardan siempre, con peso 1.
 - La decisión se toma antes de la geolocalización, que también se ahorra en las peticiones que no se guardan.
 - No afecta la detección, el rate limiting ni el motor de riesgo. El dashboard y Tráfico en Vivo avisan cuando los totales son estimaciones.
+
+### Versión
+
+- Versión actualizada a `0.6.0` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin, que se reinstala solo (ahora carga las clases de la escalada a rango). Al actualizar, la migración crea las tablas `wps_file_integrity` y `wps_activity_log`, agrega la columna `sample_weight` al log de tráfico y completa los ajustes nuevos con sus valores por defecto. El primer escaneo de integridad corre con el mantenimiento diario y sólo toma la referencia.
 
 ## [0.5.0] — 2026-09-29
 

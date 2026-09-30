@@ -157,6 +157,16 @@ class WPS_Activator {
 
             // Integridad de archivos.
             'integrity_enabled'        => true,
+
+            // Headers HSTS y CSP.
+            'hsts_max_age'             => '0',
+            'hsts_include_subdomains'  => false,
+            'csp_mode'                 => 'off',
+            'csp_policy'               => '',
+
+            // Registro de actividad.
+            'activity_log_enabled'     => true,
+            'retention_activity_days'  => 180,
             'notify_daily_summary'     => true,
         );
 
