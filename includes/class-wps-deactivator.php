@@ -18,6 +18,9 @@ class WPS_Deactivator {
         // Remover MU-Plugin (Capa 1).
         WPS_Activator::remove_muplugin();
 
+        // Reglas de uploads/.htaccess: se vuelven a escribir al reactivar.
+        WPS_Uploads_Guard::sync_rules( false );
+
         // Marcar como desactivado.
         update_option( 'wps_activated', false );
     }

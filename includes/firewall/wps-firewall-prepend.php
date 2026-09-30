@@ -9,6 +9,7 @@
  * Trabaja exclusivamente con un archivo de IPs bloqueadas en disco.
  *
  * Flujo:
+ * 0. Si el script pedido está en una carpeta sin PHP (uploads) → 403.
  * 1. Obtener la IP del visitante.
  * 2. Comprobar si está en la whitelist local.
  * 3. Comprobar si está bloqueada (IPs individuales, CIDRs).
@@ -62,14 +63,20 @@ final class WPS_Firewall_Prepend {
 			return;
 		}
 
-		$ip = self::get_client_ip();
-		if ( ! $ip ) {
-			return;
-		}
-
 		// Cargar datos de bloqueo.
 		$data = self::load_data();
 		if ( ! $data ) {
+			return;
+		}
+
+		// PHP en la carpeta de subidas: nunca, ni para IPs en whitelist.
+		$script = isset( $_SERVER['SCRIPT_FILENAME'] ) ? (string) $_SERVER['SCRIPT_FILENAME'] : '';
+		if ( self::is_denied_script( $script, $data ) ) {
+			self::block_response( self::get_client_ip(), 'DENIED_PHP' );
+		}
+
+		$ip = self::get_client_ip();
+		if ( ! $ip ) {
 			return;
 		}
 
@@ -141,6 +148,31 @@ final class WPS_Firewall_Prepend {
 		}
 
 		return $data;
+	}
+
+	/**
+	 * ¿El script está dentro de una carpeta donde no se ejecuta PHP?
+	 *
+	 * Es lo que hace efectivo el bloqueo de PHP en uploads en nginx, que no
+	 * lee .htaccess. Se resuelve la ruta real para que un enlace simbólico o
+	 * un `..` no la esquiven.
+	 */
+	private static function is_denied_script( string $script, array $data ): bool {
+		if ( empty( $data['deny_php_dirs'] ) || '' === $script ) {
+			return false;
+		}
+
+		$real   = realpath( $script );
+		$script = str_replace( '\\', '/', false !== $real ? $real : $script );
+
+		foreach ( (array) $data['deny_php_dirs'] as $dir ) {
+			$dir = rtrim( str_replace( '\\', '/', (string) $dir ), '/' ) . '/';
+			if ( '/' !== $dir && 0 === strncasecmp( $script, $dir, strlen( $dir ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -243,9 +275,9 @@ final class WPS_Firewall_Prepend {
 	/**
 	 * Enviar respuesta de bloqueo y terminar.
 	 */
-	private static function block_response( string $ip ): void {
+	private static function block_response( string $ip, string $reason = 'BLOCKED' ): void {
 		// Log mínimo a archivo (sin DB).
-		self::log_block( $ip );
+		self::log_block( $ip, $reason );
 
 		// Respuesta HTTP 403.
 		if ( ! headers_sent() ) {
@@ -262,7 +294,7 @@ final class WPS_Firewall_Prepend {
 	/**
 	 * Log mínimo del bloqueo. Escribe en un archivo de texto simple.
 	 */
-	private static function log_block( string $ip ): void {
+	private static function log_block( string $ip, string $reason = 'BLOCKED' ): void {
 		$dir = dirname( self::$data_file );
 
 		// No intentar crear el archivo si el directorio no es escribible.
@@ -278,9 +310,10 @@ final class WPS_Firewall_Prepend {
 		}
 
 		$line = sprintf(
-			"[%s] BLOCKED %s %s %s\n",
+			"[%s] %s %s %s %s\n",
 			gmdate( 'Y-m-d H:i:s' ),
-			$ip,
+			$reason,
+			'' !== $ip ? $ip : '-',
 			self::clean_log_value( isset( $_SERVER['REQUEST_METHOD'] ) ? (string) $_SERVER['REQUEST_METHOD'] : '-', 10 ),
 			self::clean_log_value( isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '-', 200 )
 		);

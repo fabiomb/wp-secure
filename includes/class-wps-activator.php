@@ -19,6 +19,7 @@ class WPS_Activator {
         self::install_muplugin();
         self::install_prepend_loader();
         self::create_blocked_ips_file();
+        WPS_Uploads_Guard::sync_rules( (bool) WPS_Loader::get_instance()->get_setting( 'uploads_block_php', false ) );
 
         // Marcar como recién activado para mostrar wizard.
         update_option( 'wps_activated', true );
@@ -430,7 +431,14 @@ class WPS_Activator {
             "SELECT ip_address, cidr FROM {$wl_table} WHERE whitelist_type = 'global'"
         );
 
-        $data    = self::build_blocked_ips_data( $blocked, $whitelist_rows, time() );
+        // Con el bloqueo de PHP en uploads, la Capa 0 también lo aplica: es lo
+        // que lo hace efectivo en nginx, que no lee .htaccess.
+        $deny_php_dirs = array();
+        if ( WPS_Loader::get_instance()->get_setting( 'uploads_block_php', false ) ) {
+            $deny_php_dirs = array_filter( array( WPS_Uploads_Guard::uploads_dir() ) );
+        }
+
+        $data    = self::build_blocked_ips_data( $blocked, $whitelist_rows, time(), $deny_php_dirs );
         $content = '<?php return ' . var_export( $data, true ) . ';' . "\n";
 
         self::write_file_atomically( $file, $content );
@@ -444,10 +452,11 @@ class WPS_Activator {
      * bloqueo de 15 minutos seguía vigente hasta la siguiente regeneración.
      *
      * @param array $blocked   Filas con ip_address, cidr y expires_at (UTC).
-     * @param array $whitelist Filas con ip_address y cidr.
-     * @param int   $now       Timestamp de generación.
+     * @param array $whitelist     Filas con ip_address y cidr.
+     * @param int   $now           Timestamp de generación.
+     * @param array $deny_php_dirs Carpetas donde no se ejecuta PHP.
      */
-    public static function build_blocked_ips_data( array $blocked, array $whitelist, int $now ): array {
+    public static function build_blocked_ips_data( array $blocked, array $whitelist, int $now, array $deny_php_dirs = array() ): array {
         $ips   = array();
         $cidrs = array();
 
@@ -474,13 +483,19 @@ class WPS_Activator {
             }
         }
 
-        return array(
+        $data = array(
             'ips'             => $ips,
             'cidrs'           => $cidrs,
             'whitelist'       => $whitelist_ips,
             'whitelist_cidrs' => array_values( array_unique( $whitelist_cidrs ) ),
             'updated'         => $now,
         );
+
+        if ( $deny_php_dirs ) {
+            $data['deny_php_dirs'] = array_values( $deny_php_dirs );
+        }
+
+        return $data;
     }
 
     /**

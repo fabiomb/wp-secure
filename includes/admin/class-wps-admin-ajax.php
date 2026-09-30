@@ -457,7 +457,9 @@ class WPS_Admin_Ajax {
         $result = WPS_Admin_Export::import_config( $data );
 
         if ( $result['success'] ) {
-            // La importación puede encender o apagar la Capa 0.
+            // La importación puede encender o apagar la Capa 0 y el bloqueo
+            // de PHP en uploads.
+            WPS_Uploads_Guard::sync_rules( (bool) $this->loader->get_setting( 'uploads_block_php', false ) );
             WPS_Activator::sync_blocked_ips_file();
 
             WPS_Admin_Notifier::get_instance( $this->loader )->notify_settings_change(

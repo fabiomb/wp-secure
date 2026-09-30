@@ -222,6 +222,48 @@ class WPS_Admin_Notifier {
 	}
 
 	/**
+	 * Avisar de archivos ejecutables en la carpeta de subidas.
+	 *
+	 * @param array<string, array> $files Ruta => [reason, hash].
+	 * @return bool Si se envió el aviso.
+	 */
+	public function notify_uploads_php( array $files ): bool {
+		if ( ! $files || ! $this->loader->get_setting( 'notify_file_changes', true ) ) {
+			return false;
+		}
+
+		$labels = array(
+			'php'	=> __( 'PHP', 'wp-secure' ),
+			'config' => __( 'habilita PHP', 'wp-secure' ),
+		);
+
+		$lines = array();
+		foreach ( array_slice( $files, 0, 50, true ) as $path => $file ) {
+			$lines[] = sprintf( '[%s] %s', $labels[ $file['reason'] ] ?? $file['reason'], $path );
+		}
+		if ( count( $files ) > 50 ) {
+			/* translators: %d: number of files not listed */
+			$lines[] = sprintf( __( '… y %d más.', 'wp-secure' ), count( $files ) - 50 );
+		}
+
+		$subject = sprintf(
+			/* translators: 1: number of files, 2: site name */
+			_n( '[WP Seguro] %1$d archivo ejecutable en uploads de %2$s', '[WP Seguro] %1$d archivos ejecutables en uploads de %2$s', count( $files ), 'wp-secure' ),
+			count( $files ),
+			get_bloginfo( 'name' )
+		);
+
+		$body = sprintf(
+			/* translators: 1: list of files, 2: site name */
+			__( "Se encontraron archivos que el servidor podría ejecutar en la carpeta de subidas de %2\$s:\n\n%1\$s\n\nEsa carpeta sólo debería tener medios: un PHP ahí suele ser un webshell subido por un formulario o un plugin vulnerable. Revisalos y, si no los reconocés, eliminalos. Para impedir que se ejecuten, activá «PHP en uploads» en WP Seguro → Configuración.", 'wp-secure' ),
+			implode( "\n", $lines ),
+			get_bloginfo( 'name' )
+		);
+
+		return $this->send( $subject, $body );
+	}
+
+	/**
 	 * Avisar de archivos modificados, agregados o eliminados.
 	 *
 	 * @param array[] $changes Cambios: path, area, status.

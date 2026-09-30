@@ -83,6 +83,9 @@ class WPS_Loader {
         // Monitor de integridad de archivos.
         ( new WPS_File_Integrity( $this ) )->init();
 
+        // PHP en la carpeta de subidas.
+        ( new WPS_Uploads_Guard( $this ) )->init();
+
         // Límite de sesiones simultáneas de administradores.
         add_action( 'wp_login', array( $this, 'limit_admin_sessions' ), 20, 2 );
 
@@ -570,6 +573,7 @@ class WPS_Loader {
             WPS_Activator::install_muplugin();
             WPS_Activator::install_prepend_loader();
             WPS_Activator::protect_data_dir();
+            WPS_Uploads_Guard::sync_rules( (bool) $this->get_setting( 'uploads_block_php', false ) );
             update_option( 'wps_version', WPS_VERSION );
         }
     }

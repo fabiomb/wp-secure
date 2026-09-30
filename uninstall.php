@@ -9,6 +9,7 @@ defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
 // Cargar las clases necesarias.
 require_once __DIR__ . '/includes/database/class-wps-db-schema.php';
+require_once __DIR__ . '/includes/core/class-wps-uploads-guard.php';
 
 // Eliminar tablas propias.
 WPS_Db_Schema::drop_tables();
@@ -20,6 +21,10 @@ delete_option( 'wps_unsafe_mode' );
 delete_option( 'wps_block_digest' );
 delete_option( 'wps_integrity_state' );
 delete_option( 'wps_integrity_last_scan' );
+delete_option( 'wps_uploads_php' );
+
+// Reglas propias en uploads/.htaccess (se conservan las de otros plugins).
+WPS_Uploads_Guard::sync_rules( false );
 
 // Eliminar transients propios (cache de geolocalización y de verificación
 // de crawlers): uno por IP, pueden ser miles de filas en wp_options.

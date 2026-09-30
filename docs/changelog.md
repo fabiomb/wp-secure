@@ -15,6 +15,16 @@ Casi toda intrusión deja un archivo de código modificado o agregado: un backdo
 - **Nueva tabla** `wps_file_integrity` y ajuste «Monitor de integridad» (Configuración → Firewall Avanzado, activado por defecto).
 - **Rendimiento medido** en un sitio con 54 áreas y 15.247 archivos vigilados: un escaneo completo tarda unos 10 segundos. El primero, que lee todos los archivos por primera vez, puede tardar varios minutos (en el equipo de prueba, con antivirus en tiempo real, casi tres); se reparte en varias pasadas.
 
+### Nuevo: PHP en la carpeta de subidas — aviso y bloqueo de ejecución ([#17](https://github.com/fabiomb/wp-secure/issues/17))
+
+La carpeta de subidas sólo debería tener medios. Un archivo PHP ahí es casi siempre un webshell que entró por un formulario o un plugin vulnerable, y nada impedía ejecutarlo ni avisaba de que estaba.
+
+- **`WPS_Uploads_Guard`** (nuevo): una vez por día (con el monitor de integridad) busca en la carpeta de subidas archivos que el servidor podría ejecutar, también con doble extensión (`foto.php.jpg`), y `.htaccess` o `.user.ini` que habiliten PHP o inyecten código. Lo que ya estaba en el primer escaneo también se avisa: no hay una referencia que lo acepte en silencio.
+- **Sin falsas alarmas conocidas**: se descartan los PHP que sólo tienen comentarios o HTML (los `index.php` «Silence is golden» de muchos plugins), analizados con el tokenizer de PHP para que `<?php // ?>` seguido de código no pase por inofensivo, y los `.htaccess` de protección de otros plugins.
+- **Aviso**: evento «Archivos modificados» (crítico), mail con la lista (ajuste «Notificar archivos modificados») y aviso en el panel mientras haya archivos sin revisar. En **WP Seguro → Integridad** se listan, con «Buscar ahora» y «Marcar como revisados»; un archivo revisado que cambia se vuelve a avisar.
+- **Bloqueo de ejecución** (nuevo ajuste «PHP en uploads», Configuración → Firewall Avanzado, desactivado por defecto): escribe reglas en `uploads/.htaccess` (Apache 2.2/2.4 y LiteSpeed) conservando las de otros plugins, y con la Capa 0 activa también rechaza ahí los scripts de la carpeta de subidas, lo que lo hace efectivo en nginx. `configuration.md` documenta la regla para nginx sin Capa 0.
+- La Capa 0 registra esos rechazos en su log como `DENIED_PHP`. Las reglas se quitan al desactivar o desinstalar el plugin.
+
 ## [0.5.0] — 2026-09-29
 
 ### Seguridad: Límite de intentos de login por cuenta ([#12](https://github.com/fabiomb/wp-secure/issues/12))

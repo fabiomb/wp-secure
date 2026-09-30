@@ -88,7 +88,8 @@ Los límites se cuentan por **cliente**: en IPv4 es la dirección IP; en IPv6, l
 | Bloquear User-Agent vacío | Bloquear peticiones sin cabecera User-Agent. | Desactivado |
 | Bloquear peticiones sin Host | Bloquear peticiones sin cabecera Host válida. | Activado |
 | Prefijo IPv6 por cliente | Tamaño de la red IPv6 que se trata como un solo cliente (48–128). `128` = dirección exacta. | 64 |
-| Monitor de integridad | Vigila los archivos de código del núcleo, plugins, temas y `wp-content` (ver abajo). | Activado |
+| Monitor de integridad | Vigila los archivos de código del núcleo, plugins, temas y `wp-content`, y busca PHP en la carpeta de subidas (ver abajo). | Activado |
+| PHP en uploads | Impedir la ejecución de archivos PHP en la carpeta de subidas (ver abajo). | Desactivado |
 | Rutas trampa | Bloquear de inmediato a quien pida una ruta trampa. | Activado |
 | Lista de rutas trampa | Una por línea (ver abajo). | `/.env`, copias de `wp-config.php`, `/.git/*`, … |
 | Duración del bloqueo por ruta trampa | En minutos. | 1440 (24 h) |
@@ -106,6 +107,24 @@ Compara los archivos de código (`.php`, `.phtml`, `.phar`, `.inc`, `.htaccess`,
 - Los cambios se revisan en **WP Seguro → Integridad**, donde se aceptan por área o todos juntos (pasan a ser la nueva referencia). También con `wp wps integrity scan|status|accept`.
 - Guardar los enlaces permanentes regenera `.htaccess`, y editar `wp-config.php` también cuenta como cambio: son archivos que un atacante suele tocar, así que conviene revisarlos y aceptarlos.
 - El primer escaneo de un sitio grande puede tardar varios minutos, porque lee todos los archivos por primera vez. Los siguientes son mucho más rápidos.
+
+### PHP en la carpeta de subidas
+
+La carpeta de subidas (`wp-content/uploads/`) sólo debería tener medios. Un archivo PHP ahí es casi siempre un webshell que entró por un formulario o un plugin vulnerable, y ejecutarlo es lo que convierte esa subida en el control del sitio.
+
+- **Aviso**: junto con el monitor de integridad, una vez por día se buscan archivos que el servidor podría ejecutar (`.php`, `.phtml`, `.phar`, `.pht`, `.phps`, también con doble extensión como `foto.php.jpg`) y `.htaccess` o `.user.ini` que habiliten PHP o inyecten código (`AddHandler … php`, `auto_prepend_file`, …). A diferencia del monitor de integridad, lo que ya estaba en el primer escaneo **también** se avisa. Los nuevos llegan por mail («Notificar archivos modificados») y, mientras haya archivos sin revisar, el panel muestra un aviso.
+- **Qué no se informa**: los `index.php` que sólo tienen comentarios («Silence is golden», los de LearnDash, WooCommerce, etc.) y los `.htaccess` de protección de otros plugins (`deny from all`, `php_flag engine 0`).
+- **Revisión**: en **WP Seguro → Integridad**, sección «PHP en la carpeta de subidas», con «Buscar ahora» y «Marcar como revisados». Un archivo revisado que cambia se vuelve a avisar.
+- **Bloqueo** (ajuste «PHP en uploads», desactivado por defecto): escribe reglas en `uploads/.htaccess` que niegan esos archivos (Apache 2.2 y 2.4, LiteSpeed), conservando las reglas de otros plugins que hubiera. Si la Capa 0 está activa, además rechaza ahí cualquier script dentro de la carpeta de subidas, lo que lo hace efectivo también en nginx. Al desactivar el plugin se quitan las reglas; al reactivarlo se vuelven a escribir.
+- **nginx sin Capa 0**: agregá esta regla al bloque `server`, **antes** del `location` que pasa los `.php` a PHP-FPM, y recargá nginx:
+
+```nginx
+location ~* ^/wp-content/uploads/.*\.(php[0-9]*|phtml|phar|pht|phps)(\.|$) {
+    deny all;
+}
+```
+
+Para comprobarlo, subí por FTP un `prueba.php` inofensivo a `wp-content/uploads/` y pedilo en el navegador: tiene que responder 403. Borralo después.
 
 ### Rutas trampa
 

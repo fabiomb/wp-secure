@@ -586,7 +586,15 @@ class WPS_Admin_Settings {
                         'type'           => 'checkbox',
                         'default'        => true,
                         'checkbox_label' => __( 'Vigilar los archivos de código del núcleo, plugins y temas', 'wp-secure' ),
-                        'description'    => __( 'Una vez por día se comparan contra la referencia tomada. Las actualizaciones toman una referencia nueva automáticamente. Los cambios se revisan en WP Seguro → Integridad.', 'wp-secure' ),
+                        'description'    => __( 'Una vez por día se comparan contra la referencia tomada. Las actualizaciones toman una referencia nueva automáticamente. Los cambios se revisan en WP Seguro → Integridad. También busca archivos PHP en la carpeta de subidas.', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'            => 'uploads_block_php',
+                        'label'          => __( 'PHP en uploads', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => false,
+                        'checkbox_label' => __( 'Impedir la ejecución de archivos PHP en la carpeta de subidas', 'wp-secure' ),
+                        'description'    => __( 'Escribe reglas en uploads/.htaccess (Apache y LiteSpeed) y, con la Capa 0 activa, también lo aplica ahí (nginx). Un webshell subido por un formulario o un plugin vulnerable deja de poder ejecutarse.', 'wp-secure' ),
                     ),
                     array(
                         'key'            => 'honeypot_enabled',

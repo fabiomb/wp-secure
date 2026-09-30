@@ -49,6 +49,9 @@ class WPS_Admin {
         // Aviso mientras el kill switch de wp-config.php esté activo.
         add_action( 'admin_notices', array( $this, 'maybe_show_kill_switch_notice' ) );
 
+        // Aviso de archivos PHP sin revisar en la carpeta de subidas.
+        add_action( 'admin_notices', array( $this, 'maybe_show_uploads_php_notice' ) );
+
         // Widget en el dashboard de WordPress.
         add_action( 'wp_dashboard_setup', array( $this, 'register_dashboard_widget' ) );
 
@@ -68,6 +71,32 @@ class WPS_Admin {
             <p>
                 <strong><?php esc_html_e( 'WP Seguro: el bloqueo está suspendido por la constante WPS_DISABLE_BLOCKING.', 'wp-secure' ); ?></strong>
                 <?php esc_html_e( 'El firewall sólo detecta y registra. Quitá la constante de wp-config.php cuando termines.', 'wp-secure' ); ?>
+            </p>
+        </div>
+        <?php
+    }
+
+    /**
+     * Avisar de archivos PHP sin revisar en la carpeta de subidas.
+     */
+    public function maybe_show_uploads_php_notice(): void {
+        if ( ! current_user_can( $this->capability ) ) {
+            return;
+        }
+
+        $pending = count( ( new WPS_Uploads_Guard( $this->loader ) )->pending() );
+        if ( ! $pending ) {
+            return;
+        }
+        ?>
+        <div class="notice notice-error">
+            <p>
+                <strong><?php
+                    /* translators: %d: number of files */
+                    echo esc_html( sprintf( _n( 'WP Seguro: hay %d archivo ejecutable en la carpeta de subidas.', 'WP Seguro: hay %d archivos ejecutables en la carpeta de subidas.', $pending, 'wp-secure' ), $pending ) );
+                ?></strong>
+                <?php esc_html_e( 'La carpeta de subidas sólo debería tener medios: un PHP ahí suele ser un webshell.', 'wp-secure' ); ?>
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->menu_slug . '-integrity#wps-uploads' ) ); ?>"><?php esc_html_e( 'Revisarlos', 'wp-secure' ); ?></a>
             </p>
         </div>
         <?php
@@ -412,6 +441,9 @@ class WPS_Admin {
 
         $settings_page = new WPS_Admin_Settings( $this->loader );
         $settings_page->save();
+
+        // Reglas de uploads/.htaccess según el ajuste.
+        WPS_Uploads_Guard::sync_rules( (bool) $this->loader->get_setting( 'uploads_block_php', false ) );
 
         // Encender o apagar la Capa 0 crea o elimina su archivo de datos.
         WPS_Activator::sync_blocked_ips_file();
