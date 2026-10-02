@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.6.2] — Sin publicar
+## [0.6.2] — 2026-10-02
 
 ### Corrección: el motor de riesgo casi no medía nada ([#26](https://github.com/fabiomb/wp-secure/issues/26))
 
@@ -10,6 +10,10 @@ En modo sombra la página **Motor de riesgo** quedaba vacía aun con tráfico y 
 - **`WPS_Rate_Limiter::get_counts()`** (nuevo): varios contadores en una sola consulta; reemplaza la consulta que el motor ya hacía para la tasa de páginas.
 - **Reporte**: muestra las peticiones del período (del log de tráfico) junto a las que tuvieron puntaje, y una tabla **Qué está midiendo** con los factores que aparecieron, también en los eventos de riesgo bajo. Si hubo tráfico pero nada llegó a 31 puntos, lo dice en lugar de pedir que se espere.
 - **Documentación**: `rules-reference.md` listaba como factores del motor SQLi, XSS, path traversal y XML-RPC, que sus detectores bloquean antes de que el motor evalúe la petición. Ahora la tabla indica de dónde sale cada factor y aclara cuáles no suman.
+
+### Versión
+
+- Versión actualizada a `0.6.2` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin. Sin cambios de base de datos.
 
 ## [0.6.1] — 2026-09-30
 
