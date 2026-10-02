@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.7.0] — Sin publicar
+## [0.7.0] — 2026-10-02
 
 ### Nuevo: Actualizaciones desde los releases de GitHub ([#27](https://github.com/fabiomb/wp-secure/issues/27))
 
@@ -21,6 +21,10 @@ Con actualizaciones automáticas, la cuenta de GitHub pasa a ser la llave de tod
 - **`WPS_Updater::download_verified()`** (nuevo, filtro `upgrader_pre_download`): descarga el paquete y su firma y la verifica con `sodium_compat`, que viene con WordPress, así que funciona aunque PHP no tenga la extensión sodium. Si falta o no es válida, la actualización se cancela antes de tocar el plugin instalado, con un mensaje claro y un evento crítico «Actualización rechazada».
 - `docs/releasing.md` (nuevo): cómo armar, firmar y publicar una versión.
 - `Plugin URI` apunta al repositorio (`github.com/fabiomb/wp-secure`).
+
+### Versión
+
+- Versión actualizada a `0.7.0` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin. Sin cambios de base de datos; la migración agrega el ajuste «Buscar versiones nuevas en GitHub» (activado). **Esta versión se instala a mano**: es la primera con el actualizador. Desde acá, las siguientes llegan desde el panel.
 
 ## [0.6.2] — 2026-10-02
 
