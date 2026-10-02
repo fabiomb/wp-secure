@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: WP Seguro
- * Plugin URI:  https://github.com/wp-secure
+ * Plugin URI:  https://github.com/fabiomb/wp-secure
  * Description: Sistema de protección contra bots, spiders e intrusiones. Orientado a rendimiento y claridad.
  * Version:     0.6.2
  * Author:      Fabio Baccaglioni

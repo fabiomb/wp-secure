@@ -13,6 +13,15 @@ El plugin no está en wordpress.org, así que cada sitio tenía que bajar el zip
 - **Carpeta**: si el plugin está instalado con otro nombre de carpeta (`wp-secure-main`), la actualización la respeta en lugar de dejar una segunda copia.
 - **Se puede desactivar** con el ajuste «Buscar versiones nuevas en GitHub» (API y Datos) o la constante `WPS_DISABLE_UPDATE_CHECK`.
 
+### Seguridad: Verificación de firma de las actualizaciones ([#28](https://github.com/fabiomb/wp-secure/issues/28))
+
+Con actualizaciones automáticas, la cuenta de GitHub pasa a ser la llave de todos los sitios: quien la tomara podría publicar un release con un backdoor.
+
+- **Firma Ed25519**: cada zip se publica con su firma (`wp-secure-X.Y.Z.zip.sig`), hecha con una clave privada que no está en GitHub. El plugin trae dos claves públicas: la principal y una de emergencia guardada fuera de línea, para poder reemplazar la principal si se pierde o se compromete.
+- **`WPS_Updater::download_verified()`** (nuevo, filtro `upgrader_pre_download`): descarga el paquete y su firma y la verifica con `sodium_compat`, que viene con WordPress, así que funciona aunque PHP no tenga la extensión sodium. Si falta o no es válida, la actualización se cancela antes de tocar el plugin instalado, con un mensaje claro y un evento crítico «Actualización rechazada».
+- `docs/releasing.md` (nuevo): cómo armar, firmar y publicar una versión.
+- `Plugin URI` apunta al repositorio (`github.com/fabiomb/wp-secure`).
+
 ## [0.6.2] — 2026-10-02
 
 ### Corrección: el motor de riesgo casi no medía nada ([#26](https://github.com/fabiomb/wp-secure/issues/26))

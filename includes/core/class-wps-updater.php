@@ -15,7 +15,8 @@ defined( 'ABSPATH' ) || exit;
  * - Se consulta el último release publicado (no borradores ni prereleases)
  *   con un User-Agent propio: WordPress manda por defecto la URL del sitio.
  * - Sólo se acepta el zip del release (`wp-secure-X.Y.Z.zip`) publicado en
- *   este repositorio.
+ *   este repositorio, y sólo si su firma Ed25519 (`.zip.sig`) es válida
+ *   para una de las claves públicas de abajo.
  * - Se desactiva con el ajuste «Buscar actualizaciones en GitHub» o con la
  *   constante WPS_DISABLE_UPDATE_CHECK.
  */
@@ -37,6 +38,19 @@ class WPS_Updater {
 
 	const SLUG = 'wp-secure';
 
+	/**
+	 * Claves públicas Ed25519 de quien publica los releases.
+	 *
+	 * Quien tome la cuenta de GitHub podría publicar un release, pero no
+	 * firmarlo: la clave privada no está en GitHub. La de emergencia se guarda
+	 * fuera de línea y sirve para publicar, firmada con ella, una versión que
+	 * deje de aceptar la principal si se pierde o se compromete.
+	 */
+	const PUBLIC_KEYS = array(
+		'principal'  => 'CgMdPMp8D7EtUU/nbW8yQpHui85W9oEd8tYkyEWjQoM=',
+		'emergencia' => 'tB2RxtzrBrGB0Zm+aoY1lpI1wwkCBMXUjTcEquJMFfg=',
+	);
+
 	/** @var WPS_Loader */
 	private $loader;
 
@@ -56,6 +70,7 @@ class WPS_Updater {
 		add_filter( 'update_plugins_github.com', array( $this, 'update_info' ), 10, 3 );
 		add_filter( 'plugins_api', array( $this, 'plugin_info' ), 10, 3 );
 		add_filter( 'upgrader_source_selection', array( $this, 'keep_folder_name' ), 10, 4 );
+		add_filter( 'upgrader_pre_download', array( $this, 'download_verified' ), 10, 4 );
 	}
 
 	public function enabled(): bool {
@@ -137,6 +152,108 @@ class WPS_Updater {
 				'changelog' => self::markdown_to_html( $release['notes'] ),
 			),
 		);
+	}
+
+	/**
+	 * Descargar el paquete y verificar su firma antes de instalarlo.
+	 *
+	 * Reemplaza la descarga de WordPress sólo para paquetes de este
+	 * repositorio. Si falta la firma o no es válida, la actualización se
+	 * cancela antes de tocar el plugin instalado y queda un evento crítico.
+	 *
+	 * @param false|string|WP_Error $reply      Resultado de otro filtro.
+	 * @param string                $package    URL del paquete.
+	 * @param object|null           $upgrader   Upgrader.
+	 * @param array                 $hook_extra Datos de la actualización.
+	 * @return false|string|WP_Error Ruta del zip verificado.
+	 */
+	public function download_verified( $reply, $package, $upgrader = null, $hook_extra = array() ) {
+		if ( false !== $reply || ! is_string( $package ) || 0 !== strpos( $package, self::DOWNLOAD_PREFIX ) ) {
+			return $reply;
+		}
+
+		if ( ! function_exists( 'download_url' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+
+		if ( is_object( $upgrader ) && isset( $upgrader->skin ) && is_object( $upgrader->skin ) ) {
+			$upgrader->skin->feedback( __( 'Descargando WP Seguro y verificando su firma…', 'wp-secure' ) );
+		}
+
+		$zip = download_url( $package, 300 );
+		if ( is_wp_error( $zip ) ) {
+			return $zip;
+		}
+
+		$sig_file  = download_url( $package . '.sig', 60 );
+		$signature = is_wp_error( $sig_file ) ? '' : (string) file_get_contents( $sig_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ( ! is_wp_error( $sig_file ) ) {
+			@unlink( $sig_file ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		}
+
+		$key = '' === $signature ? null : self::verify( (string) file_get_contents( $zip ), $signature, $this->public_keys() ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ( null !== $key ) {
+			return $zip;
+		}
+
+		@unlink( $zip ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+
+		$reason = '' === $signature ? 'missing' : 'invalid';
+		WPS_Logger::get_instance()->event_immediate( WPS_Event_Types::UPDATE_REJECTED, array(
+			'details' => array( 'package' => $package, 'reason' => $reason ),
+		) );
+
+		return new WP_Error(
+			'wps_update_signature',
+			'missing' === $reason
+				? __( 'La actualización de WP Seguro no trae firma, así que no se instaló. El plugin sigue en la versión actual.', 'wp-secure' )
+				: __( 'La firma de la actualización de WP Seguro no es válida: el paquete pudo haber sido alterado y no se instaló. El plugin sigue en la versión actual.', 'wp-secure' )
+		);
+	}
+
+	/**
+	 * Clave que valida la firma, o null si ninguna.
+	 *
+	 * La firma es la de `openssl pkeyutl -sign -rawin` (64 bytes); también se
+	 * acepta en base64.
+	 *
+	 * @param array<string, string> $keys Nombre => clave pública en base64.
+	 */
+	public static function verify( string $data, string $signature, array $keys ): ?string {
+		if ( 64 !== strlen( $signature ) ) {
+			$decoded   = base64_decode( trim( $signature ), true );
+			$signature = false === $decoded ? '' : $decoded;
+		}
+		if ( 64 !== strlen( $signature ) ) {
+			return null;
+		}
+
+		if ( ! function_exists( 'sodium_crypto_sign_verify_detached' ) && defined( 'WPINC' ) && is_file( ABSPATH . WPINC . '/sodium_compat/autoload.php' ) ) {
+			require_once ABSPATH . WPINC . '/sodium_compat/autoload.php';
+		}
+		if ( ! function_exists( 'sodium_crypto_sign_verify_detached' ) ) {
+			return null;
+		}
+
+		foreach ( $keys as $name => $key ) {
+			$public = base64_decode( $key, true );
+			try {
+				if ( false !== $public && 32 === strlen( $public ) && sodium_crypto_sign_verify_detached( $signature, $data, $public ) ) {
+					return (string) $name;
+				}
+			} catch ( \Throwable $e ) {
+				continue;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * @return array<string, string>
+	 */
+	protected function public_keys(): array {
+		return self::PUBLIC_KEYS;
 	}
 
 	/**

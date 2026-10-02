@@ -15,6 +15,7 @@ Plugin de seguridad para WordPress orientado a rendimiento y claridad. Detecta, 
 9. [Solución de Problemas](troubleshooting.md)
 10. [Preguntas Frecuentes](faq.md)
 11. [Registro de Cambios](changelog.md)
+12. [Publicar una versión](releasing.md) (para quien mantiene el plugin)
 
 ## Inicio Rápido
 

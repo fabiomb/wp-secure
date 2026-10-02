@@ -101,6 +101,7 @@ Desde la versión 0.7.0 el plugin se actualiza desde el panel, como cualquier ot
 - Se instala con un clic o, si activás **Activar actualizaciones automáticas** en la fila del plugin, sola.
 - La consulta se hace cada pocas horas a la API pública de GitHub, con un User-Agent propio: no se envía la dirección del sitio. **Buscar actualizaciones** en Escritorio → Actualizaciones fuerza una consulta nueva.
 - Sólo se acepta el zip del release (`wp-secure-X.Y.Z.zip`) publicado en este repositorio. La cabecera `Update URI` hace que WordPress no busque este plugin en wordpress.org, así que otro plugin con el mismo nombre no puede reemplazarlo.
+- **Cada paquete se verifica con una firma Ed25519** (`wp-secure-X.Y.Z.zip.sig`) contra las claves públicas que trae el plugin. Quien tomara la cuenta de GitHub podría publicar un release, pero no firmarlo. Si la firma falta o no es válida, la actualización se cancela antes de tocar el plugin instalado, se muestra el motivo y queda un evento crítico «Actualización rechazada».
 - Si la carpeta del plugin tiene otro nombre (por ejemplo `wp-secure-main`, si se instaló desde «Download ZIP» de GitHub), la actualización la respeta.
 - Para no consultar GitHub: desactivá **Buscar versiones nuevas en GitHub** (Configuración → API y Datos) o definí `define( 'WPS_DISABLE_UPDATE_CHECK', true );` en `wp-config.php`. En ese caso se actualiza a mano, subiendo el zip.
 - Las versiones anteriores a 0.7.0 no tienen el actualizador: la 0.7.0 se instala a mano una vez.
