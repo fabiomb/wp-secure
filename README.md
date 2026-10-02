@@ -41,8 +41,8 @@
 | Capa | Mecanismo | Momento | Qué hace |
 |------|-----------|---------|----------|
 | **0** | `auto_prepend_file` | Antes de cualquier PHP del sitio | Descarta IPs y rangos bloqueados leyendo un archivo plano. Sin base de datos, sin WordPress. |
-| **1** | MU-plugin | Después del núcleo, antes de plugins y temas | Detecta patrones, aplica rate limiting, calcula el riesgo y registra. |
-| **2** | Plugin | Carga normal | Asistente, dashboard, eventos, reglas, whitelist y configuración. |
+| **1** | MU-plugin | Después del núcleo, antes de plugins y temas | Corta las IPs bloqueadas, las rutas trampa y el exceso de peticiones antes de que carguen los plugins. |
+| **2** | Plugin | Carga normal (`init`) | Detectores de ataques, motor de riesgo y registro de tráfico y eventos; además el panel: dashboard, reglas, whitelist y configuración. |
 
 Además de los detectores, que bloquean por sí solos ante un patrón claro, el **motor de riesgo** suma puntos por señales débiles de la petición y del comportamiento reciente del cliente (404 seguidos, logins fallidos, usuarios inexistentes, ritmo alto) y actúa según el total:
 

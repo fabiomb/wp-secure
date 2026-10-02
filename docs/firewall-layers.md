@@ -14,8 +14,9 @@ Petición HTTP entrante
 │  Capa 0: Firewall PHP       │  ← Antes de WordPress (< 1ms)
 │  auto_prepend_file           │
 ├─────────────────────────────┤
-│  ¿IP en lista negra? → 403  │
+│  ¿PHP en uploads?    → 403  │
 │  ¿IP en whitelist?   → OK   │
+│  ¿IP en lista negra? → 403  │
 │  No decidido → continuar     │
 └─────────────┬───────────────┘
               │
@@ -24,22 +25,22 @@ Petición HTTP entrante
 │  Capa 1: MU-Plugin          │  ← Antes de plugins (< 5ms)
 │  wps-firewall-muplugin.php   │
 ├─────────────────────────────┤
-│  Análisis de petición        │
-│  Detección de patrones       │
+│  ¿IP bloqueada?      → 403  │
+│  Rutas trampa                │
 │  Rate limiting               │
-│  Puntuación de riesgo        │
 │  ¿Bloquear? → 403           │
 └─────────────┬───────────────┘
               │
               ▼
 ┌─────────────────────────────┐
-│  Capa 2: Plugin Principal    │  ← Carga normal de WordPress
+│  Capa 2: Plugin Principal    │  ← Carga normal, en init
 │  wp-secure.php               │
 ├─────────────────────────────┤
-│  Dashboard                   │
-│  Configuración               │
-│  Reportes y logs             │
-│  Gestión de reglas           │
+│  Detectores de ataques       │
+│  Motor de riesgo             │
+│  Headers y reglas de método  │
+│  Registro de tráfico/eventos │
+│  Panel de administración     │
 └─────────────────────────────┘
 ```
 
@@ -54,8 +55,9 @@ La Capa 0 usa la directiva `auto_prepend_file` de PHP para ejecutar un script **
 ### ¿Qué hace?
 
 - Consulta un archivo de datos en disco con las IPs actualmente bloqueadas.
-- Si la IP está bloqueada → responde con HTTP 403 inmediatamente.
+- Si «PHP en uploads» está activo y el script pedido está en la carpeta de subidas → HTTP 403, para cualquier IP.
 - Si la IP está en whitelist → permite sin más verificaciones.
+- Si la IP está bloqueada → responde con HTTP 403 inmediatamente.
 - Si no hay decisión → pasa a la Capa 1.
 
 ### Limitaciones
@@ -75,28 +77,21 @@ Ver [Instalación — Capa 0](installation.md#capa-0-firewall-php).
 
 ### ¿Qué es?
 
-Un Must-Use Plugin (MU-Plugin) se carga antes que los plugins convencionales y los temas. WP Seguro instala un pequeño archivo en `wp-content/mu-plugins/` que inicia el análisis de seguridad temprano en el ciclo de WordPress.
+Un Must-Use Plugin (MU-Plugin) se carga antes que los plugins convencionales y los temas. WP Seguro instala un pequeño archivo en `wp-content/mu-plugins/` que corta lo que ya se sabe que hay que cortar antes de que carguen los plugins y el tema.
 
 ### ¿Qué hace?
 
-- Clasifica el tipo de petición (login, XML-RPC, REST API, admin, página, recurso estático).
-- Ejecuta todas las reglas de detección:
-  - Inyección SQL (SQLi)
-  - Cross-Site Scripting (XSS)
-  - Path Traversal
-  - Scanners y herramientas automatizadas
-  - Fuerza bruta en login
-  - Abuso de XML-RPC
-- Evalúa el rate limiting.
-- Calcula la puntuación de riesgo acumulada.
-- Decide bloquear o permitir según umbrales configurados.
-- Registra eventos y tráfico en la base de datos del plugin.
+- Exime al propio servidor (cron, loopbacks) y a la whitelist.
+- Si la IP (o su red, en IPv6) está bloqueada → HTTP 403.
+- Rutas trampa (`/.env`, copias de `wp-config.php`, `/.git/`…): bloquea a quien las pide. Sin sesión iniciada; con sesión lo decide la Capa 2 con los permisos reales.
+- Rate limiting de peticiones totales y de páginas, también sin sesión iniciada.
+
+Los detectores de patrones y el motor de riesgo **no** corren acá: necesitan WordPress completo (usuario actual, ajustes, `init`) y corren en la Capa 2.
 
 ### Ventajas
 
-- Se ejecuta antes que otros plugins → no hay interferencia.
-- Tiene acceso completo a la base de datos → reglas complejas.
-- La mayoría de atacantes son bloqueados aquí, antes de que WordPress procese la petición.
+- Se ejecuta antes que otros plugins → no hay interferencia y el costo es mínimo.
+- Un atacante ya bloqueado, o que pide una ruta trampa, se descarta antes de cargar plugins y tema.
 
 ### Activación
 
@@ -108,21 +103,28 @@ El asistente de configuración inicial ofrece instalar el MU-Plugin automáticam
 
 ### ¿Qué es?
 
-El plugin convencional que proporciona la interfaz de administración. Solo se carga en el contexto de `/wp-admin/`.
+El plugin convencional. Se carga en **todas** las peticiones que pasan por WordPress, públicas y del panel: ahí corre la detección y, en el panel, la administración.
 
 ### ¿Qué hace?
 
-- Dashboard con estadísticas y gráficas.
-- Configuración de todas las reglas y ajustes.
-- Visor de tráfico en tiempo real.
-- Gestión de whitelist y bloqueos manuales.
-- Detalle de IP con historial de eventos.
-- Exportación de datos (CSV).
+En cada petición (en `init`):
+
+- Bloqueo por país o ASN, si hay geolocalización configurada.
+- Detectores: inyección SQL, XSS, path traversal, escáneres, login (fuerza bruta, usuarios inexistentes, enumeración), XML-RPC y REST API.
+- Reglas de métodos HTTP, User-Agent vacío y Host ausente; headers de seguridad, HSTS y CSP.
+- Motor de puntuación de riesgo (si está en modo sombra o activo).
+- Protección de formularios, límite de búsquedas y rutas trampa con los permisos reales del usuario.
+- Registro de tráfico y de eventos.
+
+En segundo plano y en el panel:
+
+- Mantenimiento programado: purga de registros, monitor de integridad, PHP en uploads, resúmenes por mail.
+- Dashboard, tráfico en vivo, bloqueos, whitelist, eventos, configuración, reglas y exportación.
 - Gestión de la base de datos MMDB (geolocalización).
 
 ### Nota sobre rendimiento
 
-La Capa 2 solo se activa en el panel de administración. Las páginas públicas del sitio no cargan ningún código de esta capa, asegurando cero impacto en el rendimiento para los visitantes.
+Lo que más pesa en cada petición es el registro de tráfico (una escritura) y, si está encendido, el motor de riesgo (dos consultas). En sitios con mucho tráfico, «Registro de tráfico» permite muestreo ([ver Configuración](configuration.md#registro-de-tráfico-en-sitios-con-mucho-tráfico)). Las IPs ya bloqueadas se descartan en las Capas 0 y 1, antes de llegar acá.
 
 ---
 
@@ -134,6 +136,6 @@ WP Seguro está diseñado para funcionar incluso si no todas las capas están ac
 |---------------|---------------------|------|
 | 0 + 1 + 2 | Máximo | Configuración completa recomendada |
 | 1 + 2 | Alto | Suficiente para la mayoría de sitios |
-| Solo 2 | Básico | Sin interceptación temprana, pero dashboard y reglas funcionan |
+| Solo 2 | Básico | Detección completa, pero los bloqueados se descartan recién con WordPress y los plugins cargados |
 
 El plugin detecta automáticamente qué capas están activas y muestra el estado en el dashboard.
