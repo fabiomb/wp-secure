@@ -353,7 +353,7 @@ class WPS_Admin_Settings {
                         'type'           => 'checkbox',
                         'default'        => true,
                         'checkbox_label' => __( 'Buscar versiones nuevas en GitHub', 'wp-secure' ),
-                        'description'    => __( 'Cada pocas horas se consulta el último release publicado en github.com/fabiomb/wp-secure, sin enviar la dirección del sitio. Las versiones nuevas aparecen en Plugins y en Escritorio → Actualizaciones, y se pueden instalar con un clic o activar las actualizaciones automáticas. También se desactiva con la constante WPS_DISABLE_UPDATE_CHECK.', 'wp-secure' ),
+                        'description'    => __( 'Cuando WordPress busca actualizaciones se consulta el último release publicado en github.com/fabiomb/wp-secure, sin enviar la dirección del sitio. Las versiones nuevas aparecen en Plugins y en Escritorio → Actualizaciones, y se pueden instalar con un clic o activar las actualizaciones automáticas. También se desactiva con la constante WPS_DISABLE_UPDATE_CHECK.', 'wp-secure' ) . ' ' . WPS_Updater::status_text(),
                     ),
                 ),
             ),

@@ -12,8 +12,10 @@ class Test_WPS_Updater extends \PHPUnit\Framework\TestCase {
 	}
 
 	protected function tearDown(): void {
-		unset( $GLOBALS['wps_test_http_response'], $GLOBALS['wps_test_is_admin'], $_GET['force-check'] );
-		$GLOBALS['wps_test_transients'] = array();
+		unset( $GLOBALS['wps_test_http_response'], $GLOBALS['wps_test_http_head'], $GLOBALS['wps_test_is_admin'], $GLOBALS['wps_test_caps'], $_GET['force-check'] );
+		$GLOBALS['wps_test_transients']      = array();
+		$GLOBALS['wps_test_site_transients'] = array();
+		$GLOBALS['wps_test_options']         = array();
 	}
 
 	/*──────────────────────────────────────────────
@@ -111,6 +113,83 @@ class Test_WPS_Updater extends \PHPUnit\Framework\TestCase {
 
 		$this->updater()->init();
 		$this->assertContains( 'update_plugins_github.com', array_column( $GLOBALS['wps_test_hooks'], 'hook' ) );
+	}
+
+	/*──────────────────────────────────────────────
+	 * Caché, comprobación forzada y respaldo (#30)
+	 *──────────────────────────────────────────────*/
+
+	public function test_cache_lasts_minutes_not_hours(): void {
+		$this->assertLessThanOrEqual( 900, WPS_Updater::CACHE_TTL, 'WordPress ya decide cada cuánto revisa.' );
+		$this->assertLessThanOrEqual( 900, WPS_Updater::ERROR_TTL );
+	}
+
+	public function test_check_again_forces_a_real_plugin_check(): void {
+		$GLOBALS['wps_test_caps']           = array( 'update_plugins' => true );
+		$_GET['force-check']                = '1';
+		$GLOBALS['wps_test_transients'][ WPS_Updater::CACHE ] = array( 'release' => null );
+		$GLOBALS['wps_test_site_transients']['update_plugins'] = (object) array( 'last_checked' => time() );
+
+		$this->updater()->on_force_check();
+
+		$this->assertArrayNotHasKey( WPS_Updater::CACHE, $GLOBALS['wps_test_transients'] );
+		$this->assertArrayNotHasKey( 'update_plugins', $GLOBALS['wps_test_site_transients'], 'WordPress revisa aunque haya revisado hace menos de un minuto.' );
+	}
+
+	public function test_check_again_needs_the_capability(): void {
+		$_GET['force-check'] = '1';
+		$GLOBALS['wps_test_site_transients']['update_plugins'] = (object) array( 'last_checked' => 123 );
+
+		$this->updater()->on_force_check();
+
+		$this->assertArrayHasKey( 'update_plugins', $GLOBALS['wps_test_site_transients'] );
+	}
+
+	public function test_release_page_redirect_is_parsed(): void {
+		$release = WPS_Updater::release_from_location( 'https://github.com/fabiomb/wp-secure/releases/tag/v0.7.3' );
+
+		$this->assertSame( '0.7.3', $release['version'] );
+		$this->assertSame( 'https://github.com/fabiomb/wp-secure/releases/download/v0.7.3/wp-secure-0.7.3.zip', $release['package'] );
+
+		$this->assertNull( WPS_Updater::release_from_location( 'https://github.com/otro/wp-secure/releases/tag/v0.7.3' ) );
+		$this->assertNull( WPS_Updater::release_from_location( 'https://github.com/fabiomb/wp-secure/releases/tag/v0.7.3-beta' ) );
+		$this->assertNull( WPS_Updater::release_from_location( '' ) );
+	}
+
+	public function test_api_limit_falls_back_to_the_release_page(): void {
+		$GLOBALS['wps_test_http_response'] = array( 'code' => 403, 'body' => '' );
+		$GLOBALS['wps_test_http_head']     = array( 'code' => 302, 'headers' => array( 'location' => 'https://github.com/fabiomb/wp-secure/releases/tag/v9.2.0' ) );
+
+		$release = $this->updater()->latest_release();
+
+		$this->assertSame( '9.2.0', $release['version'] );
+		$this->assertStringContainsString( '9.2.0', WPS_Updater::status_text() );
+		$this->assertStringContainsString( 'página de releases', WPS_Updater::status_text() );
+	}
+
+	public function test_failed_check_is_shown_with_its_reason(): void {
+		$GLOBALS['wps_test_http_response'] = array( 'code' => 403, 'body' => '' );
+
+		$this->assertNull( $this->updater()->latest_release() );
+		$this->assertStringContainsString( '403', WPS_Updater::status_text() );
+		$this->assertStringContainsString( 'límite de consultas', WPS_Updater::status_text() );
+	}
+
+	public function test_successful_check_is_shown(): void {
+		$this->assertSame( 'Todavía no se consultó.', WPS_Updater::status_text() );
+
+		$this->updater()->latest_release();
+
+		$this->assertStringContainsString( 'última versión publicada: 9.1.0', WPS_Updater::status_text() );
+	}
+
+	public function test_details_without_notes_link_to_the_release(): void {
+		$GLOBALS['wps_test_http_response'] = array( 'code' => 403, 'body' => '' );
+		$GLOBALS['wps_test_http_head']     = array( 'code' => 302, 'headers' => array( 'location' => 'https://github.com/fabiomb/wp-secure/releases/tag/v9.2.0' ) );
+
+		$info = $this->updater()->plugin_info( false, 'plugin_information', (object) array( 'slug' => 'wp-secure' ) );
+
+		$this->assertStringContainsString( 'https://github.com/fabiomb/wp-secure/releases/tag/v9.2.0', $info->sections['changelog'] );
 	}
 
 	/*──────────────────────────────────────────────

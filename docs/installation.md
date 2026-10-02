@@ -99,7 +99,9 @@ Desde la versión 0.7.0 el plugin se actualiza desde el panel, como cualquier ot
 
 - La versión nueva aparece en **Plugins** y en **Escritorio → Actualizaciones**. «Ver detalles» muestra las notas del release.
 - Se instala con un clic o, si activás **Activar actualizaciones automáticas** en la fila del plugin, sola.
-- La consulta se hace cada pocas horas a la API pública de GitHub, con un User-Agent propio: no se envía la dirección del sitio. **Buscar actualizaciones** en Escritorio → Actualizaciones fuerza una consulta nueva.
+- La consulta se hace cuando WordPress busca actualizaciones (dos veces por día por cron, y al entrar a Plugins o a Actualizaciones), a la API pública de GitHub y con un User-Agent propio: no se envía la dirección del sitio. **Comprobar de nuevo** en Escritorio → Actualizaciones fuerza una consulta en ese momento.
+- Si la API de GitHub no responde (por ejemplo, porque en un hosting compartido se agotó su límite de 60 consultas por hora e IP), se usa la página de releases, que no tiene ese límite.
+- El resultado de la última consulta (cuándo, qué versión encontró o por qué falló) se ve en Configuración → API y Datos, junto al ajuste.
 - Sólo se acepta el zip del release (`wp-secure-X.Y.Z.zip`) publicado en este repositorio. La cabecera `Update URI` hace que WordPress no busque este plugin en wordpress.org, así que otro plugin con el mismo nombre no puede reemplazarlo.
 - **Cada paquete se verifica con una firma Ed25519** (`wp-secure-X.Y.Z.zip.sig`) contra las claves públicas que trae el plugin. Quien tomara la cuenta de GitHub podría publicar un release, pero no firmarlo. Si la firma falta o no es válida, la actualización se cancela antes de tocar el plugin instalado, se muestra el motivo y queda un evento crítico «Actualización rechazada».
 - Si la carpeta del plugin tiene otro nombre (por ejemplo `wp-secure-main`, si se instaló desde «Download ZIP» de GitHub), la actualización la respeta.

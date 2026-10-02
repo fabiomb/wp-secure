@@ -29,12 +29,25 @@ class WPS_Updater {
 	/** Prefijo obligatorio de la URL del paquete. */
 	const DOWNLOAD_PREFIX = 'https://github.com/fabiomb/wp-secure/releases/download/';
 
-	/** Release en caché (también el resultado fallido, para no insistir). */
+	/** Página (no API) que redirige al tag del último release. */
+	const LATEST_URL = 'https://github.com/fabiomb/wp-secure/releases/latest';
+
+	/**
+	 * Release en caché (también el resultado fallido, para no insistir).
+	 *
+	 * Sólo unos minutos, para no repetir la consulta dentro de una misma
+	 * revisión: WordPress ya decide cada cuánto revisa (dos veces por día por
+	 * cron, una vez por hora en Plugins). Con 3 horas, una versión nueva
+	 * tardaba horas en aparecer aun pidiéndola a mano.
+	 */
 	const CACHE = 'wps_update_release';
 
-	const CACHE_TTL = 3 * 3600;
+	const CACHE_TTL = 600;
 
-	const ERROR_TTL = 3600;
+	const ERROR_TTL = 900;
+
+	/** Resultado de la última consulta, para mostrarlo en el panel. */
+	const STATUS_OPTION = 'wps_update_status';
 
 	const SLUG = 'wp-secure';
 
@@ -71,6 +84,28 @@ class WPS_Updater {
 		add_filter( 'plugins_api', array( $this, 'plugin_info' ), 10, 3 );
 		add_filter( 'upgrader_source_selection', array( $this, 'keep_folder_name' ), 10, 4 );
 		add_filter( 'upgrader_pre_download', array( $this, 'download_verified' ), 10, 4 );
+		add_action( 'load-update-core.php', array( $this, 'on_force_check' ), 9 );
+	}
+
+	/**
+	 * «Comprobar de nuevo» en Escritorio → Actualizaciones.
+	 *
+	 * WordPress sólo fuerza ahí la revisión del núcleo: la de plugins se
+	 * saltea si hubo una hace menos de un minuto, y al abrir la página ya se
+	 * hizo una. Se borran el release guardado y el estado de actualizaciones
+	 * de plugins, así la revisión (prioridad 10) consulta GitHub de verdad.
+	 *
+	 * Se borra en lugar de poner `last_checked` en 0: los actualizadores de
+	 * muchos plugins premium (EDD Software Licensing) lo vuelven a fijar en
+	 * cada guardado del transient, y el cambio no tenía efecto.
+	 */
+	public function on_force_check(): void {
+		if ( empty( $_GET['force-check'] ) || ! current_user_can( 'update_plugins' ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			return;
+		}
+
+		delete_transient( self::CACHE );
+		delete_site_transient( 'update_plugins' );
 	}
 
 	public function enabled(): bool {
@@ -149,7 +184,9 @@ class WPS_Updater {
 			'last_updated'  => $release['published'],
 			'download_link' => $release['package'],
 			'sections'      => array(
-				'changelog' => self::markdown_to_html( $release['notes'] ),
+				'changelog' => '' !== $release['notes']
+					? self::markdown_to_html( $release['notes'] )
+					: '<p><a href="' . esc_url( $release['url'] ) . '">' . esc_html__( 'Ver las notas del release en GitHub', 'wp-secure' ) . '</a></p>',
 			),
 		);
 	}
@@ -304,9 +341,8 @@ class WPS_Updater {
 	/**
 	 * Último release válido, o null si no hay o GitHub no respondió.
 	 *
-	 * Se guarda en caché unas horas (y el fallo, una hora). «Buscar
-	 * actualizaciones» en Escritorio → Actualizaciones (`force-check`) la
-	 * saltea.
+	 * Se guarda en caché unos minutos (ver CACHE). «Comprobar de nuevo» en
+	 * Escritorio → Actualizaciones (`force-check`) la saltea.
 	 *
 	 * @return array{version: string, package: string, url: string, notes: string, published: string}|null
 	 */
@@ -328,14 +364,128 @@ class WPS_Updater {
 	 * Consultar la API de GitHub.
 	 */
 	protected function fetch_release(): ?array {
-		$response = wp_remote_get( self::API_URL, self::request_args() );
+		$response = $this->http( 'GET', self::API_URL );
+		$code     = is_wp_error( $response ) ? 0 : (int) wp_remote_retrieve_response_code( $response );
 
-		if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+		if ( 200 === $code ) {
+			$data    = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+			$release = is_array( $data ) ? self::parse_release( $data ) : null;
+			$this->save_status( $release, 'api', null === $release ? __( 'GitHub no tiene un release válido (zip de la versión).', 'wp-secure' ) : '' );
+			return $release;
+		}
+
+		$api_error = is_wp_error( $response ) ? $response->get_error_message() : sprintf(
+			/* translators: %d: HTTP status code */
+			__( 'la API de GitHub respondió %d', 'wp-secure' ),
+			$code
+		);
+		if ( 403 === $code || 429 === $code ) {
+			$api_error .= ' ' . __( '(límite de consultas por IP)', 'wp-secure' );
+		}
+
+		// Respaldo sin la API: la página del último release redirige a su tag
+		// y no tiene el límite de 60 consultas por hora e IP de la API (que en
+		// un hosting compartido gastan todos los sitios del servidor).
+		$release = $this->release_from_web();
+		$this->save_status( $release, 'web', null === $release ? $api_error : '' );
+
+		return $release;
+	}
+
+	/**
+	 * Último release según la redirección de `releases/latest`.
+	 *
+	 * Sin notas: «Ver detalles» enlaza al release. El zip y su firma tienen
+	 * nombre fijo; si faltan, la descarga o la verificación lo rechazan.
+	 */
+	protected function release_from_web(): ?array {
+		$response = $this->http( 'HEAD', self::LATEST_URL );
+		if ( is_wp_error( $response ) ) {
 			return null;
 		}
 
-		$data = json_decode( (string) wp_remote_retrieve_body( $response ), true );
-		return is_array( $data ) ? self::parse_release( $data ) : null;
+		return self::release_from_location( (string) wp_remote_retrieve_header( $response, 'location' ) );
+	}
+
+	/**
+	 * Release a partir de la URL del tag (`…/releases/tag/vX.Y.Z`).
+	 */
+	public static function release_from_location( string $location ): ?array {
+		$prefix = 'https://github.com/' . self::REPO . '/releases/tag/v';
+		if ( 0 !== strpos( $location, $prefix ) ) {
+			return null;
+		}
+
+		$version = substr( $location, strlen( $prefix ) );
+		if ( ! preg_match( '/^\d+\.\d+\.\d+$/', $version ) ) {
+			return null;
+		}
+
+		return array(
+			'version'   => $version,
+			'package'   => self::DOWNLOAD_PREFIX . 'v' . $version . '/' . self::SLUG . '-' . $version . '.zip',
+			'url'       => $location,
+			'notes'     => '',
+			'published' => '',
+		);
+	}
+
+	/**
+	 * Petición a GitHub (se reemplaza en los tests).
+	 *
+	 * @return array|WP_Error
+	 */
+	protected function http( string $method, string $url ) {
+		$args = self::request_args();
+
+		if ( 'HEAD' === $method ) {
+			$args['redirection'] = 0;
+			return wp_remote_head( $url, $args );
+		}
+
+		return wp_remote_get( $url, $args );
+	}
+
+	/**
+	 * Guardar el resultado de la consulta para mostrarlo en el panel.
+	 */
+	private function save_status( ?array $release, string $source, string $error ): void {
+		update_option( self::STATUS_OPTION, array(
+			'checked_at' => time(),
+			'version'    => null === $release ? '' : $release['version'],
+			'source'     => $source,
+			'error'      => $error,
+		), false );
+	}
+
+	/**
+	 * Resumen de la última consulta, para el panel.
+	 */
+	public static function status_text(): string {
+		$status = get_option( self::STATUS_OPTION, array() );
+		if ( ! is_array( $status ) || empty( $status['checked_at'] ) ) {
+			return __( 'Todavía no se consultó.', 'wp-secure' );
+		}
+
+		$when = wp_date( 'Y-m-d H:i', (int) $status['checked_at'] );
+
+		if ( '' !== (string) $status['error'] ) {
+			/* translators: 1: date, 2: error */
+			return sprintf( __( 'Última consulta: %1$s — falló: %2$s.', 'wp-secure' ), $when, $status['error'] );
+		}
+
+		$text = sprintf(
+			/* translators: 1: date, 2: latest version */
+			__( 'Última consulta: %1$s — última versión publicada: %2$s.', 'wp-secure' ),
+			$when,
+			$status['version']
+		);
+
+		if ( 'web' === $status['source'] ) {
+			$text .= ' ' . __( '(La API de GitHub no respondió y se usó la página de releases.)', 'wp-secure' );
+		}
+
+		return $text;
 	}
 
 	/**

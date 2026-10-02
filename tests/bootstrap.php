@@ -123,6 +123,24 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 			return $GLOBALS['wps_test_http_response'] ?? array( 'code' => 200, 'body' => '{}' );
 		}
 	}
+	// HEAD: la respuesta la fija cada test en $GLOBALS['wps_test_http_head'].
+	if ( ! function_exists( 'wp_remote_head' ) ) {
+		function wp_remote_head( $url, $args = array() ) {
+			return $GLOBALS['wps_test_http_head'] ?? array( 'error' => 'sin respuesta' );
+		}
+	}
+	if ( ! function_exists( 'wp_remote_retrieve_header' ) ) {
+		function wp_remote_retrieve_header( $response, $header ) { return $response['headers'][ strtolower( $header ) ] ?? ''; }
+	}
+	if ( ! function_exists( 'get_site_transient' ) ) {
+		function get_site_transient( $key ) { return $GLOBALS['wps_test_site_transients'][ $key ] ?? false; }
+	}
+	if ( ! function_exists( 'delete_site_transient' ) ) {
+		function delete_site_transient( $key ) { unset( $GLOBALS['wps_test_site_transients'][ $key ] ); return true; }
+	}
+	if ( ! function_exists( 'set_site_transient' ) ) {
+		function set_site_transient( $key, $value, $ttl = 0 ) { $GLOBALS['wps_test_site_transients'][ $key ] = $value; return true; }
+	}
 	if ( ! function_exists( 'is_wp_error' ) ) {
 		function is_wp_error( $thing ) {
 			return $thing instanceof WP_Error || ( is_array( $thing ) && isset( $thing['error'] ) );

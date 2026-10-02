@@ -1,5 +1,17 @@
 # Registro de Cambios
 
+## [0.7.3] — Sin publicar
+
+### Corrección: una versión nueva tardaba horas en aparecer ([#30](https://github.com/fabiomb/wp-secure/issues/30))
+
+Probado con la 0.7.2 en un sitio real: la versión nueva no aparecía ni con «Comprobar de nuevo», y por eso tampoco se instalaba sola.
+
+- **Caché de minutos**: el actualizador guardaba la respuesta de GitHub 3 horas, y mientras durara todos los chequeos de WordPress (el del cron incluido) recibían la versión anterior. Ahora la guarda 10 minutos, sólo para no repetir la consulta dentro de una misma revisión: WordPress ya decide cada cuánto revisa.
+- **«Comprobar de nuevo» funciona de verdad**: WordPress sólo fuerza ahí la revisión del núcleo, y la de plugins se salteaba si hubo una hace menos de un minuto (al abrir la página ya se hace una). Ahora se borra el estado de actualizaciones de plugins antes de esa revisión. Se borra en lugar de modificarlo porque los actualizadores de muchos plugins premium (EDD Software Licensing) vuelven a fijar la hora de la última revisión en cada guardado.
+- **Respaldo sin la API de GitHub**: si la API no responde (en un hosting compartido, el límite de 60 consultas por hora e IP lo gastan todos los sitios del servidor), se lee la última versión de la redirección de `github.com/fabiomb/wp-secure/releases/latest`, que no tiene ese límite. La firma se verifica igual.
+- **Estado visible**: Configuración → API y Datos muestra cuándo fue la última consulta, qué versión encontró o por qué falló.
+- Las versiones con el actualizador anterior (0.7.0 a 0.7.2) pueden tardar hasta 3 horas en ver esta; desde la 0.7.3, ya no.
+
 ## [0.7.2] — 2026-10-02
 
 ### Versión
