@@ -1,5 +1,11 @@
 # Registro de Cambios
 
+## [0.7.2] — 2026-10-02
+
+### Versión
+
+- Versión actualizada a `0.7.2` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin, sin otros cambios. Sirve para probar en sitios reales la actualización automática de WordPress con el actualizador de la 0.7.0 ([#29](https://github.com/fabiomb/wp-secure/issues/29)).
+
 ## [0.7.1] — 2026-10-02
 
 ### Corrección: avisos «Deprecated» en PHP 8.4 ([#25](https://github.com/fabiomb/wp-secure/issues/25))
