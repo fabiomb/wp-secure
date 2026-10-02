@@ -159,6 +159,45 @@ class WPS_Rate_Limiter {
 	}
 
 	/**
+	 * Conteo actual de varios tipos en una sola consulta.
+	 *
+	 * Cada tipo tiene su propia ventana (1 minuto u 1 hora), así que se busca
+	 * cada par tipo-ventana. Lo usa el motor de riesgo en cada petición que
+	 * evalúa: una consulta en lugar de una por tipo.
+	 *
+	 * @param string[] $types Tipos a contar.
+	 * @return array<string, int> Tipo => conteo (0 si no hay fila).
+	 */
+	public function get_counts( string $ip, array $types ): array {
+		global $wpdb;
+
+		$counts = array_fill_keys( $types, 0 );
+		if ( ! $types ) {
+			return $counts;
+		}
+
+		$where = array();
+		$args  = array( $this->blocker->client_key( $ip ) );
+		foreach ( $types as $type ) {
+			$where[] = '(limit_type = %s AND window_start = %s)';
+			$args[]  = $type;
+			$args[]  = $this->get_window_start( $this->get_window_seconds( $type ) );
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT limit_type, request_count FROM {$this->table} WHERE ip_address = %s AND (" . implode( ' OR ', $where ) . ')',
+			...$args
+		), ARRAY_A );
+
+		foreach ( (array) $rows as $row ) {
+			$counts[ $row['limit_type'] ] = (int) $row['request_count'];
+		}
+
+		return $counts;
+	}
+
+	/**
 	 * Incrementar el contador de peticiones.
 	 *
 	 * Usa INSERT ... ON DUPLICATE KEY UPDATE para atomicidad, y recupera el

@@ -162,20 +162,22 @@ Además de los detectores, que bloquean por sí solos cuando encuentran un patr�
 
 ### Puntos por factor
 
-| Factor | Puntos |
-|--------|--------|
-| Patrón de SQLi (desde el detector) | 50 |
-| Patrón de XSS (desde el detector) | 40 |
-| Path traversal (desde el detector) | 40 |
-| Ruta sospechosa (`install.php`, `setup-config.php`, `xmlrpc.php`, `wp-trackback.php`, `wp-cron.php` con parámetros) | 30 |
-| User-Agent de herramienta (curl, wget, python-requests, Go, axios, …) | 25 |
-| Usuario inexistente en un intento de login | 25 |
-| User-Agent vacío | 20 |
-| Acceso a `xmlrpc.php` | 20 |
-| Tasa de peticiones por encima del 70 % del límite de páginas | 20 |
-| País de la lista «Países de alto riesgo» | 15 |
-| Cada login fallido acumulado | 15 |
-| Cada error 404 acumulado | 5 |
+| Factor | Puntos | De dónde sale |
+|--------|--------|---------------|
+| Ruta sospechosa (`install.php`, `setup-config.php`, `wp-trackback.php`, `wp-cron.php` con parámetros) | 30 | La petición. |
+| User-Agent de herramienta (curl, wget, python-requests, Go, axios, …) | 25 | La petición. |
+| Usuario inexistente | 25 | Algún login fallido del cliente con un usuario que no existe en la última hora. |
+| User-Agent vacío | 20 | La petición. |
+| Tasa de peticiones por encima del 70 % del límite de páginas | 20 | Contador de páginas del rate limiter (minuto actual). |
+| Cada login fallido | 15 | Logins fallidos del cliente en la última hora. |
+| Cada error 404 | 5 | Contador de 404 del rate limiter (minuto actual). |
+| País de la lista «Países de alto riesgo» | 15 | Geolocalización, sólo si configuraste la lista. |
+
+Los factores de comportamiento (404, logins fallidos, usuario inexistente, tasa) son los que justifican el motor: ninguno alcanza para que un detector bloquee, pero juntos describen a un cliente que tantea el sitio. Cuestan dos consultas por petición evaluada, y sólo con el motor encendido.
+
+**SQLi, XSS, path traversal y XML-RPC no suman en el motor.** Sus detectores bloquean la petición antes de que el motor la evalúe, así que lo que bloquean nunca llega a puntuarse; el reporte del modo sombra cuenta esas IPs como atacantes confirmados.
+
+Sólo se registran las peticiones de 31 puntos o más. Un bot que pide páginas normales con un User-Agent de curl suma 25 y no deja rastro: que el reporte esté vacío con mucho tráfico significa que nada combinó señales suficientes, no que el motor no mida. La página **Motor de riesgo** muestra cuántas peticiones hubo en el período y qué factores aparecieron.
 
 ### Umbrales
 

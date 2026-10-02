@@ -46,6 +46,7 @@ class WPS_Risk_Report {
 
 		$report['days']       = $days;
 		$report['counts']     = $this->counts( $days );
+		$report['requests']   = $this->requests( $days );
 		$report['truncated']  = count( $events ) >= self::MAX_EVENTS;
 		$report['mode']       = $engine->mode();
 		$report['thresholds'] = $engine->get_thresholds();
@@ -63,6 +64,7 @@ class WPS_Risk_Report {
 	 */
 	public static function aggregate( array $events, array $confirmed, int $threshold ): array {
 		$clients = array();
+		$totals  = array();
 		$first   = null;
 
 		foreach ( $events as $event ) {
@@ -92,6 +94,12 @@ class WPS_Risk_Report {
 			$client['last']        = max( $client['last'], (string) ( $event['created_at'] ?? '' ) );
 			foreach ( $factors as $factor ) {
 				$client['factors'][ $factor ] = ( $client['factors'][ $factor ] ?? 0 ) + 1;
+
+				if ( ! isset( $totals[ $factor ] ) ) {
+					$totals[ $factor ] = array( 'factor' => $factor, 'events' => 0, 'clients' => array() );
+				}
+				$totals[ $factor ]['events']++;
+				$totals[ $factor ]['clients'][ $ip ] = true;
 			}
 			unset( $client );
 
@@ -163,7 +171,30 @@ class WPS_Risk_Report {
 			'new_clients'  => array_slice( $new_clients, 0, self::MAX_LISTED ),
 			'suggested'    => self::suggest( $simulation ),
 			'first_event'  => $first,
+			'measured'     => self::factor_totals( $totals ),
 		);
+	}
+
+	/**
+	 * Qué está midiendo el motor: cada factor con sus eventos y clientes,
+	 * de todas las peticiones registradas (también las de riesgo bajo).
+	 *
+	 * @param array<string, array> $totals Factor => events, clients (set).
+	 * @return array[] factor, events, clients; más frecuentes primero.
+	 */
+	private static function factor_totals( array $totals ): array {
+		$rows = array();
+		foreach ( $totals as $total ) {
+			$rows[] = array(
+				'factor'  => (string) $total['factor'],
+				'events'  => $total['events'],
+				'clients' => count( $total['clients'] ),
+			);
+		}
+		usort( $rows, function ( $a, $b ) {
+			return $b['events'] <=> $a['events'];
+		} );
+		return $rows;
 	}
 
 	/**
@@ -231,20 +262,39 @@ class WPS_Risk_Report {
 	 *──────────────────────────────────────────────*/
 
 	/**
-	 * Eventos del motor que alcanzan un umbral de bloqueo simulable (los de
-	 * riesgo bajo, por debajo de 51, no cambian ninguna simulación).
+	 * Eventos del motor (desde 31 puntos). Los de riesgo bajo no cambian
+	 * ninguna simulación de bloqueo, pero muestran qué está midiendo.
 	 */
 	protected function events( int $days ): array {
 		$table = WPS_Db_Schema::table( 'security_events' );
 
 		return WPS_Db::get_instance()->get_results(
 			"SELECT ip_address, details, created_at FROM {$table}
-			 WHERE event_type IN (%s, %s) AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 WHERE event_type IN (%s, %s, %s) AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
 			 ORDER BY id DESC LIMIT %d",
+			WPS_Event_Types::RISK_LOW,
 			WPS_Event_Types::RISK_MEDIUM,
 			WPS_Event_Types::RISK_HIGH,
 			$days,
 			self::MAX_EVENTS
+		);
+	}
+
+	/**
+	 * Peticiones del período según el log de tráfico (con su peso de
+	 * muestreo), o null si el log está desactivado. Es la referencia para
+	 * saber si el motor midió: sin eventos y con miles de peticiones, ninguna
+	 * llegó a 31 puntos.
+	 */
+	protected function requests( int $days ): ?int {
+		if ( WPS_Traffic_Sampler::MODE_OFF === WPS_Traffic_Sampler::mode( $this->loader ) ) {
+			return null;
+		}
+
+		$table = WPS_Db_Schema::table( 'traffic_log' );
+		return (int) WPS_Db::get_instance()->get_var(
+			"SELECT COALESCE(SUM(sample_weight), 0) FROM {$table} WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
+			$days
 		);
 	}
 

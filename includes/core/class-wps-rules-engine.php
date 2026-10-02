@@ -192,7 +192,8 @@ class WPS_Rules_Engine {
 	 * @param WPS_Request $request Petición a evaluar.
 	 * @param array       $context Contexto adicional de otros detectores.
 	 *                             Claves opcionales: sqli, xss, traversal,
-	 *                             login_fails, is_404, country_code.
+	 *                             login_fails, count_404, nonexistent_user,
+	 *                             page_count, country_code.
 	 * @return int Puntuación de riesgo.
 	 */
 	public function evaluate( WPS_Request $request, array $context = array() ): int {
@@ -291,9 +292,10 @@ class WPS_Rules_Engine {
 		}
 
 		// 9. Tasa de peticiones elevada.
-		$rate_limiter = WPS_Rate_Limiter::get_instance( $this->loader );
-		$page_count   = $rate_limiter->get_count( $ip, 'pages' );
-		$page_limit   = (int) $this->loader->get_setting( 'rate_pages_per_min', 60 );
+		$page_count = isset( $context['page_count'] )
+			? (int) $context['page_count']
+			: WPS_Rate_Limiter::get_instance( $this->loader )->get_count( $ip, 'pages' );
+		$page_limit = (int) $this->loader->get_setting( 'rate_pages_per_min', 60 );
 		if ( $page_limit > 0 && $page_count > ( $page_limit * 0.7 ) ) {
 			$score += self::$scores['high_rate'];
 			$factors[] = 'high_rate:' . $page_count;
@@ -309,6 +311,51 @@ class WPS_Rules_Engine {
 			'score'   => $score,
 			'factors' => $factors,
 			'action'  => $this->action_for_score( $score ),
+		);
+	}
+
+	/**
+	 * Señales acumuladas del cliente para el motor.
+	 *
+	 * Los detectores bloquean un ataque claro por sí solos; el motor existe
+	 * para sumar señales graduales que ninguno bloquea de a una: 404 seguidos,
+	 * logins fallidos, usuarios inexistentes, ritmo alto. Antes sólo recibía
+	 * el país, así que esos factores nunca sumaban.
+	 *
+	 * Dos consultas: los contadores del rate limiter (páginas y 404 del minuto
+	 * actual) y los intentos de login de la última hora.
+	 *
+	 * @return array page_count, count_404, login_fails, nonexistent_user.
+	 */
+	public function behavior_context( string $ip ): array {
+		$counts = WPS_Rate_Limiter::get_instance( $this->loader )->get_counts( $ip, array( 'pages', '404' ) );
+		$logins = $this->recent_login_failures( $ip );
+
+		return array(
+			'page_count'       => $counts['pages'],
+			'count_404'        => $counts['404'],
+			'login_fails'      => $logins['fails'],
+			'nonexistent_user' => $logins['unknown'] > 0,
+		);
+	}
+
+	/**
+	 * Logins fallidos del cliente en la última hora y cuántos con un usuario
+	 * que no existe.
+	 *
+	 * @return array{fails: int, unknown: int}
+	 */
+	protected function recent_login_failures( string $ip ): array {
+		$table = WPS_Db_Schema::table( 'login_attempts' );
+		$row   = WPS_Db::get_instance()->get_row(
+			"SELECT COUNT(*) AS fails, COALESCE(SUM(user_exists = 0), 0) AS unknown FROM {$table}
+			 WHERE ip_address = %s AND success = 0 AND attempted_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 HOUR)",
+			$this->blocker->client_key( $ip )
+		);
+
+		return array(
+			'fails'   => (int) ( $row['fails'] ?? 0 ),
+			'unknown' => (int) ( $row['unknown'] ?? 0 ),
 		);
 	}
 

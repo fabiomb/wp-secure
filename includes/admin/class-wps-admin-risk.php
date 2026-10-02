@@ -58,7 +58,15 @@ class WPS_Admin_Risk {
 							&nbsp;
 						<?php endforeach; ?>
 					</td></tr>
-					<tr><th><?php esc_html_e( 'Eventos registrados', 'wp-secure' ); ?></th><td>
+					<tr><th><?php esc_html_e( 'Peticiones del período', 'wp-secure' ); ?></th><td>
+						<?php if ( null === $report['requests'] ) : ?>
+							<?php esc_html_e( 'Sin datos: el registro de tráfico está desactivado.', 'wp-secure' ); ?>
+						<?php else : ?>
+							<?php echo esc_html( number_format_i18n( $report['requests'] ) ); ?>
+							<span class="description"><?php esc_html_e( '(según el log de tráfico; el motor no evalúa a usuarios con sesión ni a la whitelist)', 'wp-secure' ); ?></span>
+						<?php endif; ?>
+					</td></tr>
+					<tr><th><?php esc_html_e( 'Peticiones con puntaje (31 o más)', 'wp-secure' ); ?></th><td>
 						<?php
 						echo esc_html( sprintf(
 							/* translators: 1: low, 2: medium, 3: high */
@@ -76,6 +84,29 @@ class WPS_Admin_Risk {
 			</table>
 
 			<?php $this->render_guidance( $report ); ?>
+
+			<?php if ( $report['measured'] ) : ?>
+				<h2><?php esc_html_e( 'Qué está midiendo', 'wp-secure' ); ?></h2>
+				<p class="description"><?php esc_html_e( 'Factores que aparecieron en las peticiones con puntaje del período, de 31 puntos en adelante. Las que suman menos no se registran.', 'wp-secure' ); ?></p>
+				<table class="widefat striped wps-table" style="max-width:720px;">
+					<thead><tr>
+						<th><?php esc_html_e( 'Factor', 'wp-secure' ); ?></th>
+						<th><?php esc_html_e( 'Puntos', 'wp-secure' ); ?></th>
+						<th><?php esc_html_e( 'Peticiones', 'wp-secure' ); ?></th>
+						<th><?php esc_html_e( 'Clientes', 'wp-secure' ); ?></th>
+					</tr></thead>
+					<tbody>
+					<?php foreach ( $report['measured'] as $factor ) : ?>
+						<tr>
+							<td><?php echo esc_html( WPS_Risk_Report::factor_label( $factor['factor'] ) ); ?></td>
+							<td><?php echo esc_html( $this->weight( $factor['factor'], $report['weights'] ) ); ?></td>
+							<td><?php echo esc_html( number_format_i18n( $factor['events'] ) ); ?></td>
+							<td><?php echo esc_html( number_format_i18n( $factor['clients'] ) ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
 
 			<?php if ( $report['clients'] ) : ?>
 				<h2><?php esc_html_e( 'Qué pasaría con cada umbral', 'wp-secure' ); ?></h2>
@@ -163,8 +194,14 @@ class WPS_Admin_Risk {
 
 		if ( 'off' === $report['mode'] && ! $report['clients'] ) {
 			$text = __( 'Paso 1: activá el modo sombra en Configuración → Firewall Avanzado. No bloquea a nadie; durante unos días registra qué habría hecho el motor con tu tráfico real.', 'wp-secure' );
+		} elseif ( ! $report['clients'] && 'off' !== $report['mode'] && ! empty( $report['requests'] ) ) {
+			$text = sprintf(
+				/* translators: %s: number of requests */
+				__( 'El motor está midiendo, pero ninguna de las %s peticiones del período llegó a 31 puntos: no hubo combinaciones de señales (404 seguidos, logins fallidos, User-Agent de herramienta, rutas sospechosas, ritmo alto) que lo justifiquen. Lo que bloquean los detectores no pasa por el motor.', 'wp-secure' ),
+				number_format_i18n( $report['requests'] )
+			);
 		} elseif ( ! $report['clients'] ) {
-			$text = __( 'Todavía no hay peticiones con puntaje suficiente para bloquear en este período. Esperá unos días de tráfico.', 'wp-secure' );
+			$text = __( 'Todavía no hay peticiones con puntaje en este período. Esperá unos días de tráfico.', 'wp-secure' );
 		} elseif ( ! $report['would_block'] ) {
 			$text = sprintf(
 				/* translators: %d: current threshold */

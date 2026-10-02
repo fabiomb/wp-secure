@@ -1,5 +1,16 @@
 # Registro de Cambios
 
+## [0.6.2] — Sin publicar
+
+### Corrección: el motor de riesgo casi no medía nada ([#26](https://github.com/fabiomb/wp-secure/issues/26))
+
+En modo sombra la página **Motor de riesgo** quedaba vacía aun con tráfico y reglas bloqueando. El contexto que recibía el motor sólo traía el país: los 404 y los logins fallidos acumulados y el usuario inexistente nunca le llegaban, así que de doce factores sólo sumaban los de la propia petición (User-Agent, ruta, tasa). Casi ninguna petición llegaba a los 31 puntos desde los que se registra.
+
+- **`WPS_Rules_Engine::behavior_context()`** (nuevo): el motor recibe los 404 del minuto actual y las páginas del rate limiter, y los logins fallidos de la última hora con y sin usuario existente. Son dos consultas por petición evaluada, sólo con el motor encendido.
+- **`WPS_Rate_Limiter::get_counts()`** (nuevo): varios contadores en una sola consulta; reemplaza la consulta que el motor ya hacía para la tasa de páginas.
+- **Reporte**: muestra las peticiones del período (del log de tráfico) junto a las que tuvieron puntaje, y una tabla **Qué está midiendo** con los factores que aparecieron, también en los eventos de riesgo bajo. Si hubo tráfico pero nada llegó a 31 puntos, lo dice en lugar de pedir que se espere.
+- **Documentación**: `rules-reference.md` listaba como factores del motor SQLi, XSS, path traversal y XML-RPC, que sus detectores bloquean antes de que el motor evalúe la petición. Ahora la tabla indica de dónde sale cada factor y aclara cuáles no suman.
+
 ## [0.6.1] — 2026-09-30
 
 ### Corrección: WP-CLI bloqueado por «Host ausente» ([#24](https://github.com/fabiomb/wp-secure/issues/24))

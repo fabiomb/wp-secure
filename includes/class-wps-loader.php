@@ -520,7 +520,7 @@ class WPS_Loader {
      * Contexto adicional para la evaluación de riesgo.
      */
     private function build_risk_context( WPS_Request $request ): array {
-        $context = array();
+        $context = WPS_Rules_Engine::get_instance( $this )->behavior_context( $request->ip() );
 
         $country = $this->resolve_country( $request->ip() );
         if ( $country ) {
