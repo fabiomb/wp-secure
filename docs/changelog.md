@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.7.1] — Sin publicar
+## [0.7.1] — 2026-10-02
 
 ### Corrección: avisos «Deprecated» en PHP 8.4 ([#25](https://github.com/fabiomb/wp-secure/issues/25))
 
@@ -8,6 +8,10 @@ Con PHP 8.4, el log del sitio se llenaba de avisos en cada petición: `WPS_Rate_
 
 - Los tres usan ahora el tipo nullable explícito (`?WPS_Loader $loader = null`). Una revisión de todo el plugin no encontró otros casos.
 - Test nuevo que recorre el código fuente y falla si aparece otro parámetro con nullable implícito: con PHP 8.2 el aviso no se ve.
+
+### Versión
+
+- Versión actualizada a `0.7.1` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin. Sin cambios de base de datos. Es la primera versión que se instala desde el panel con el actualizador de la 0.7.0 ([#29](https://github.com/fabiomb/wp-secure/issues/29)).
 
 ## [0.7.0] — 2026-10-02
 
