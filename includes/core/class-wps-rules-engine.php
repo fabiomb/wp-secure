@@ -123,7 +123,7 @@ class WPS_Rules_Engine {
 	/**
 	 * @param WPS_Loader|null $loader Requerido en la primera llamada.
 	 */
-	public static function get_instance( WPS_Loader $loader = null ): self {
+	public static function get_instance( ?WPS_Loader $loader = null ): self {
 		if ( null === self::$instance ) {
 			if ( null === $loader ) {
 				$loader = WPS_Loader::get_instance();

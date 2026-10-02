@@ -61,7 +61,7 @@ class WPS_Rate_Limiter {
 	/**
 	 * @param WPS_Loader|null $loader Requerido en la primera llamada.
 	 */
-	public static function get_instance( WPS_Loader $loader = null ): self {
+	public static function get_instance( ?WPS_Loader $loader = null ): self {
 		if ( null === self::$instance ) {
 			self::$instance = new self( $loader );
 		}

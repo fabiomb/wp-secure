@@ -1,5 +1,14 @@
 # Registro de Cambios
 
+## [0.7.1] — Sin publicar
+
+### Corrección: avisos «Deprecated» en PHP 8.4 ([#25](https://github.com/fabiomb/wp-secure/issues/25))
+
+Con PHP 8.4, el log del sitio se llenaba de avisos en cada petición: `WPS_Rate_Limiter`, `WPS_Admin_Notifier` y `WPS_Rules_Engine` declaraban `get_instance( WPS_Loader $loader = null )`, y PHP 8.4 depreca el tipo nullable implícito. No afectaba el funcionamiento.
+
+- Los tres usan ahora el tipo nullable explícito (`?WPS_Loader $loader = null`). Una revisión de todo el plugin no encontró otros casos.
+- Test nuevo que recorre el código fuente y falla si aparece otro parámetro con nullable implícito: con PHP 8.2 el aviso no se ve.
+
 ## [0.7.0] — 2026-10-02
 
 ### Nuevo: Actualizaciones desde los releases de GitHub ([#27](https://github.com/fabiomb/wp-secure/issues/27))
