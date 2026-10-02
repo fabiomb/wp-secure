@@ -1,6 +1,6 @@
 # Registro de Cambios
 
-## [0.7.3] — Sin publicar
+## [0.7.3] — 2026-10-02
 
 ### Corrección: una versión nueva tardaba horas en aparecer ([#30](https://github.com/fabiomb/wp-secure/issues/30))
 
@@ -11,6 +11,10 @@ Probado con la 0.7.2 en un sitio real: la versión nueva no aparecía ni con «C
 - **Respaldo sin la API de GitHub**: si la API no responde (en un hosting compartido, el límite de 60 consultas por hora e IP lo gastan todos los sitios del servidor), se lee la última versión de la redirección de `github.com/fabiomb/wp-secure/releases/latest`, que no tiene ese límite. La firma se verifica igual.
 - **Estado visible**: Configuración → API y Datos muestra cuándo fue la última consulta, qué versión encontró o por qué falló.
 - Las versiones con el actualizador anterior (0.7.0 a 0.7.2) pueden tardar hasta 3 horas en ver esta; desde la 0.7.3, ya no.
+
+### Versión
+
+- Versión actualizada a `0.7.3` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin. Sin cambios de base de datos.
 
 ## [0.7.2] — 2026-10-02
 
