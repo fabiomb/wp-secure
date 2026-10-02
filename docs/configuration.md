@@ -10,6 +10,7 @@ Todos los ajustes de WP Seguro se gestionan desde **WP Seguro → Configuración
 |--------|-------------|-------------------|
 | Modo Inseguro | Desde el dashboard. El firewall detecta y registra, pero no bloquea. Equivale a definir `WPS_DISABLE_BLOCKING` en `wp-config.php`. | Desactivado |
 | Email de notificaciones | Dirección para alertas de seguridad. | Email del administrador |
+| Buscar versiones nuevas en GitHub | En API y Datos. Consulta el último release y lo ofrece como actualización ([ver Instalación](installation.md#actualizaciones)). También se desactiva con `WPS_DISABLE_UPDATE_CHECK`. | Activado |
 
 ---
 

@@ -347,6 +347,14 @@ class WPS_Admin_Settings {
                         ),
                         'description' => __( 'El modo local es más rápido pero requiere descargar la base de datos.', 'wp-secure' ),
                     ),
+                    array(
+                        'key'            => 'update_check_enabled',
+                        'label'          => __( 'Actualizaciones', 'wp-secure' ),
+                        'type'           => 'checkbox',
+                        'default'        => true,
+                        'checkbox_label' => __( 'Buscar versiones nuevas en GitHub', 'wp-secure' ),
+                        'description'    => __( 'Cada pocas horas se consulta el último release publicado en github.com/fabiomb/wp-secure, sin enviar la dirección del sitio. Las versiones nuevas aparecen en Plugins y en Escritorio → Actualizaciones, y se pueden instalar con un clic o activar las actualizaciones automáticas. También se desactiva con la constante WPS_DISABLE_UPDATE_CHECK.', 'wp-secure' ),
+                    ),
                 ),
             ),
 

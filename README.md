@@ -65,6 +65,8 @@ El detalle está en [Capas del firewall](docs/firewall-layers.md) y en la [Refer
 3. Subí el archivo, instalalo y activá **WP Seguro**.
 4. Completá el asistente de configuración inicial y revisá **WP Seguro → Dashboard**.
 
+Desde la 0.7.0, las versiones nuevas llegan como cualquier actualización de WordPress, desde los releases de GitHub ([detalles](docs/installation.md#actualizaciones)).
+
 > [!IMPORTANT]
 > Si el sitio está detrás de Cloudflare u otro proxy, revisá la [configuración de CDN/Proxy](docs/cdn-proxy-setup.md) antes de activar el bloqueo en producción. Con el proxy mal configurado, todo el tráfico parece venir de pocas IPs y el rate limiter puede bloquearlas.
 

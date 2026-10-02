@@ -93,6 +93,18 @@ Sin esa regla en nginx, la base de geolocalización (`.mmdb`) queda descargable.
 
 Para comprobarlo, abrí `https://tu-sitio/wp-content/wps-data/.htaccess` en el navegador: tiene que responder 403 o 404.
 
+## Actualizaciones
+
+Desde la versión 0.7.0 el plugin se actualiza desde el panel, como cualquier otro, aunque no esté en wordpress.org: consulta el último release publicado en [GitHub](https://github.com/fabiomb/wp-secure/releases) y WordPress lo ofrece como actualización.
+
+- La versión nueva aparece en **Plugins** y en **Escritorio → Actualizaciones**. «Ver detalles» muestra las notas del release.
+- Se instala con un clic o, si activás **Activar actualizaciones automáticas** en la fila del plugin, sola.
+- La consulta se hace cada pocas horas a la API pública de GitHub, con un User-Agent propio: no se envía la dirección del sitio. **Buscar actualizaciones** en Escritorio → Actualizaciones fuerza una consulta nueva.
+- Sólo se acepta el zip del release (`wp-secure-X.Y.Z.zip`) publicado en este repositorio. La cabecera `Update URI` hace que WordPress no busque este plugin en wordpress.org, así que otro plugin con el mismo nombre no puede reemplazarlo.
+- Si la carpeta del plugin tiene otro nombre (por ejemplo `wp-secure-main`, si se instaló desde «Download ZIP» de GitHub), la actualización la respeta.
+- Para no consultar GitHub: desactivá **Buscar versiones nuevas en GitHub** (Configuración → API y Datos) o definí `define( 'WPS_DISABLE_UPDATE_CHECK', true );` en `wp-config.php`. En ese caso se actualiza a mano, subiendo el zip.
+- Las versiones anteriores a 0.7.0 no tienen el actualizador: la 0.7.0 se instala a mano una vez.
+
 ## Desinstalación
 
 Al desactivar el plugin, las tablas de datos se conservan por seguridad. Al **desinstalar** (eliminar) el plugin:

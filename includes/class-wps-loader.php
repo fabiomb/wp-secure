@@ -89,6 +89,9 @@ class WPS_Loader {
         // Registro de actividad del equipo del sitio.
         ( new WPS_Activity_Log( $this ) )->init();
 
+        // Actualizaciones desde los releases de GitHub.
+        ( new WPS_Updater( $this ) )->init();
+
         // Límite de sesiones simultáneas de administradores.
         add_action( 'wp_login', array( $this, 'limit_admin_sessions' ), 20, 2 );
 

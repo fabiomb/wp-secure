@@ -1,5 +1,18 @@
 # Registro de Cambios
 
+## [0.7.0] — Sin publicar
+
+### Nuevo: Actualizaciones desde los releases de GitHub ([#27](https://github.com/fabiomb/wp-secure/issues/27))
+
+El plugin no está en wordpress.org, así que cada sitio tenía que bajar el zip de cada versión y reemplazarlo a mano.
+
+- **`WPS_Updater`** (nuevo): con la cabecera `Update URI: https://github.com/fabiomb/wp-secure`, WordPress deja de buscar el plugin en wordpress.org y le pregunta al filtro `update_plugins_github.com`, que consulta el último release publicado. La versión nueva aparece en Plugins y en Escritorio → Actualizaciones, se instala con un clic y funciona con las **actualizaciones automáticas** de WordPress.
+- **«Ver detalles»** muestra las notas del release (el changelog), convertidas a HTML y escapadas.
+- **Seguridad**: sólo se acepta el zip `wp-secure-X.Y.Z.zip` del release publicado en este repositorio (no borradores ni prereleases, ni otro host). Con `Update URI`, otro plugin con el mismo slug en wordpress.org no puede reemplazarlo.
+- **Privacidad**: la consulta usa un User-Agent propio (`WP-Seguro/X.Y.Z`); el de WordPress incluye la URL del sitio. Se guarda en caché tres horas (una si GitHub falla) y «Buscar actualizaciones» fuerza una consulta nueva.
+- **Carpeta**: si el plugin está instalado con otro nombre de carpeta (`wp-secure-main`), la actualización la respeta en lugar de dejar una segunda copia.
+- **Se puede desactivar** con el ajuste «Buscar versiones nuevas en GitHub» (API y Datos) o la constante `WPS_DISABLE_UPDATE_CHECK`.
+
 ## [0.6.2] — 2026-10-02
 
 ### Corrección: el motor de riesgo casi no medía nada ([#26](https://github.com/fabiomb/wp-secure/issues/26))

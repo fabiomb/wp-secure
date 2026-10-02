@@ -48,6 +48,21 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	if ( ! function_exists( '__' ) ) {
 		function __( $text, $domain = 'default' ) { return $text; }
 	}
+	if ( ! function_exists( 'esc_html' ) ) {
+		function esc_html( $text ) { return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' ); }
+	}
+	if ( ! function_exists( 'esc_url' ) ) {
+		function esc_url( $url ) { return filter_var( (string) $url, FILTER_VALIDATE_URL ) ? (string) $url : ''; }
+	}
+	if ( ! function_exists( 'is_admin' ) ) {
+		function is_admin() { return ! empty( $GLOBALS['wps_test_is_admin'] ); }
+	}
+	if ( ! function_exists( 'trailingslashit' ) ) {
+		function trailingslashit( $value ) { return rtrim( (string) $value, '/\\' ) . '/'; }
+	}
+	if ( ! function_exists( 'untrailingslashit' ) ) {
+		function untrailingslashit( $value ) { return rtrim( (string) $value, '/\\' ); }
+	}
 	if ( ! function_exists( 'esc_html__' ) ) {
 		function esc_html__( $text, $domain = 'default' ) { return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' ); }
 	}

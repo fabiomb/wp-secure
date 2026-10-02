@@ -12,6 +12,7 @@
  * Domain Path: /languages
  * Requires at least: 6.0
  * Requires PHP: 7.4
+ * Update URI:  https://github.com/fabiomb/wp-secure
  */
 
 defined( 'ABSPATH' ) || exit;

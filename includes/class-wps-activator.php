@@ -74,6 +74,7 @@ class WPS_Activator {
             // API.
             'ipinfo_api_key'       => '',
             'ipinfo_mode'          => 'api', // 'api' | 'local'.
+            'update_check_enabled' => true,
 
             // Login.
             'login_max_attempts'   => 5,
