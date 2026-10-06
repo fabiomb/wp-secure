@@ -31,6 +31,10 @@ En varios sitios en producción, al completar el paso 1 del asistente el siguien
 - Dependía de `output_buffering` en el php.ini del hosting, por eso en algunos sitios funcionaba.
 - Ahora cada paso se guarda y redirige en `admin_init`, antes de imprimir nada.
 
+### Versión
+
+- Versión actualizada a `0.7.4` en la cabecera del plugin, la constante `WPS_VERSION` y el MU-plugin. Sin cambios en las tablas: los ajustes nuevos (`geo_provider` y los de MaxMind) se completan al actualizar, y los sitios con ipinfo.io quedan con ipinfo.io como proveedor.
+
 ## [0.7.3] — 2026-10-02
 
 ### Corrección: una versión nueva tardaba horas en aparecer ([#30](https://github.com/fabiomb/wp-secure/issues/30))
