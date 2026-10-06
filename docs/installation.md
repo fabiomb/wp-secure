@@ -37,10 +37,10 @@
 
 Al activar el plugin por primera vez, se mostrará un **asistente de configuración** que te guiará por los ajustes básicos:
 
-1. **API y geolocalización** — Token de ipinfo.io y base de datos local de países/ASN.
+1. **Básico** — CDN/proxy (para ver la IP real) y agregar tu IP actual a la whitelist (marcado por defecto).
 2. **Login y XML-RPC** — Intentos máximos, duración de bloqueos y bloqueo de XML-RPC.
 3. **Rate limiting** — Límites de peticiones por minuto.
-4. **Whitelist** — Ofrece agregar tu IP actual (marcado por defecto).
+4. **Geolocalización (opcional)** — Ninguna, ipinfo.io o MaxMind GeoLite2. Sin proveedor el plugin funciona completo; sólo se pierden los datos y bloqueos de país/ASN. Si elegís una base local, al finalizar se abre la página de Geolocalización para descargarla.
 
 ## Activación de Capas
 

@@ -5,8 +5,18 @@ defined( 'ABSPATH' ) || exit;
  * Wizard de configuración inicial.
  *
  * Se muestra automáticamente tras la primera activación del plugin.
- * Guía al administrador por los pasos esenciales: API key, modo de
- * datos, protección de login, XML-RPC, rate limiting y whitelist.
+ * Guía al administrador por los pasos esenciales:
+ * 1. Básico: CDN/proxy y whitelist de la IP actual.
+ * 2. Protección de login y XML-RPC.
+ * 3. Rate limiting.
+ * 4. Geolocalización (opcional): ninguna, ipinfo.io o MaxMind GeoLite2.
+ *
+ * Cada paso se guarda en admin_init (handle_submit) y redirige al siguiente;
+ * render() sólo dibuja. Al finalizar, si el proveedor elegido usa base local
+ * y todavía no está descargada, se lleva a la página de Geolocalización para
+ * descargarla (nunca se descarga dentro del POST del wizard). Si faltan las
+ * credenciales del proveedor se guarda igual y se avisa en la página
+ * siguiente.
  */
 class WPS_Admin_Wizard {
 
@@ -45,7 +55,7 @@ class WPS_Admin_Wizard {
 		$next_step = $current_step + 1;
 		if ( $next_step > self::TOTAL_STEPS ) {
 			$this->loader->set_setting( 'wizard_completed', true );
-			wp_safe_redirect( admin_url( 'admin.php?page=wp-secure&wizard=done' ) );
+			wp_safe_redirect( $this->finish_url() );
 			exit;
 		}
 
@@ -56,9 +66,68 @@ class WPS_Admin_Wizard {
 	/**
 	 * Paso pedido en la URL, acotado a los pasos existentes.
 	 */
-	private function current_step(): int {
+	public function current_step(): int {
 		$step = isset( $_GET['step'] ) ? absint( $_GET['step'] ) : 1;
 		return max( 1, min( self::TOTAL_STEPS, $step ) );
+	}
+
+	/**
+	 * Destino al finalizar, según el proveedor de geolocalización elegido.
+	 *
+	 * - Base local sin descargar: página de Geolocalización, para descargarla.
+	 * - Proveedor sin credenciales: aviso de configuración incompleta.
+	 * - Si no: dashboard.
+	 */
+	public function finish_url(): string {
+		$manager  = WPS_Ipdb_Manager::get_instance();
+		$provider = $manager->get_provider();
+
+		if ( WPS_Ipdb_Manager::PROVIDER_NONE === $provider ) {
+			return admin_url( 'admin.php?page=wp-secure&wizard=done' );
+		}
+
+		$has_credentials = $manager->has_credentials( $provider );
+
+		if ( 'local' === $manager->get_mode( $provider ) && ! $manager->is_local_complete( $provider ) ) {
+			return admin_url( 'admin.php?page=wp-secure-ipdb&wizard=done&wps_geo=' . ( $has_credentials ? 'download' : 'incomplete' ) );
+		}
+
+		if ( ! $has_credentials ) {
+			return admin_url( 'admin.php?page=wp-secure&wizard=done&wps_geo=incomplete' );
+		}
+
+		return admin_url( 'admin.php?page=wp-secure&wizard=done' );
+	}
+
+	/**
+	 * IP del administrador según el modo de proxy guardado ahora.
+	 *
+	 * WPS_Request resolvió la IP al construirse, con el modo de proxy que
+	 * había al comenzar la petición. En el paso 1 ese modo puede acabar de
+	 * cambiar, así que se vuelve a resolver con WPS_Proxy_Config, que lee el
+	 * ajuste del loader en cada llamada.
+	 */
+	public function resolve_current_ip(): string {
+		$proxy = WPS_Proxy_Config::get_instance();
+		$proxy->set_loader( $this->loader );
+
+		$ip = $proxy->get_real_ip();
+		if ( WPS_Ip_Utils::is_valid_ip( $ip ) ) {
+			return $ip;
+		}
+
+		$remote_addr = WPS_Ip_Utils::strip_port( $_SERVER['REMOTE_ADDR'] ?? '' );
+		return WPS_Ip_Utils::is_valid_ip( $remote_addr ) ? $remote_addr : '';
+	}
+
+	/**
+	 * Opciones de `proxy_mode`, las mismas de Configuración → CDN / Proxy.
+	 *
+	 * @return array<string, string>
+	 */
+	private function proxy_modes(): array {
+		$fields = ( new WPS_Admin_Settings( $this->loader ) )->fields();
+		return $fields['proxy_mode']['options'];
 	}
 
 	/**
@@ -96,7 +165,7 @@ class WPS_Admin_Wizard {
 					<?php
 					switch ( $current_step ) {
 						case 1:
-							$this->render_step_api();
+							$this->render_step_basic();
 							break;
 						case 2:
 							$this->render_step_protection();
@@ -105,7 +174,7 @@ class WPS_Admin_Wizard {
 							$this->render_step_rate_limiting();
 							break;
 						case 4:
-							$this->render_step_whitelist();
+							$this->render_step_geo();
 							break;
 					}
 					?>
@@ -142,40 +211,61 @@ class WPS_Admin_Wizard {
 	 */
 	private function step_label( int $step ): string {
 		$labels = array(
-			1 => __( 'API y Datos', 'wp-secure' ),
+			1 => __( 'Básico', 'wp-secure' ),
 			2 => __( 'Protección', 'wp-secure' ),
 			3 => __( 'Rate Limiting', 'wp-secure' ),
-			4 => __( 'Whitelist', 'wp-secure' ),
+			4 => __( 'Geolocalización (opcional)', 'wp-secure' ),
 		);
 		return $labels[ $step ] ?? '';
 	}
 
 	/**
-	 * Paso 1: Configuración de API y modo de datos.
+	 * Paso 1: CDN/proxy y whitelist de la IP actual.
 	 */
-	private function render_step_api(): void {
-		$api_key = $this->loader->get_setting( 'ipinfo_api_key', '' );
-		$mode    = $this->loader->get_setting( 'ipinfo_mode', 'api' );
+	private function render_step_basic(): void {
+		$proxy_mode = $this->loader->get_setting( 'proxy_mode', 'auto' );
+		$current_ip = $this->resolve_current_ip();
+		$is_wl      = '' !== $current_ip && WPS_Whitelist::get_instance()->is_whitelisted( $current_ip );
 		?>
-		<h2><?php esc_html_e( 'Paso 1: API y Datos de Geolocalización', 'wp-secure' ); ?></h2>
+		<h2><?php esc_html_e( 'Paso 1: Básico', 'wp-secure' ); ?></h2>
 		<p class="description">
-			<?php esc_html_e( 'WP Seguro utiliza ipinfo.io para resolver la geolocalización de IPs. Puedes usar la API en línea o descargar la base de datos local para mayor velocidad.', 'wp-secure' ); ?>
+			<?php esc_html_e( 'Indicá si el sitio está detrás de un CDN o proxy, para que el firewall vea la IP real de cada visitante, y agregá tu IP a la whitelist para no bloquearte.', 'wp-secure' ); ?>
 		</p>
 
 		<table class="form-table">
 			<tr>
-				<th scope="row"><label for="wps_ipinfo_api_key"><?php esc_html_e( 'API Key ipinfo.io', 'wp-secure' ); ?></label></th>
+				<th scope="row"><label for="wps_proxy_mode"><?php esc_html_e( 'CDN / Proxy', 'wp-secure' ); ?></label></th>
 				<td>
-					<input type="text" id="wps_ipinfo_api_key" name="ipinfo_api_key" value="<?php echo esc_attr( $api_key ); ?>" class="regular-text" />
-					<p class="description"><?php esc_html_e( 'Opcional. Obtén una API key gratuita en ipinfo.io/signup', 'wp-secure' ); ?></p>
+					<select id="wps_proxy_mode" name="proxy_mode">
+						<?php foreach ( $this->proxy_modes() as $value => $label ) : ?>
+							<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $proxy_mode, $value ); ?>><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<p class="description"><?php esc_html_e( 'Auto-detectar funciona para Cloudflare y Sucuri. Con "Personalizado", las IPs de proxy confiables y el header de IP real se configuran en Configuración → CDN / Proxy.', 'wp-secure' ); ?></p>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><?php esc_html_e( 'Modo de datos', 'wp-secure' ); ?></th>
+				<th scope="row"><?php esc_html_e( 'Tu IP actual', 'wp-secure' ); ?></th>
 				<td>
-					<label><input type="radio" name="ipinfo_mode" value="api" <?php checked( $mode, 'api' ); ?> /> <?php esc_html_e( 'API en línea (requiere API key)', 'wp-secure' ); ?></label><br>
-					<label><input type="radio" name="ipinfo_mode" value="local" <?php checked( $mode, 'local' ); ?> /> <?php esc_html_e( 'Base de datos local (MMDB)', 'wp-secure' ); ?></label>
-					<p class="description"><?php esc_html_e( 'El modo local es más rápido pero requiere descargar la base de datos después.', 'wp-secure' ); ?></p>
+					<?php if ( '' !== $current_ip ) : ?>
+						<code style="font-size:16px;padding:6px 12px;"><?php echo esc_html( $current_ip ); ?></code>
+						<?php if ( $is_wl ) : ?>
+							<span class="wps-badge wps-badge-ok" style="margin-left:8px;"><?php esc_html_e( 'Ya en whitelist', 'wp-secure' ); ?></span>
+						<?php endif; ?>
+					<?php else : ?>
+						<?php esc_html_e( 'No se pudo detectar.', 'wp-secure' ); ?>
+					<?php endif; ?>
+					<p class="description"><?php esc_html_e( 'Detectada con el modo de proxy guardado. Si cambiás el modo, al pasar al paso siguiente se vuelve a detectar con el nuevo.', 'wp-secure' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Agregar a whitelist', 'wp-secure' ); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="whitelist_current_ip" value="1" <?php checked( ! $is_wl ); ?> <?php disabled( $is_wl ); ?> />
+						<?php esc_html_e( 'Agregar mi IP a la whitelist global', 'wp-secure' ); ?>
+					</label>
+					<p class="description"><?php esc_html_e( 'Altamente recomendado para evitar bloquearte a ti mismo.', 'wp-secure' ); ?></p>
 				</td>
 			</tr>
 		</table>
@@ -267,44 +357,146 @@ class WPS_Admin_Wizard {
 	}
 
 	/**
-	 * Paso 4: Whitelist de la IP actual.
+	 * Paso 4: Geolocalización (opcional) y resumen.
+	 *
+	 * Las filas de cada proveedor llevan `data-wps-geo`; un script mínimo
+	 * oculta las del proveedor no elegido. Sin JavaScript se ven todas.
 	 */
-	private function render_step_whitelist(): void {
-		$current_ip  = WPS_Request::get_instance()->ip();
-		$is_wl       = WPS_Whitelist::get_instance()->is_whitelisted( $current_ip );
+	private function render_step_geo(): void {
+		$manager     = WPS_Ipdb_Manager::get_instance();
+		$provider    = $manager->get_provider();
+		$ipinfo_key  = $this->loader->get_setting( 'ipinfo_api_key', '' );
+		$ipinfo_mode = $manager->get_mode( WPS_Ipdb_Manager::PROVIDER_IPINFO );
+		$mm_account  = $this->loader->get_setting( 'maxmind_account_id', '' );
+		$mm_license  = $this->loader->get_setting( 'maxmind_license_key', '' );
+		$mm_mode     = $manager->get_mode( WPS_Ipdb_Manager::PROVIDER_MAXMIND );
 		?>
-		<h2><?php esc_html_e( 'Paso 4: Whitelist', 'wp-secure' ); ?></h2>
+		<h2><?php esc_html_e( 'Paso 4: Geolocalización (opcional)', 'wp-secure' ); ?></h2>
 		<p class="description">
-			<?php esc_html_e( 'Agrega tu IP actual a la whitelist para garantizar que nunca seas bloqueado por el firewall.', 'wp-secure' ); ?>
+			<?php esc_html_e( 'La geolocalización resuelve el país y la red (ASN) de cada IP. Podés dejarla desactivada y configurarla más adelante desde Configuración → Geolocalización.', 'wp-secure' ); ?>
 		</p>
 
-		<table class="form-table">
+		<?php WPS_Admin_Ipdb::render_optional_explanation(); ?>
+
+		<table class="form-table" id="wps-wizard-geo">
 			<tr>
-				<th scope="row"><?php esc_html_e( 'Tu IP actual', 'wp-secure' ); ?></th>
+				<th scope="row"><?php esc_html_e( 'Proveedor', 'wp-secure' ); ?></th>
 				<td>
-					<code style="font-size:16px;padding:6px 12px;"><?php echo esc_html( $current_ip ); ?></code>
-					<?php if ( $is_wl ) : ?>
-						<span class="wps-badge wps-badge-ok" style="margin-left:8px;"><?php esc_html_e( 'Ya en whitelist', 'wp-secure' ); ?></span>
-					<?php endif; ?>
+					<?php foreach ( WPS_Ipdb_Manager::providers() as $value => $label ) : ?>
+						<label style="display:block;margin-bottom:4px;">
+							<input type="radio" name="geo_provider" value="<?php echo esc_attr( $value ); ?>" <?php checked( $provider, $value ); ?> />
+							<?php echo esc_html( $label ); ?>
+						</label>
+					<?php endforeach; ?>
 				</td>
 			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Agregar a whitelist', 'wp-secure' ); ?></th>
+
+			<!-- ipinfo.io -->
+			<tr data-wps-geo="ipinfo">
+				<th scope="row"><label for="wps_ipinfo_api_key"><?php esc_html_e( 'API Key ipinfo.io', 'wp-secure' ); ?></label></th>
 				<td>
-					<label>
-						<input type="checkbox" name="whitelist_current_ip" value="1" <?php checked( ! $is_wl ); ?> <?php disabled( $is_wl ); ?> />
-						<?php esc_html_e( 'Agregar esta IP a la whitelist global', 'wp-secure' ); ?>
-					</label>
-					<p class="description"><?php esc_html_e( 'Altamente recomendado para evitar bloquearte a ti mismo.', 'wp-secure' ); ?></p>
+					<input type="password" id="wps_ipinfo_api_key" name="ipinfo_api_key" value="<?php echo esc_attr( $ipinfo_key ); ?>" class="regular-text" autocomplete="off" />
+					<p class="description"><?php esc_html_e( 'Obtené una API key gratuita en ipinfo.io/signup.', 'wp-secure' ); ?></p>
+				</td>
+			</tr>
+			<tr data-wps-geo="ipinfo">
+				<th scope="row"><?php esc_html_e( 'Modo ipinfo.io', 'wp-secure' ); ?></th>
+				<td>
+					<label><input type="radio" name="ipinfo_mode" value="api" <?php checked( $ipinfo_mode, 'api' ); ?> /> <?php esc_html_e( 'API en línea', 'wp-secure' ); ?></label><br>
+					<label><input type="radio" name="ipinfo_mode" value="local" <?php checked( $ipinfo_mode, 'local' ); ?> /> <?php esc_html_e( 'Base de datos local (MMDB)', 'wp-secure' ); ?></label>
+					<p class="description"><?php esc_html_e( 'El modo local es más rápido; la base se descarga después de finalizar.', 'wp-secure' ); ?></p>
+				</td>
+			</tr>
+
+			<!-- MaxMind GeoLite2 -->
+			<tr data-wps-geo="maxmind">
+				<th scope="row"><label for="wps_maxmind_account_id"><?php esc_html_e( 'Account ID MaxMind', 'wp-secure' ); ?></label></th>
+				<td>
+					<input type="text" id="wps_maxmind_account_id" name="maxmind_account_id" value="<?php echo esc_attr( $mm_account ); ?>" class="regular-text" autocomplete="off" />
+					<p class="description"><?php esc_html_e( 'La cuenta GeoLite2 es gratuita: maxmind.com/en/geolite2/signup.', 'wp-secure' ); ?></p>
+				</td>
+			</tr>
+			<tr data-wps-geo="maxmind">
+				<th scope="row"><label for="wps_maxmind_license_key"><?php esc_html_e( 'License Key MaxMind', 'wp-secure' ); ?></label></th>
+				<td>
+					<input type="password" id="wps_maxmind_license_key" name="maxmind_license_key" value="<?php echo esc_attr( $mm_license ); ?>" class="regular-text" autocomplete="off" />
+					<p class="description"><?php esc_html_e( 'Se genera en tu cuenta de MaxMind → Manage License Keys.', 'wp-secure' ); ?></p>
+				</td>
+			</tr>
+			<tr data-wps-geo="maxmind">
+				<th scope="row"><?php esc_html_e( 'Modo MaxMind', 'wp-secure' ); ?></th>
+				<td>
+					<label><input type="radio" name="maxmind_mode" value="local" <?php checked( $mm_mode, 'local' ); ?> /> <?php esc_html_e( 'Bases locales GeoLite2 Country + ASN (recomendado)', 'wp-secure' ); ?></label><br>
+					<label><input type="radio" name="maxmind_mode" value="api" <?php checked( $mm_mode, 'api' ); ?> /> <?php esc_html_e( 'Servicio web GeoLite (1000 consultas por día)', 'wp-secure' ); ?></label>
+					<p class="description"><?php esc_html_e( 'Las bases locales se descargan después de finalizar y se actualizan solas cada semana.', 'wp-secure' ); ?></p>
 				</td>
 			</tr>
 		</table>
 
+		<script>
+		( function () {
+			var table = document.getElementById( 'wps-wizard-geo' );
+			if ( ! table ) {
+				return;
+			}
+			function sync() {
+				var checked = table.querySelector( 'input[name="geo_provider"]:checked' );
+				var current = checked ? checked.value : 'none';
+				table.querySelectorAll( 'tr[data-wps-geo]' ).forEach( function ( row ) {
+					row.style.display = row.getAttribute( 'data-wps-geo' ) === current ? '' : 'none';
+				} );
+			}
+			table.querySelectorAll( 'input[name="geo_provider"]' ).forEach( function ( input ) {
+				input.addEventListener( 'change', sync );
+			} );
+			sync();
+		} )();
+		</script>
+
+		<?php
+		$this->render_summary();
+	}
+
+	/**
+	 * Resumen de lo configurado en los pasos anteriores.
+	 */
+	private function render_summary(): void {
+		$proxy_modes = $this->proxy_modes();
+		$proxy_mode  = $this->loader->get_setting( 'proxy_mode', 'auto' );
+		?>
 		<div class="wps-notice wps-notice-info" style="margin-top:16px;">
-			<p>
-				<strong><?php esc_html_e( 'Resumen:', 'wp-secure' ); ?></strong>
-				<?php esc_html_e( 'Al finalizar, tu sitio estará protegido contra ataques de fuerza bruta, inyecciones SQL/XSS, scanners y tráfico abusivo. Puedes ajustar toda la configuración después desde el menú de Configuración.', 'wp-secure' ); ?>
-			</p>
+			<p><strong><?php esc_html_e( 'Resumen:', 'wp-secure' ); ?></strong></p>
+			<ul style="list-style:disc;margin-left:20px;">
+				<li>
+					<?php
+					printf(
+						/* translators: %s: proxy mode */
+						esc_html__( 'CDN / Proxy: %s', 'wp-secure' ),
+						esc_html( $proxy_modes[ $proxy_mode ] ?? $proxy_mode )
+					);
+					?>
+				</li>
+				<li>
+					<?php
+					printf(
+						/* translators: 1: attempts, 2: minutes */
+						esc_html__( 'Login: bloqueo tras %1$d intentos, durante %2$d minutos.', 'wp-secure' ),
+						(int) $this->loader->get_setting( 'login_max_attempts', 5 ),
+						(int) $this->loader->get_setting( 'login_block_minutes', 15 )
+					);
+					?>
+				</li>
+				<li>
+					<?php
+					printf(
+						/* translators: %d: requests per minute */
+						esc_html__( 'Rate limiting: %d páginas por minuto por IP.', 'wp-secure' ),
+						(int) $this->loader->get_setting( 'rate_pages_per_min', 60 )
+					);
+					?>
+				</li>
+			</ul>
+			<p><?php esc_html_e( 'Al finalizar, tu sitio estará protegido contra ataques de fuerza bruta, inyecciones SQL/XSS, scanners y tráfico abusivo. Podés ajustar toda la configuración después desde el menú de Configuración.', 'wp-secure' ); ?></p>
 		</div>
 		<?php
 	}
@@ -315,13 +507,20 @@ class WPS_Admin_Wizard {
 	private function save_step( int $step ): void {
 		switch ( $step ) {
 			case 1:
-				$api_key = sanitize_text_field( wp_unslash( $_POST['ipinfo_api_key'] ?? '' ) );
-				$mode    = sanitize_text_field( wp_unslash( $_POST['ipinfo_mode'] ?? 'api' ) );
-				if ( ! in_array( $mode, array( 'api', 'local' ), true ) ) {
-					$mode = 'api';
+				$proxy_mode = sanitize_text_field( wp_unslash( $_POST['proxy_mode'] ?? 'auto' ) );
+				if ( ! array_key_exists( $proxy_mode, $this->proxy_modes() ) ) {
+					$proxy_mode = 'auto';
 				}
-				$this->loader->set_setting( 'ipinfo_api_key', $api_key );
-				$this->loader->set_setting( 'ipinfo_mode', $mode );
+				$this->loader->set_setting( 'proxy_mode', $proxy_mode );
+
+				if ( isset( $_POST['whitelist_current_ip'] ) ) {
+					// Con el modo de proxy recién guardado, no con el de la petición.
+					$current_ip = $this->resolve_current_ip();
+					$whitelist  = WPS_Whitelist::get_instance();
+					if ( '' !== $current_ip && ! $whitelist->is_whitelisted( $current_ip ) ) {
+						$whitelist->add_ip( $current_ip, __( 'IP del administrador (wizard)', 'wp-secure' ), 'global' );
+					}
+				}
 				break;
 
 			case 2:
@@ -339,13 +538,22 @@ class WPS_Admin_Wizard {
 				break;
 
 			case 4:
-				if ( isset( $_POST['whitelist_current_ip'] ) ) {
-					$current_ip = WPS_Request::get_instance()->ip();
-					$whitelist  = WPS_Whitelist::get_instance();
-					if ( ! $whitelist->is_whitelisted( $current_ip ) ) {
-						$whitelist->add_ip( $current_ip, __( 'IP del administrador (wizard)', 'wp-secure' ), 'global' );
-					}
+				$provider = sanitize_key( wp_unslash( $_POST['geo_provider'] ?? WPS_Ipdb_Manager::PROVIDER_NONE ) );
+				if ( ! in_array( $provider, WPS_Ipdb_Manager::PROVIDER_IDS, true ) ) {
+					$provider = WPS_Ipdb_Manager::PROVIDER_NONE;
 				}
+
+				$ipinfo_mode = sanitize_key( wp_unslash( $_POST['ipinfo_mode'] ?? 'api' ) );
+				$mm_mode     = sanitize_key( wp_unslash( $_POST['maxmind_mode'] ?? 'local' ) );
+
+				// Se guarda el proveedor elegido aunque falten credenciales: la
+				// página siguiente avisa que la configuración está incompleta.
+				$this->loader->set_setting( 'geo_provider', $provider );
+				$this->loader->set_setting( 'ipinfo_api_key', sanitize_text_field( wp_unslash( $_POST['ipinfo_api_key'] ?? '' ) ) );
+				$this->loader->set_setting( 'ipinfo_mode', 'local' === $ipinfo_mode ? 'local' : 'api' );
+				$this->loader->set_setting( 'maxmind_account_id', sanitize_text_field( wp_unslash( $_POST['maxmind_account_id'] ?? '' ) ) );
+				$this->loader->set_setting( 'maxmind_license_key', sanitize_text_field( wp_unslash( $_POST['maxmind_license_key'] ?? '' ) ) );
+				$this->loader->set_setting( 'maxmind_mode', 'api' === $mm_mode ? 'api' : 'local' );
 				break;
 		}
 	}

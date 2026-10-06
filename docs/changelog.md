@@ -2,6 +2,15 @@
 
 ## [0.7.4] — 2026-10-06
 
+### Cambio: el asistente empieza por lo básico y deja la geolocalización para el final ([#33](https://github.com/fabiomb/wp-secure/issues/33))
+
+El paso 1 del asistente pedía la API key de ipinfo.io: lo primero que se veía era una dependencia externa opcional.
+
+1. **Básico**: CDN/proxy (para ver la IP real) y agregar tu IP actual a la whitelist. La IP se resuelve con el modo de proxy recién elegido, no con el anterior.
+2. **Protección**: login y XML-RPC.
+3. **Rate limiting**.
+4. **Geolocalización (opcional)**: Ninguna, ipinfo.io o MaxMind, con lo que se pierde sin proveedor y un resumen final. Si se elige una base local, al finalizar se abre la página de Geolocalización para descargarla; si faltan credenciales, se avisa.
+
 ### Nuevo: geolocalización opcional y MaxMind como segundo proveedor ([#32](https://github.com/fabiomb/wp-secure/issues/32))
 
 La geolocalización dependía sólo de ipinfo.io y el panel la mostraba como un requisito («API Key: No configurada» en rojo), aunque el plugin funcionaba igual sin ella.
