@@ -10,7 +10,7 @@ Todos los ajustes de WP Seguro se gestionan desde **WP Seguro → Configuración
 |--------|-------------|-------------------|
 | Modo Inseguro | Desde el dashboard. El firewall detecta y registra, pero no bloquea. Equivale a definir `WPS_DISABLE_BLOCKING` en `wp-config.php`. | Desactivado |
 | Email de notificaciones | Dirección para alertas de seguridad. | Email del administrador |
-| Buscar versiones nuevas en GitHub | En API y Datos. Consulta el último release y lo ofrece como actualización ([ver Instalación](installation.md#actualizaciones)). También se desactiva con `WPS_DISABLE_UPDATE_CHECK`. | Activado |
+| Buscar versiones nuevas en GitHub | En Actualizaciones. Consulta el último release y lo ofrece como actualización ([ver Instalación](installation.md#actualizaciones)). También se desactiva con `WPS_DISABLE_UPDATE_CHECK`. | Activado |
 
 ---
 
@@ -226,9 +226,17 @@ Los crawlers verificados se excluyen de las reglas del scanner. Los crawlers fal
 
 ## Geolocalización
 
+Opcional. Resuelve el país y el ASN de cada IP con **un solo proveedor a la vez**: ipinfo.io o MaxMind GeoLite2. Sin proveedor el plugin funciona completo; sólo se pierden el bloqueo por país/ASN, el país y el ASN en el tráfico, los eventos y las notificaciones, los «países de alto riesgo» del motor de riesgo, la condición de país de las reglas personalizadas y la verificación por ASN de crawlers sin rDNS confiable. El firewall, la protección de login, el rate limiting, los detectores y el resto no dependen de ella.
+
+El estado, la descarga de bases locales y una prueba de consulta están en **WP Seguro → Geolocalización**.
+
 | Opción | Descripción | Valor por defecto |
 |--------|-------------|-------------------|
-| Base de datos MMDB | Ruta al archivo MaxMind GeoLite2 o GeoIP2. | data/geolite2-country.mmdb |
+| Proveedor | Ninguno, ipinfo.io o MaxMind GeoLite2. Nunca se consulta al proveedor no elegido. | Ninguno (instalaciones nuevas); ipinfo.io si ya había un token o una base de ipinfo.io |
+| API Key ipinfo.io | Token de ipinfo.io. No se exporta. | (vacío) |
+| Modo ipinfo.io | API en línea o base local `country_asn.mmdb`. Cada modo cae en el otro si no responde. | API |
+| Account ID / License Key MaxMind | Credenciales de una cuenta GeoLite2 (gratuita). La License Key no se exporta. | (vacío) |
+| Modo MaxMind | Bases locales GeoLite2-Country + GeoLite2-ASN (`maxmind-country.mmdb`, `maxmind-asn.mmdb`) o servicio web GeoLite (1000 consultas por día, con cache de 24 horas). | Local |
 | Países bloqueados | Lista de códigos de país a bloquear. | (ninguno) |
 | ASNs bloqueados | Lista de números de sistema autónomo a bloquear. | (ninguno) |
 

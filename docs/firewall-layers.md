@@ -120,7 +120,7 @@ En segundo plano y en el panel:
 
 - Mantenimiento programado: purga de registros, monitor de integridad, PHP en uploads, resúmenes por mail.
 - Dashboard, tráfico en vivo, bloqueos, whitelist, eventos, configuración, reglas y exportación.
-- Gestión de la base de datos MMDB (geolocalización).
+- Geolocalización opcional (ipinfo.io o MaxMind GeoLite2) y descarga de sus bases MMDB.
 
 ### Nota sobre rendimiento
 

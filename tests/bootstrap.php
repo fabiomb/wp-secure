@@ -89,6 +89,12 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	if ( ! function_exists( 'home_url' ) ) {
 		function home_url( $path = '' ) { return 'https://example.com' . $path; }
 	}
+	if ( ! function_exists( 'admin_url' ) ) {
+		function admin_url( $path = '' ) { return 'https://example.com/wp-admin/' . ltrim( (string) $path, '/' ); }
+	}
+	if ( ! function_exists( 'wp_delete_file' ) ) {
+		function wp_delete_file( $file ) { @unlink( $file ); }
+	}
 	if ( ! function_exists( 'add_query_arg' ) ) {
 		function add_query_arg( $key, $value, $url ) {
 			return $url . ( false === strpos( $url, '?' ) ? '?' : '&' ) . rawurlencode( $key ) . '=' . rawurlencode( $value );
@@ -120,6 +126,8 @@ if ( file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	if ( ! function_exists( 'wp_remote_get' ) ) {
 		function wp_remote_get( $url, $args = array() ) {
 			$GLOBALS['wps_test_http_calls'] = ( $GLOBALS['wps_test_http_calls'] ?? 0 ) + 1;
+			$GLOBALS['wps_test_http_urls'][] = $url;
+			$GLOBALS['wps_test_http_args'][] = $args;
 			return $GLOBALS['wps_test_http_response'] ?? array( 'code' => 200, 'body' => '{}' );
 		}
 	}

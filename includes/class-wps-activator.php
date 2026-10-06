@@ -70,10 +70,21 @@ class WPS_Activator {
     public static function set_defaults(): void {
         $db = WPS_Db::get_instance();
 
+        // Proveedor de geolocalización: se decide antes de completar los
+        // valores por defecto, que lo dejarían en 'none'. Una instalación
+        // anterior con ipinfo.io configurado lo conserva.
+        if ( null === $db->get_setting( 'geo_provider' ) ) {
+            $db->set_setting( 'geo_provider', self::initial_geo_provider( $db ) );
+        }
+
         $defaults = array(
-            // API.
+            // Geolocalización (opcional).
+            'geo_provider'         => 'none', // 'none' | 'ipinfo' | 'maxmind'.
             'ipinfo_api_key'       => '',
             'ipinfo_mode'          => 'api', // 'api' | 'local'.
+            'maxmind_account_id'   => '',
+            'maxmind_license_key'  => '',
+            'maxmind_mode'         => 'local', // 'local' | 'api'.
             'update_check_enabled' => true,
 
             // Login.
@@ -177,6 +188,20 @@ class WPS_Activator {
                 $db->set_setting( $key, $value );
             }
         }
+    }
+
+    /**
+     * Proveedor de geolocalización para una instalación sin el ajuste.
+     *
+     * Instalación nueva: 'none'. Actualización desde una versión que sólo
+     * conocía ipinfo.io: 'ipinfo' si había token o base descargada (también
+     * en la ubicación anterior, que migrate_data_dir() mueve después).
+     */
+    public static function initial_geo_provider( WPS_Db $db ): string {
+        $has_mmdb = WPS_Ipdb_Manager::get_instance()->has_ipinfo_mmdb()
+            || is_file( WPS_PLUGIN_DIR . 'data/' . WPS_Ipdb_Updater::MMDB_FILENAME );
+
+        return WPS_Ipdb_Manager::legacy_provider( (string) $db->get_setting( 'ipinfo_api_key', '' ), $has_mmdb );
     }
 
     /**

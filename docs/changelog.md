@@ -2,6 +2,18 @@
 
 ## [0.7.4] — 2026-10-06
 
+### Nuevo: geolocalización opcional y MaxMind como segundo proveedor ([#32](https://github.com/fabiomb/wp-secure/issues/32))
+
+La geolocalización dependía sólo de ipinfo.io y el panel la mostraba como un requisito («API Key: No configurada» en rojo), aunque el plugin funcionaba igual sin ella.
+
+- **Proveedor de geolocalización**: Ninguno, ipinfo.io o MaxMind GeoLite2, uno por vez. Cada proveedor usa sus propios archivos y nunca se mezclan datos de uno con el otro; dentro de un proveedor se mantiene el respaldo entre API y base local.
+- **MaxMind GeoLite2**: base local (GeoLite2-Country + GeoLite2-ASN, descargadas con Account ID + License Key) o web service GeoLite. La credencial sólo se envía a MaxMind, no al CDN al que redirige la descarga; el `.tar.gz` se extrae sin depender de la extensión Phar. El web service guarda cada resultado 24 horas (la cuota gratuita es de 1.000 consultas por día) y deja de consultar unos minutos ante errores de cuenta o de cuota.
+- **Actualización automática de la base local** del proveedor activo con el mantenimiento diario: cada 7 días para MaxMind y cada 30 para ipinfo.io (antes ipinfo.io no se actualizaba sola).
+- **Sin proveedor, todo sigue funcionando**: el panel lo marca como «Desactivada (opcional)» y explica qué se pierde (bloqueo por país/ASN, esos datos en tráfico, eventos y notificaciones, y los países de alto riesgo del motor de riesgo). Firewall, login, rate limiting y detectores no cambian. Las pestañas País y ASN de Bloqueos avisan si no hay proveedor.
+- La página «Base de Datos IP» pasa a llamarse **Geolocalización**, con el estado de cada proveedor, la descarga y la prueba de una IP. En Configuración, «API y Datos» pasa a ser **Geolocalización** y el ajuste de búsqueda de versiones nuevas se mueve a **Actualizaciones**.
+- La License Key de MaxMind, como la API key de ipinfo.io, no se incluye al exportar la configuración.
+- Los sitios que ya usan ipinfo.io (con API key o base descargada) siguen con ipinfo.io sin tocar nada; las instalaciones nuevas arrancan sin proveedor.
+
 ### Corrección: el asistente quedaba en blanco después del paso 1 ([#31](https://github.com/fabiomb/wp-secure/issues/31))
 
 En varios sitios en producción, al completar el paso 1 del asistente el siguiente aparecía en blanco y no se podía seguir; en algunos se veía «Cannot modify header information - headers already sent».

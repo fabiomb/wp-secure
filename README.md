@@ -33,7 +33,7 @@
 - **Rate limiting** por IP, con escalada del bloqueo al rango cuando varias IPs del mismo /24 atacan.
 - **IP real detrás de CDN**: Cloudflare (IPv4 e IPv6), Sucuri y proxies propios, sin que la IP pueda falsificarse con un header.
 - **Crawlers verificados por rDNS**: Googlebot pasa, quien se hace pasar por Googlebot no.
-- **Tráfico en vivo y geolocalización** con una base MMDB local.
+- **Tráfico en vivo** y **geolocalización opcional** (ipinfo.io o MaxMind GeoLite2, por API o base MMDB local). Sin geolocalización el plugin funciona completo; sólo se pierden los datos de país/ASN.
 - **Reglas personalizadas**, whitelist, exportación y notificaciones.
 
 ## Cómo funciona

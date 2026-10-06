@@ -28,6 +28,8 @@ class WPS_Admin_Dashboard {
 		<div class="wrap wps-wrap">
 			<h1><?php esc_html_e( 'WP Seguro — Dashboard', 'wp-secure' ); ?></h1>
 
+			<?php WPS_Admin_Ipdb::render_wizard_notices(); ?>
+
 			<!-- Estado del sistema -->
 			<div class="wps-cards-row">
 				<?php $this->render_status_card(); ?>
@@ -349,26 +351,11 @@ class WPS_Admin_Dashboard {
 	private function render_status_card(): void {
 		$unsafe_mode = (bool) get_option( 'wps_unsafe_mode', false );
 		$tables_ok = WPS_Db_Schema::tables_exist();
-		$ipdb      = WPS_Ipdb_Manager::get_instance();
-		$has_mmdb  = $ipdb->is_local_available();
-		$mode      = $this->loader->get_setting( 'ipinfo_mode', 'api' );
-		$api_key   = $this->loader->get_setting( 'ipinfo_api_key', '' );
-		$has_api   = ! empty( $api_key );
 
-		// IPDB status.
-		if ( 'local' === $mode && $has_mmdb ) {
-			$ipdb_badge = 'ok';
-			$ipdb_label = __( 'MMDB local', 'wp-secure' );
-		} elseif ( 'api' === $mode && $has_api ) {
-			$ipdb_badge = 'ok';
-			$ipdb_label = __( 'API en línea', 'wp-secure' );
-		} elseif ( $has_api ) {
-			$ipdb_badge = 'pending';
-			$ipdb_label = __( 'API configurada', 'wp-secure' );
-		} else {
-			$ipdb_badge = 'pending';
-			$ipdb_label = __( 'No configurada', 'wp-secure' );
-		}
+		// Geolocalización: opcional, sin proveedor se muestra como informativa.
+		$geo_status = WPS_Admin_Ipdb::status();
+		$ipdb_badge = $geo_status['badge'];
+		$ipdb_label = $geo_status['label'];
 
 		// Layer 0/1 status.
 		$layer0_ok = $this->loader->get_setting( 'firewall_layer0_enabled', false ) && is_file( WPS_DATA_DIR . 'wps-blocked-ips.php' );
@@ -452,7 +439,7 @@ class WPS_Admin_Dashboard {
 					</td>
 				</tr>
 				<tr>
-					<td><?php esc_html_e( 'Base de Datos IP', 'wp-secure' ); ?></td>
+					<td><?php esc_html_e( 'Geolocalización', 'wp-secure' ); ?></td>
 					<td><span class="wps-badge wps-badge-<?php echo esc_attr( $ipdb_badge ); ?>"><?php echo esc_html( $ipdb_label ); ?></span></td>
 				</tr>
 				<?php if ( $blocked_countries > 0 || $blocked_asns > 0 ) : ?>

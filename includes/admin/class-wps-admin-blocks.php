@@ -220,6 +220,7 @@ class WPS_Admin_Blocks {
         $blocker           = WPS_Blocker::get_instance();
         $blocked_countries = $blocker->get_blocked_countries();
         $all_countries     = WPS_Geo::get_countries_list();
+        WPS_Admin_Ipdb::render_geo_required_notice();
         ?>
 
         <!-- Formulario para bloquear país -->
@@ -309,6 +310,7 @@ class WPS_Admin_Blocks {
 
         $prefill_asn      = isset( $_GET['prefill_asn'] ) ? absint( $_GET['prefill_asn'] ) : 0;
         $prefill_asn_name = isset( $_GET['prefill_asn_name'] ) ? sanitize_text_field( wp_unslash( $_GET['prefill_asn_name'] ) ) : '';
+        WPS_Admin_Ipdb::render_geo_required_notice();
         ?>
 
         <!-- Formulario para bloquear ASN -->

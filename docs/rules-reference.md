@@ -78,12 +78,12 @@ Limita el número de peticiones por IP en un período de tiempo.
 
 ### R08 — Bloqueo por País
 
-Bloquea tráfico de países específicos usando la base de datos de geolocalización.
+Bloquea tráfico de países específicos usando la geolocalización (ipinfo.io o MaxMind GeoLite2).
 
 | Aspecto | Detalle |
 |---------|---------|
 | Severidad | Media |
-| Detección | Lookup de IP → país vía MMDB. |
+| Detección | Lookup de IP → país con el proveedor de geolocalización (opcional). Sin proveedor la regla no se aplica. |
 | Acción | Bloqueo inmediato si el país está en la lista. |
 
 ### R09 — Bloqueo por ASN
@@ -93,7 +93,7 @@ Bloquea tráfico de redes (Autonomous System Numbers) específicas.
 | Aspecto | Detalle |
 |---------|---------|
 | Severidad | Media |
-| Detección | Lookup de IP → ASN vía MMDB. |
+| Detección | Lookup de IP → ASN con el proveedor de geolocalización (opcional). Sin proveedor la regla no se aplica. |
 | Acción | Bloqueo inmediato si el ASN está en la lista. |
 
 ### R10 — Bloqueo por CIDR

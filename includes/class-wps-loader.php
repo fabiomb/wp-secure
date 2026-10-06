@@ -52,6 +52,9 @@ class WPS_Loader {
         add_action( 'wps_daily_maintenance', array( 'WPS_Db_Maintenance', 'daily' ) );
         add_action( 'wps_hourly_maintenance', array( 'WPS_Db_Maintenance', 'hourly' ) );
 
+        // Actualizar la base de geolocalización local del proveedor activo.
+        add_action( 'wps_daily_maintenance', array( 'WPS_Ipdb_Updater', 'scheduled_update' ) );
+
         // Regenerar archivo de Capa 0 después de actualizar el plugin.
         add_action( 'upgrader_process_complete', array( 'WPS_Activator', 'on_upgrade_complete' ), 10, 2 );
 
@@ -322,8 +325,10 @@ class WPS_Loader {
         $country = null;
         $asn     = null;
         if ( class_exists( 'WPS_Geo' ) ) {
-            $has_mmdb = WPS_Ipdb_Manager::get_instance()->is_local_available();
-            if ( $has_mmdb && ! WPS_Ip_Utils::is_private_ip( $ip ) ) {
+            // Sólo con base local del proveedor activo: consultar una API por
+            // cada petición registrada gastaría su cuota.
+            $ipdb = WPS_Ipdb_Manager::get_instance();
+            if ( $ipdb->is_configured() && $ipdb->is_local_available() && ! WPS_Ip_Utils::is_private_ip( $ip ) ) {
                 $geo_data = WPS_Geo::get_instance()->lookup( $ip );
                 $country  = $geo_data['country'] ?? null;
                 $asn      = $geo_data['asn'] ?? null;
@@ -437,11 +442,8 @@ class WPS_Loader {
      * Verificar bloqueo por país o ASN usando geolocalización.
      */
     private function check_geo_block( string $ip, WPS_Request $request, WPS_Blocker $blocker, WPS_Logger $logger ): void {
-        // Solo verificar si hay configuración de geo disponible.
-        $api_key  = $this->get_setting( 'ipinfo_api_key', '' );
-        $has_mmdb = WPS_Ipdb_Manager::get_instance()->is_local_available();
-
-        if ( empty( $api_key ) && ! $has_mmdb ) {
+        // Sin geolocalización configurada no hay país ni ASN que comparar.
+        if ( ! WPS_Ipdb_Manager::get_instance()->is_configured() ) {
             return;
         }
 
@@ -537,10 +539,7 @@ class WPS_Loader {
      * Resolver el país de una IP, si hay geolocalización disponible.
      */
     private function resolve_country( string $ip ): ?string {
-        $api_key  = $this->get_setting( 'ipinfo_api_key', '' );
-        $has_mmdb = WPS_Ipdb_Manager::get_instance()->is_local_available();
-
-        if ( empty( $api_key ) && ! $has_mmdb ) {
+        if ( ! WPS_Ipdb_Manager::get_instance()->is_configured() ) {
             return null;
         }
 

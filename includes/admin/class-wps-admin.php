@@ -300,11 +300,11 @@ class WPS_Admin {
             array( $this, 'render_patterns' )
         );
 
-        // Base de Datos IP.
+        // Geolocalización (opcional).
         $this->page_hooks[] = add_submenu_page(
             $this->menu_slug,
-            __( 'Base de Datos IP', 'wp-secure' ),
-            __( 'Base de Datos IP', 'wp-secure' ),
+            __( 'Geolocalización', 'wp-secure' ),
+            __( 'Geolocalización', 'wp-secure' ),
             $this->capability,
             $this->menu_slug . '-ipdb',
             array( $this, 'render_ipdb' )
@@ -653,7 +653,7 @@ class WPS_Admin {
     }
 
     /**
-     * Base de Datos IP.
+     * Geolocalización.
      */
     public function render_ipdb(): void {
         if ( ! current_user_can( $this->capability ) ) {

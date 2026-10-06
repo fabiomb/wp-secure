@@ -324,11 +324,23 @@ class WPS_Admin_Settings {
      */
     private function define_sections(): array {
         return array(
+            // La clave 'api' se conserva: otras páginas enlazan a #wps-section-api.
             'api' => array(
-                'title'       => __( 'API y Datos', 'wp-secure' ),
-                'icon'        => 'dashicons-cloud',
-                'description' => __( 'Configuración de la API de ipinfo.io para geolocalización de IPs.', 'wp-secure' ),
+                'title'       => __( 'Geolocalización', 'wp-secure' ),
+                'icon'        => 'dashicons-location-alt',
+                'description' => __( 'Opcional. Resuelve el país y el ASN de cada IP con un proveedor a la vez. Sin proveedor el plugin funciona igual; sólo se pierden el bloqueo por país/ASN, el país/ASN en tráfico, eventos y notificaciones, y los "países de alto riesgo" del motor de riesgo. La descarga de bases locales se hace desde la página Geolocalización.', 'wp-secure' ),
                 'fields'      => array(
+                    array(
+                        'key'         => 'geo_provider',
+                        'label'       => __( 'Proveedor', 'wp-secure' ),
+                        'type'        => 'select',
+                        // Mientras la migración no guardó el ajuste, el proveedor
+                        // se deduce de la configuración anterior de ipinfo.io:
+                        // mostrar 'none' y guardarlo apagaría la geolocalización.
+                        'default'     => WPS_Ipdb_Manager::get_instance()->get_provider(),
+                        'options'     => WPS_Ipdb_Manager::providers(),
+                        'description' => __( 'Se usa sólo el proveedor elegido; nunca se consulta al otro.', 'wp-secure' ),
+                    ),
                     array(
                         'key'         => 'ipinfo_api_key',
                         'label'       => __( 'API Key ipinfo.io', 'wp-secure' ),
@@ -338,7 +350,7 @@ class WPS_Admin_Settings {
                     ),
                     array(
                         'key'     => 'ipinfo_mode',
-                        'label'   => __( 'Modo de datos', 'wp-secure' ),
+                        'label'   => __( 'Modo ipinfo.io', 'wp-secure' ),
                         'type'    => 'select',
                         'default' => 'api',
                         'options' => array(
@@ -347,6 +359,39 @@ class WPS_Admin_Settings {
                         ),
                         'description' => __( 'El modo local es más rápido pero requiere descargar la base de datos.', 'wp-secure' ),
                     ),
+                    array(
+                        'key'         => 'maxmind_account_id',
+                        'label'       => __( 'Account ID MaxMind', 'wp-secure' ),
+                        'type'        => 'text',
+                        'default'     => '',
+                        'description' => __( 'Número de cuenta de MaxMind. La cuenta GeoLite2 es gratuita: maxmind.com/en/geolite2/signup', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'         => 'maxmind_license_key',
+                        'label'       => __( 'License Key MaxMind', 'wp-secure' ),
+                        'type'        => 'password',
+                        'default'     => '',
+                        'description' => __( 'Se genera en tu cuenta de MaxMind → Manage License Keys.', 'wp-secure' ),
+                    ),
+                    array(
+                        'key'     => 'maxmind_mode',
+                        'label'   => __( 'Modo MaxMind', 'wp-secure' ),
+                        'type'    => 'select',
+                        'default' => 'local',
+                        'options' => array(
+                            'local' => __( 'Bases locales GeoLite2 Country + ASN (recomendado)', 'wp-secure' ),
+                            'api'   => __( 'Servicio web GeoLite (1000 consultas por día)', 'wp-secure' ),
+                        ),
+                        'description' => __( 'El modo local no tiene límite de consultas y se actualiza solo una vez por semana.', 'wp-secure' ),
+                    ),
+                ),
+            ),
+
+            'updates' => array(
+                'title'       => __( 'Actualizaciones', 'wp-secure' ),
+                'icon'        => 'dashicons-update',
+                'description' => '',
+                'fields'      => array(
                     array(
                         'key'            => 'update_check_enabled',
                         'label'          => __( 'Actualizaciones', 'wp-secure' ),
@@ -746,7 +791,7 @@ class WPS_Admin_Settings {
                         'label'       => __( 'Países de alto riesgo', 'wp-secure' ),
                         'type'        => 'text',
                         'default'     => '',
-                        'description' => __( 'Códigos de país separados por coma (ej: CN,RU,KP). Aumenta la puntuación de riesgo para IPs de estos países. Requiere el motor de riesgo encendido.', 'wp-secure' ),
+                        'description' => __( 'Códigos de país separados por coma (ej: CN,RU,KP). Aumenta la puntuación de riesgo para IPs de estos países. Requiere el motor de riesgo encendido y un proveedor de geolocalización.', 'wp-secure' ),
                     ),
                     array(
                         'key'            => 'crawler_rdns_enabled',

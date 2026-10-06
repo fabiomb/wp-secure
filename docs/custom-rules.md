@@ -31,7 +31,7 @@ Cada condición evalúa un campo de la petición HTTP:
 | Query String | Los parámetros de la URL (después del `?`). | `action=edit&id=5` |
 | Referer | La página de origen de la petición. | `https://ejemplo.com/pagina` |
 | Host | El dominio solicitado. | `ejemplo.com` |
-| País (código ISO) | El código de país de dos letras de la IP (requiere base de datos de geolocalización). | `US`, `CN`, `RU` |
+| País (código ISO) | El código de país de dos letras de la IP (requiere un proveedor de geolocalización; sin él, el país queda vacío). | `US`, `CN`, `RU` |
 | Tipo de visitante | La clasificación automática del visitante. | `login`, `restapi`, `page`, `static` |
 
 ---
