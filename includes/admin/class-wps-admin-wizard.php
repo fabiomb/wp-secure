@@ -17,29 +17,56 @@ class WPS_Admin_Wizard {
 		$this->loader = $loader;
 	}
 
+	/** Cantidad de pasos del wizard. */
+	const TOTAL_STEPS = 4;
+
+	/**
+	 * Guardar el paso enviado y avanzar al siguiente.
+	 *
+	 * Corre en admin_init, antes de que WordPress imprima el encabezado del
+	 * admin: dentro del callback de la página la redirección ya no puede
+	 * enviar cabeceras y el paso siguiente queda en blanco.
+	 */
+	public function handle_submit(): void {
+		if ( 'wp-secure-wizard' !== ( $_GET['page'] ?? '' )
+			|| 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' )
+			|| ! isset( $_POST['wps_wizard_nonce'] ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wps_wizard_nonce'] ) ), 'wps_wizard' )
+			|| ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$current_step = $this->current_step();
+		$this->save_step( $current_step );
+
+		$next_step = $current_step + 1;
+		if ( $next_step > self::TOTAL_STEPS ) {
+			$this->loader->set_setting( 'wizard_completed', true );
+			wp_safe_redirect( admin_url( 'admin.php?page=wp-secure&wizard=done' ) );
+			exit;
+		}
+
+		wp_safe_redirect( admin_url( 'admin.php?page=wp-secure-wizard&step=' . $next_step ) );
+		exit;
+	}
+
+	/**
+	 * Paso pedido en la URL, acotado a los pasos existentes.
+	 */
+	private function current_step(): int {
+		$step = isset( $_GET['step'] ) ? absint( $_GET['step'] ) : 1;
+		return max( 1, min( self::TOTAL_STEPS, $step ) );
+	}
+
 	/**
 	 * Renderizar el wizard.
 	 */
 	public function render(): void {
-		$current_step = isset( $_GET['step'] ) ? absint( $_GET['step'] ) : 1;
-		$total_steps  = 4;
-
-		// Procesar POST si corresponde.
-		if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['wps_wizard_nonce'] ) ) {
-			if ( wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wps_wizard_nonce'] ) ), 'wps_wizard' )
-				&& current_user_can( 'manage_options' ) ) {
-				$this->save_step( $current_step );
-				$next_step = $current_step + 1;
-				if ( $next_step > $total_steps ) {
-					// Wizard completado.
-					$this->loader->set_setting( 'wizard_completed', true );
-					wp_safe_redirect( admin_url( 'admin.php?page=wp-secure&wizard=done' ) );
-					exit;
-				}
-				wp_safe_redirect( admin_url( 'admin.php?page=wp-secure-wizard&step=' . $next_step ) );
-				exit;
-			}
-		}
+		$current_step = $this->current_step();
+		$total_steps  = self::TOTAL_STEPS;
 
 		?>
 		<div class="wrap wps-wrap">

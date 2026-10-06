@@ -1,5 +1,15 @@
 # Registro de Cambios
 
+## [0.7.4] — 2026-10-06
+
+### Corrección: el asistente quedaba en blanco después del paso 1 ([#31](https://github.com/fabiomb/wp-secure/issues/31))
+
+En varios sitios en producción, al completar el paso 1 del asistente el siguiente aparecía en blanco y no se podía seguir; en algunos se veía «Cannot modify header information - headers already sent».
+
+- El asistente guardaba cada paso dentro de la página, cuando WordPress ya había impreso el encabezado del panel: la redirección al paso siguiente no podía enviarse y la página quedaba cortada. El paso 1 se guardaba igual.
+- Dependía de `output_buffering` en el php.ini del hosting, por eso en algunos sitios funcionaba.
+- Ahora cada paso se guarda y redirige en `admin_init`, antes de imprimir nada.
+
 ## [0.7.3] — 2026-10-02
 
 ### Corrección: una versión nueva tardaba horas en aparecer ([#30](https://github.com/fabiomb/wp-secure/issues/30))

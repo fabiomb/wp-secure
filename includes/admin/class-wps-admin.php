@@ -40,6 +40,10 @@ class WPS_Admin {
         // nada para que la redirección posterior funcione.
         add_action( 'admin_init', array( new WPS_Admin_Events( $this->loader ), 'handle_block_from_events' ) );
 
+        // El wizard guarda cada paso y redirige al siguiente: también tiene
+        // que resolverse antes de imprimir el encabezado del admin.
+        add_action( 'admin_init', array( new WPS_Admin_Wizard( $this->loader ), 'handle_submit' ) );
+
         // Aviso global cuando el Modo Inseguro está activo.
         add_action( 'admin_notices', array( $this, 'maybe_show_unsafe_mode_notice' ) );
 
