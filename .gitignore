@@ -6,3 +6,4 @@ composer.lock
 vendor/*
 .phpunit.result.cache
 .atl/
+wp-secure-*.zip*
